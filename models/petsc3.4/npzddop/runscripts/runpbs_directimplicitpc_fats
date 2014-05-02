@@ -1,0 +1,10 @@
+#PBS -o petsc.stdout
+#PBS -e petsc.stderr
+#PBS -l nodes=12:athlon:ppn=2
+#PBS -M spk@ldeo.columbia.edu
+#PBS -m abe
+#PBS -q production@fats.ldeo.columbia.edu
+#PBS -N BCimp
+cd $PBS_O_WORKDIR
+
+/usr/local/mpich-myrinet/bin/mpirun -np 24 ./directimplicitpc -i v.petsc -o w.petsc -signalfiles newpcsignalin,newpcsignalout -signalwaittime 15 -ksp_rtol 1.e-12 -ksp_monitor -use_mumps -nmax 1000 > logpc

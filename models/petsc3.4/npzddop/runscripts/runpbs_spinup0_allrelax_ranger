@@ -1,0 +1,16 @@
+#!/bin/bash               
+#$ -V                     # Inherit the submission environment
+#$ -cwd                   # Start job in  submission directory
+#$ -N BCSpin              # Job Name
+#$ -j y                   # combine stderr & stdout into stdout    
+#$ -o $JOB_NAME.o$JOB_ID  # Name of the output file (eg. myMPI.oJobID)
+#$ -pe 16way 32           # Requests 16 cores/node, 32 cores total
+#$ -q normal              # Queue name
+#$ -l h_rt=24:00:00       # Run time (hh:mm:ss) - 24 hours
+## -M spk@ldeo.columbia.edu      # Email notification address (UNCOMMENT)
+## -m be                  # Email at Begin/End of job  (UNCOMMENT)
+set -x                   #{echo cmds, use "set echo" in csh}
+
+#export MY_NSLOTS=60
+
+ibrun ./tracercalckielbiondopspinup -numtracers 5 -i po4start.petsc,dopstart.petsc,oxyini.petsc,phystart.petsc,dumini.petsc -me Ae -mi Ai -t0 0.0 -iter0 0 -dt 0.0003472222222222 -ntmax 28800000 -itout 2880 -o po4end.petsc,dopend.petsc,oxyend.petsc,phyend.petsc,dumend.petsc -external_forcing -use_profiles -num_profiles 4448 -nzmax 15 -biogeochem_deltat 10800.0 -periodic_matrix -matrix_cycle_period 1.0 -matrix_cycle_step 0.0833333333333333 -periodic_biogeochem_forcing -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_cycle_step 0.08333333333333 -num_biogeochem_steps_per_ocean_step 8 -signalfiles newicsignalin,newicsignalout -signalwaittime 15 -relax_tracer -relax_tau 1.5768e11,1.5768e11,1.5768e11,1.5768e11,1.5768e11 -relax_value 2.17,1.e-4,300.,1.e-4,0.0 > log

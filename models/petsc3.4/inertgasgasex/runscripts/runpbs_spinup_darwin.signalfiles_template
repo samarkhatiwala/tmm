@@ -1,0 +1,20 @@
+#PBS -o BCSpin.stdout
+#PBS -e BCSpin.stderr
+#PBS -l nodes=2:ppn=16
+#PBS -M spk@ldeo.columbia.edu
+#PBS -q batch@darwin.ldeo.columbia.edu
+#PBS -N BCSpin
+cd $PBS_O_WORKDIR
+
+mpiexec -np 32 ./tmminertgasspinup -numtracers 1 \
+  -i trstart.petsc \
+  -me Ae -mi Ai -t0 0.0 -iter0 0 -deltat_clock 0.0013888888888889 -max_steps 720000 -write_steps 720 \
+  -o trend.petsc \
+  -external_forcing -use_profiles -biogeochem_deltat 43200.0 \
+  -dzsurf 10 \
+  -inert_gas_id GASID -flux_scaling FINJ,FEX,FGAS \
+  -periodic_matrix -matrix_cycle_period 1.0 -matrix_cycle_step 0.0833333333333333 \
+  -periodic_biogeochem_forcing -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_cycle_step 0.08333333333333 \
+  -use_separate_winds -periodic_winds_cycle_period 1.0 -periodic_winds_cycle_step 0.0006849315068493151 \
+  -signalfiles newicsignalin,newicsignalout -signalwaittime 15 > log
+  

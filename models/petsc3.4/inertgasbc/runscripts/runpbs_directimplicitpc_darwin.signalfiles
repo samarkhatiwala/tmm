@@ -1,0 +1,9 @@
+#PBS -o BCimp.stdout
+#PBS -e BCimp.stderr
+#PBS -l nodes=4:ppn=16
+#PBS -M spk@ldeo.columbia.edu
+#PBS -q batch@darwin.ldeo.columbia.edu
+#PBS -N BCimp
+cd $PBS_O_WORKDIR
+
+mpiexec -np 64 ./directimplicitpc -i v.petsc -o w.petsc -signalfiles newpcsignalin,newpcsignalout -signalwaittime 15 -ksp_rtol 1.e-12 -ksp_monitor -use_mumps -nmax 1000 > logpc

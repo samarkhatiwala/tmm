@@ -1,0 +1,21 @@
+#PBS -o BCSpin.stdout
+#PBS -e BCSpin.stderr
+#PBS -l nodes=5:ppn=8
+#PBS -M dwang@ldeo.columbia.edu
+#PBS -q production@monk.ldeo.columbia.edu
+#PBS -N BCSpin
+cd $PBS_O_WORKDIR
+
+mpiexec -np 40 ./tmmocmipabiolandatmspinup -numtracers 2 \
+  -i dic_preindustrial_steady_ocmip.petsc,dic14start.petsc -me Ae -mi Ai \
+  -t0 0.0 -iter0 0 -deltat_clock 0.0013888888888889 \
+  -o dicend.petsc,dic14end.petsc -external_forcing -use_profiles \
+  -biogeochem_deltat 43200.0 -dzsurf 10.0 \
+  -periodic_matrix -matrix_cycle_period 1.0 -matrix_cycle_step 0.0833333333333333 \
+  -periodic_biogeochem_forcing -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_cycle_step 0.0833333333333333 \
+  -use_emp \
+  -pco2_atm 277.62 \
+  -max_steps 72000000 -write_steps 720 \
+  -signalfiles newicsignalin,newicsignalout -signalwaittime 15 > log
+ 
+    

@@ -1,0 +1,16 @@
+#PBS -o job.stdout
+#PBS -e job.stderr
+#PBS -l select=8:f_ocean=true:ncpus=8:mpiprocs=8
+#PBS -M spk@ldeo.columbia.edu
+#PBS -q f_ocean
+#PBS -N Spin
+#PBS -l walltime=24:00:00
+
+cd $PBS_O_WORKDIR
+
+. /usr/local/Modules/3.2.6/init/bash
+module load openmpi-gnu
+
+cat $PBS_NODEFILE > nodes2
+
+mpirun -np 64 -machinefile $PBS_NODEFILE ./tracercalckielbiondop -numtracers 5 -i po4ini.petsc,dopini.petsc,oxyini.petsc,phyini.petsc,dumini.petsc -me Ae -mi Ai -t0 0.0 -iter0 0 -dt 0.0003472222222222 -ntmax 2880000 -itout 144000 -o po4.petsc,dop.petsc,oxy.petsc,phy.petsc,dum.petsc -external_forcing -use_profiles -num_profiles 4448 -nzmax 15 -biogeochem_deltat 10800.0 -periodic_matrix -matrix_cycle_period 1.0 -matrix_cycle_step 0.0833333333333333 -periodic_biogeochem_forcing -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_cycle_step 0.08333333333333 -num_biogeochem_steps_per_ocean_step 8  > log_spinup

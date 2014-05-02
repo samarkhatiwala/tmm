@@ -1,0 +1,9 @@
+*.petsc
+*.petsc.info
+*.[oa]
+* ̃
+*.bin
+.DS_Store
+test*/
+build/
+attic/

@@ -1,0 +1,10 @@
+mpiexec -np 1 ./tracercalckielbiondopspinup -numtracers 6 \
+  -i po4start.petsc,dopstart.petsc,oxyini.petsc,phystart.petsc,zoostart.petsc,detstart.petsc \
+  -me Ae -mi Ai -t0 0.0 -iter0 0 -dt 0.0003472222222222 -ntmax 28800000 -itout 2880 \
+  -o po4end.petsc,dopend.petsc,oxyend.petsc,phyend.petsc,zooend.petsc,detend.petsc \
+  -external_forcing -use_profiles -num_profiles 5 -nzmax 15 -biogeochem_deltat 10800.0 \
+  -periodic_matrix -matrix_cycle_period 1.0 -matrix_cycle_step 0.0833333333333333 \
+  -periodic_biogeochem_forcing -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_cycle_step 0.08333333333333 \
+  -num_biogeochem_steps_per_ocean_step 8 -signalscript ./waitfornewic \
+  -relax_tracer -relax_tau 1.5768e11,1.5768e11,1.5768e11,1.5768e11,1.5768e11,1.5768e11 \
+  -relax_value 2.17,1.e-4,300.,1.e-4,1.e-4,1.e-4

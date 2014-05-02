@@ -1,0 +1,16 @@
+#PBS -o job.stdout
+#PBS -e job.stderr
+#PBS -l select=5:f_ocean=true:ncpus=8:mpiprocs=8
+#PBS -M spk@ldeo.columbia.edu
+#PBS -q f_ocean
+#PBS -N BCimp
+#PBS -l walltime=24:00:00
+
+cd $PBS_O_WORKDIR
+
+. /usr/local/Modules/3.2.6/init/bash
+module load openmpi-gnu
+
+cat $PBS_NODEFILE > nodes
+
+mpirun -np 40 -machinefile $PBS_NODEFILE ./directimplicitpc -i v.petsc -o w.petsc -signalscript ./waitfornewvforpc -ksp_rtol 1.e-12 -ksp_monitor -use_mumps -nmax 1000 > logpc

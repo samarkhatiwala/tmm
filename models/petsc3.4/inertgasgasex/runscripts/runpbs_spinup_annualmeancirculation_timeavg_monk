@@ -1,0 +1,19 @@
+#PBS -o BCSpin.stdout
+#PBS -e BCSpin.stderr
+#PBS -l nodes=2:ppn=8
+#PBS -M dwang@ldeo.columbia.edu
+#PBS -q production@monk.ldeo.columbia.edu
+#PBS -N BCSpin
+cd $PBS_O_WORKDIR
+
+mpiexec -np 16 ./tracercalcinertgas -numtracers 1 \
+  -i trsteady.petsc \
+  -me Ae.petsc -mi Ai.petsc -t0 0.0 -iter0 0 -dt 0.0013888888888889 \
+  -ntmax 720 -itout 72000 \
+  -o trout.petsc \
+  -external_forcing -use_profiles -num_profiles 4448 -biogeochem_deltat 43200.0 \
+  -dzsurf 50 -inert_gas_id 1 \
+  -periodic_biogeochem_forcing -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_cycle_step 0.08333333333333 \
+  -pickup_out pickup_timeavg.petsc -time_file output_time_timeavg.txt \
+  -time_avg -avg_start_time_step 1 -avg_time_steps 60 -avg_files trmm.petsc \
+  -calc_diagnostics -diag_start_time_step 1 -diag_time_steps 60 > log_timeavg

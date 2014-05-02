@@ -1,0 +1,10 @@
+mpiexec -np 4 ./tmmocmipabiolandatmjacobian -numtracers 2 \
+  -i diciniforc14.petsc,dic14startjac.petsc -me Ae.petsc -mi Ai.petsc \
+  -t0 0.0 -iter0 0 -deltat_clock 0.0013888888888889 \
+  -o dicq.petsc,dic14q.petsc -external_forcing -use_profiles \
+  -biogeochem_deltat 43200.0 -dzsurf 10.0 \
+  -use_emp \
+  -pco2_atm 277.62 \
+  -max_steps 7200000 -write_steps 2 \
+  -signalscript ./waitfornewicforjacobian 
+  
