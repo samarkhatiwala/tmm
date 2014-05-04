@@ -72,7 +72,7 @@ Vec Ts,Ss,Fe;
 PetscInt *gIndices;
 PetscScalar *localTs,*localSs,*localFe;
 PetscScalar **localTR, **localJTR;
-PetscTruth useEmP = PETSC_FALSE;
+PetscBool useEmP = PETSC_FALSE;
 PetscScalar *localEmP, EmPglobavg;
 PeriodicArray localEmPp;
 Vec surfVolFrac;
@@ -84,7 +84,7 @@ PetscScalar *localsgbathy;
 
 PetscScalar daysPerYear, secondsPerYear;
 
-PetscTruth useSeparateBiogeochemTimeStepping = PETSC_FALSE;
+PetscBool useSeparateBiogeochemTimeStepping = PETSC_FALSE;
 PetscInt nzmax;
 PetscScalar DeltaT;
 PetscScalar *drF, *zt;
@@ -97,16 +97,16 @@ PeriodicArray localswradp;
 
 PetscInt numBiogeochemPeriods;
 PetscScalar *tdpBiogeochem; /* arrays for periodic forcing */
-PetscTruth periodicBiogeochemForcing = PETSC_FALSE;
+PetscBool periodicBiogeochemForcing = PETSC_FALSE;
 PetscScalar biogeochemCyclePeriod, biogeochemCycleStep;
 
 /* atmospheric model variables */
 PetscScalar *TpCO2atm_hist, *pCO2atm_hist;
 PetscInt numpCO2atm_hist = 0;
-PetscTruth fixedAtmosCO2 = PETSC_TRUE;
+PetscBool fixedAtmosCO2 = PETSC_TRUE;
 char pCO2atmIniFile[PETSC_MAX_PATH_LEN];  
 
-PetscTruth useAtmModel = PETSC_FALSE;
+PetscBool useAtmModel = PETSC_FALSE;
 PetscScalar pCO2atm_ini = 277.0; /* default initial value */
 PetscScalar pCO2atm = 277.0; /* default initial value */
 PetscScalar *localdA;
@@ -119,15 +119,15 @@ PetscScalar Foceanint = 0.0;
 PetscInt atmModelUpdateTimeSteps=1;
 
 PetscInt atmWriteSteps;
-PetscTruth atmAppendOutput;
+PetscBool atmAppendOutput;
 FILE *atmfptime;
 PetscViewer atmfd;
 PetscInt atmfp;
 char atmOutTimeFile[PETSC_MAX_PATH_LEN];  
 
-PetscTruth calcDiagnostics = PETSC_FALSE;
+PetscBool calcDiagnostics = PETSC_FALSE;
 PetscInt diagNumTimeSteps, diagStartTimeStep, diagCount;
-PetscTruth appendDiagnostics = PETSC_FALSE;
+PetscBool appendDiagnostics = PETSC_FALSE;
 /* Add model specific diagnostic variables below */
 
 #ifdef CARBON
@@ -137,11 +137,11 @@ PetscScalar *localco2airseafluxdiag, *localco2airseafluxdiagavg;
 PetscMPIInt myId;
 PetscInt debugFlag = 0;
 
-PetscTruth TRUE = PETSC_TRUE, FALSE = PETSC_FALSE;
+PetscBool TRUE = PETSC_TRUE, FALSE = PETSC_FALSE;
 
 #if defined (FORSPINUP) || defined (FORJACOBIAN)
 PetscScalar relaxTau[50], relaxLambda[50], relaxValue[50];
-PetscTruth relaxTracer = PETSC_FALSE;
+PetscBool relaxTracer = PETSC_FALSE;
 #endif
 
 /* -----------------------------------------------------------------------------------------------------------*/
@@ -159,7 +159,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   PetscInt itr;
   PetscViewer fd;
   PetscInt fp;
-  PetscTruth flg;
+  PetscBool flg;
   PetscInt it, m;
   PetscScalar myTime;
   PetscScalar zero = 0.0;
@@ -174,16 +174,16 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
     maxValsToRead = numTracers;
     ierr = PetscOptionsGetRealArray(PETSC_NULL,"-relax_tau",relaxTau,&maxValsToRead,&flg);
-    if (!flg) SETERRQ(1,"Must indicate tracer relaxation tau with the -relax_tau option");
+    if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate tracer relaxation tau with the -relax_tau option");
     if (maxValsToRead != numTracers) {
-      SETERRQ(1,"Insufficient number of relaxation tau values specified");
+      SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of relaxation tau values specified");
     }
 
     maxValsToRead = numTracers;
     ierr = PetscOptionsGetRealArray(PETSC_NULL,"-relax_value",relaxValue,&maxValsToRead,&flg);
-    if (!flg) SETERRQ(1,"Must indicate relaxation values with the -relax_value option");
+    if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate relaxation values with the -relax_value option");
     if (maxValsToRead != numTracers) {
-      SETERRQ(1,"Insufficient number of relaxation values specified");
+      SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of relaxation values specified");
     }
     
     for (itr=0; itr<numTracers; itr++) {
@@ -295,7 +295,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 # endif
   
   if (m != numTracers) {
-    SETERRQ(1,"Error: numTracers does not match expected number of tracers!");    
+    SETERRQ(PETSC_COMM_WORLD,1,"Error: numTracers does not match expected number of tracers!");    
   }
   
   for (itr=0; itr<numTracers; itr++) {
@@ -305,10 +305,10 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = VecGetArrays(v,numTracers,&localTR);CHKERRQ(ierr);
   ierr = VecGetArrays(ut,numTracers,&localJTR);CHKERRQ(ierr);
 
-  ierr = PetscOptionsGetTruth(PETSC_NULL,"-separate_biogeochem_time_stepping",&useSeparateBiogeochemTimeStepping,0);CHKERRQ(ierr);
+  ierr = PetscOptionsGetBool(PETSC_NULL,"-separate_biogeochem_time_stepping",&useSeparateBiogeochemTimeStepping,0);CHKERRQ(ierr);
 #if defined (FORSPINUP) || defined (FORJACOBIAN)
   if (useSeparateBiogeochemTimeStepping) {
-    SETERRQ(1,"Cannot use the -separate_biogeochem_time_stepping option with SPINUP or JACOBIAN ");  
+    SETERRQ(PETSC_COMM_WORLD,1,"Cannot use the -separate_biogeochem_time_stepping option with SPINUP or JACOBIAN ");  
   
   }
 #endif
@@ -317,11 +317,11 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   }  
   
   ierr = PetscOptionsGetInt(PETSC_NULL,"-nzmax",&nzmax,&flg);CHKERRQ(ierr);
-  if (!flg) SETERRQ(1,"Must indicate maximum number of z points with the -nzmax option");  
+  if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate maximum number of z points with the -nzmax option");  
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of vertical layers is %d \n",nzmax);CHKERRQ(ierr);
 
   ierr = PetscOptionsGetReal(PETSC_NULL,"-biogeochem_deltat",&DeltaT,&flg);CHKERRQ(ierr);
-  if (!flg) SETERRQ(1,"Must indicate biogeochemical time step in seconds with the -biogeochem_deltat option");  
+  if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate biogeochemical time step in seconds with the -biogeochem_deltat option");  
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Ocean time step for BGC length is  %12.7f seconds\n",DeltaT);CHKERRQ(ierr);
 
   ierr = PetscOptionsHasName(PETSC_NULL,"-periodic_biogeochem_forcing",&periodicBiogeochemForcing);CHKERRQ(ierr);
@@ -332,9 +332,9 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 /*  read time data */
 /*  IMPORTANT: time units must be the same as that used by the toplevel driver */
     ierr = PetscOptionsGetReal(PETSC_NULL,"-periodic_biogeochem_cycle_period",&biogeochemCyclePeriod,&flg);CHKERRQ(ierr);
-    if (!flg) SETERRQ(1,"Must indicate biogeochemical forcing cycling time with the -periodic_biogeochem_cycle_period option");
+    if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate biogeochemical forcing cycling time with the -periodic_biogeochem_cycle_period option");
     ierr = PetscOptionsGetReal(PETSC_NULL,"-periodic_biogeochem_cycle_step",&biogeochemCycleStep,&flg);CHKERRQ(ierr);
-    if (!flg) SETERRQ(1,"Must indicate biogeochemical forcing cycling step with the -periodic_biogeochem_cycle_step option");
+    if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate biogeochemical forcing cycling step with the -periodic_biogeochem_cycle_step option");
     numBiogeochemPeriods=biogeochemCyclePeriod/biogeochemCycleStep;
 /*  array for holding extended time array */
     PetscMalloc((numBiogeochemPeriods+2)*sizeof(PetscScalar), &tdpBiogeochem); 
@@ -353,11 +353,11 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     Ssp.firstTime = PETSC_TRUE;
   } else {
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Ts.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-	ierr = VecLoadIntoVector(fd,Ts);CHKERRQ(ierr);  
-	ierr = PetscViewerDestroy(fd);CHKERRQ(ierr);    
+	ierr = VecLoad(Ts,fd);CHKERRQ(ierr);  
+	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Ss.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-	ierr = VecLoadIntoVector(fd,Ss);CHKERRQ(ierr);    
-	ierr = PetscViewerDestroy(fd);CHKERRQ(ierr);    
+	ierr = VecLoad(Ss,fd);CHKERRQ(ierr);    
+	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
   }  
   ierr = VecGetArray(Ts,&localTs);CHKERRQ(ierr);
   ierr = VecGetArray(Ss,&localSs);CHKERRQ(ierr);
@@ -390,16 +390,13 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
 	ierr = VecDuplicate(TR1,&surfVolFrac);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"surface_volume_fraction.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-	ierr = VecLoadIntoVector(fd,surfVolFrac);CHKERRQ(ierr);  
-	ierr = PetscViewerDestroy(fd);CHKERRQ(ierr);      
+	ierr = VecLoad(surfVolFrac,fd);CHKERRQ(ierr);  
+	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);      
 
 	ierr = PetscMalloc(numTracers*sizeof(PetscScalar),&TRglobavg);CHKERRQ(ierr);	
   }
 
 /* Grid arrays */
-//  ierr = PetscMalloc(lSize*sizeof(PetscScalar),&localdz);CHKERRQ(ierr);    
-//  ierr = VecLoadVecIntoArray(TR1,"dz.petsc",localdz);CHKERRQ(ierr);
-
   ierr = PetscMalloc(lSize*sizeof(PetscScalar),&localsgbathy);CHKERRQ(ierr);    
   ierr = VecLoadVecIntoArray(TR1,"sgbathy.petsc",localsgbathy);CHKERRQ(ierr);
 
@@ -407,13 +404,13 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
   ierr = PetscMalloc(nzmax*sizeof(PetscScalar),&zt);CHKERRQ(ierr); 
   ierr = PetscBinaryRead(fp,zt,nzmax,PETSC_SCALAR);CHKERRQ(ierr);  
-  ierr = PetscViewerDestroy(fd);CHKERRQ(ierr);
+  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"drF.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
   ierr = PetscMalloc(nzmax*sizeof(PetscScalar),&drF);CHKERRQ(ierr); 
   ierr = PetscBinaryRead(fp,drF,nzmax,PETSC_SCALAR);CHKERRQ(ierr);  
-  ierr = PetscViewerDestroy(fd);CHKERRQ(ierr);
+  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 
 /* Forcing fields */  
   ierr = VecDuplicate(TR1,&Fe);CHKERRQ(ierr);  
@@ -421,8 +418,8 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     Fep.firstTime = PETSC_TRUE;
   } else {
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Fe.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-	ierr = VecLoadIntoVector(fd,Fe);CHKERRQ(ierr);    
-	ierr = PetscViewerDestroy(fd);CHKERRQ(ierr);    
+	ierr = VecLoad(Fe,fd);CHKERRQ(ierr);    
+	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
   }  
   ierr = VecGetArray(Fe,&localFe);CHKERRQ(ierr);
 
@@ -657,18 +654,6 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
       }
     }
 #endif
-
-/* 
-  if (Iter==0) {
-  PetscViewer fd;
-  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"ut.petsc",FILE_MODE_WRITE,&fd);CHKERRQ(ierr);
-  for (itr=0; itr<numTracers; itr++) {
-    ierr = VecView(ut[itr],fd);CHKERRQ(ierr);
-  }
-  ierr = PetscViewerDestroy(fd);CHKERRQ(ierr);      
-  }
-
- */
   
 /*  Convert to discrete tendency */
 	for (itr=0; itr<numTracers; itr++) {
@@ -742,9 +727,9 @@ PetscErrorCode finalizeExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt n
   }
 #endif
 
-  ierr = VecDestroy(Ts);CHKERRQ(ierr);
-  ierr = VecDestroy(Ss);CHKERRQ(ierr);
-  ierr = VecDestroy(Fe);CHKERRQ(ierr);
+  ierr = VecDestroy(&Ts);CHKERRQ(ierr);
+  ierr = VecDestroy(&Ss);CHKERRQ(ierr);
+  ierr = VecDestroy(&Fe);CHKERRQ(ierr);
   
   ierr = PetscFree(gIndices);CHKERRQ(ierr);  
 

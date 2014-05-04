@@ -50,6 +50,10 @@ SRFMITBGC = alk_surfforcing.F carbon_chem.F fe_chem.F bio_export.F \
         phos_flux.F landsource.F \
         mitgcm_biogeochem_diagnostics.F
 
+SRCMOBI = $(STMM) tmm_external_bc.c external_forcing_mobi.c 
+SRFMOBI = mobi_copy_data.F mobi_ini.F mobi_calc.F mobi_util.F \
+        co2calc.F gosbc.F file_names.F gasbc.F iomngr.F npzd_src.F
+
 OBJLIN = $(SRCLIN:.c=.o)
 OBJLINCUS = $(SRCCUS:.c=.o)
 OBJLINMF = $(SRCLINMF:.c=.o)
@@ -63,6 +67,7 @@ OBJINERTGAS = $(SRCINERTGAS:.c=.o) $(SRFINERTGAS:.F=.o)
 OBJINERTGASBC = $(SRCINERTGASBC:.c=.o) $(SRFINERTGASBC:.F=.o)
 OBJOCMIPLANDATM = $(SRCOCMIPLANDATM:.c=.o) $(SRFOCMIPLANDATM:.F=.o)
 OBJMITBGC = $(SRCMITBGC:.c=.o) $(SRFMITBGC:.F=.o)
+OBJMOBI = $(SRCMOBI:.c=.o) $(SRFMOBI:.F=.o)
 
 .SUFFIXES: 
 .SUFFIXES: .o .f .p .F .c
@@ -165,6 +170,10 @@ tmmocmipabiolandatmjacobian: $(OBJOCMIPLANDATM) chkopts
 tmmmitbgc:
 tmmmitbgc: $(OBJMITBGC) chkopts
 	-${CLINKER} -o $@ $(OBJMITBGC) ${PETSC_MAT_LIB}
+
+tmmmobi: FPPFLAGS=-DO_TMM -r8
+tmmmobi: $(OBJMOBI) chkopts
+	-${CLINKER} -o $@ $(OBJMOBI) ${PETSC_MAT_LIB}
 
 #.F.o:
 #	-${FLINKER} -c $<
