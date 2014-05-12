@@ -270,7 +270,7 @@ CSPK set some other data
 
 #  if defined O_npzd_fe_limitation
 	  do k=1,kmt_loc
-	    if (k.le.3) then
+	    if (k.le.kmfe) then
 	      fe_dissolved(1,1,k,1) = fe_loc(k)
 	    endif  
 	  enddo

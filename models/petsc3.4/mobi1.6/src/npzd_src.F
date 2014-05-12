@@ -77,6 +77,7 @@
       zprefDet = 0.30     ! Zooplankton preference for Detritus
 # endif
 # if defined O_npzd_fe_limitation
+      kmfe = 3            ! no. of depth levels used for Fe limitation 
       kfe = 0.12          ! Half saturation constant for Fe limitation
       kfe_D = 0.12        ! Half saturation constant for Diaz Fe limitation
 # endif
@@ -129,12 +130,15 @@
       enddo
 #ifndef O_TMM      
 # if defined O_npzd_fe_limitation
+      do k=km,1,-1
+         if (zw(k) .gt. 24000) kmfe = k-1
+      enddo
 ! read in the dissolved Fe conc from O_dissolved_fe.nc
       fe_dissolved(:,:,:,:) = 0.
       ib(:) = 1
       ic(:) = imtm2
       ic(2) = jmtm2
-      ic(3) = 3
+      ic(3) = kmfe
       ic(4) = 12
 
       fname = new_file_name ("O_fe_dissolved.nc")
@@ -144,11 +148,11 @@
          call openfile (trim(fname), iou)
          call getvara ('O_dissolved_fe', iou, ic(1)*ic(2)*ic(3)*ic(4)
      &,                 ib, ic, tmpijkm, c1e9, c0)
-         fe_dissolved(2:imtm1,2:jmtm1,:,:) = tmpijkm(1:imtm2
-     &,                                            1:jmtm2,:,:)
+         fe_dissolved(2:imtm1,2:jmtm1,1:kmfe,:) = tmpijkm(1:imtm2
+     &,                                            1:jmtm2,1:kmfe,:)
 !         print*,'fe_dissolved(50,50,1,1)=',fe_dissolved(50,50,1,1)
          do m=1,12
-            do k=1,3
+            do k=1,kmfe
                do j=1,jmt
                   fe_dissolved(1,j,k,m) = fe_dissolved(imtm1,j,k,m)
                   fe_dissolved(imt,j,k,m) = fe_dissolved(2,j,k,m)
@@ -192,7 +196,7 @@
      &,                s_in, dic_in, alk_in, co2_in, dic13_in
 # endif
 # if defined O_npzd_nitrogen
-     &,                no3_in, sgb_in, sgomsk_in
+     &,                no3_in, sgb_in
 #  if defined O_npzd_nitrogen_15
      &,                din15_in
 #  endif
@@ -208,7 +212,7 @@
 !     main driver for Model of Ocean Biogeochemistry and Isotopes (MOBI)
 !     input: kmx, twodt, rctheta, dayfrac, swr, tnpzd, t_in, 
 !            po4_in, (o2_in, s_in, dic_in, alk_in, co2_in, dic13_in, no3_in,
-!            sgb_in, sgomsk_in, din15_in, felimit_in, felimit_D_in)
+!            sgb_in, din15_in, felimit_in, felimit_D_in)
 !     output: src, (sedcorgflx, sedcalflx)
 !             if O_save_npzd is switch on additional output (rnpp etc.)
 !                is in npzd.h 
@@ -241,7 +245,7 @@
       real atmpres, depth
 # endif
 # if defined O_npzd_nitrogen
-      real no3_in(km), sgb_in(km), sgomsk_in, lno3, sg_bdeni
+      real no3_in(km), sgb_in(km), lno3, sg_bdeni
       real morp_D, lntp
       real npp_D, graz_D, morpt_D, no3flag, wcdeni, bdeni(km), nfix(km)
 #  if defined O_npzd_nitrogen_15
@@ -424,7 +428,6 @@
 #  if defined O_npzd_nitrogen_15
      &                *din15flag
 #  endif
-c     &                       *sgomsk_in
 
             snpzd(7) = snpzd(7) + expo - bdeni(k)
 
@@ -465,7 +468,6 @@ c     &                       *sgomsk_in
 #  if defined O_npzd_nitrogen_15
      &                   *din15flag
 #  endif
-c     &                                *sgomsk_in
 
                snpzd(1) = snpzd(1) + sgb_in(k)*expo*redptn
                snpzd(6) = snpzd(6) + sgb_in(k)*expo*redctn
@@ -1478,7 +1480,7 @@ c        excr = (gamma1-geZ)*(graz+graz_Z+graz_Det)
 #include "size.h"
 #include "npzd.h"
 #include "tmngr.h"
-      if (k.le.3) then
+      if (k.le.kmfe) then
 #ifndef O_TMM      
 ! create x (time) and y (data) arrays for fe interpolation
 ! first zero them out just in case

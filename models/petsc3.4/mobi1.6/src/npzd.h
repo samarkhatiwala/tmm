@@ -80,7 +80,7 @@
 !   kpipe_fe = ocean pipe coordinate for fe limitation
 !
 
-      integer ntnpzd, nbio
+      integer ntnpzd, nbio, kmfe
 
       parameter (ntnpzd = 5
 #if defined O_npzd_nitrogen
@@ -140,7 +140,8 @@
       common /npzd_r/ redotc, redntc, dfrt, redptc
 # if defined O_npzd_fe_limitation
       real fe_dissolved
-      common /fe_dissolved/ fe_dissolved(imt,jmt,3,12)
+      common /fe_dissolved_r/ fe_dissolved(imt,jmt,km,12)
+      common /fe_dissolved_i/ kmfe      
 # endif
 # if defined O_save_npzd
       common /npzd_r/ rnpp(kpzd), rgraz(kpzd), rmorp(kpzd), rmorpt(kpzd)
