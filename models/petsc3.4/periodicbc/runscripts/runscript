@@ -1,0 +1,8 @@
+mpiexec -np 2 ./tmm -numtracers 2 \
+  -i Cini_01.petsc,Cini_02.petsc \
+  -me Ae1 -mi Ai1 -mbe Be -mbi Bi \
+  -t0 0.0 -iter0 0 -deltat_clock 0.0013888888888889 -max_steps 7200 -write_steps 720 \
+  -o C_01.petsc,C_02.petsc \
+  -prescribed_bc -bc_files Cbc_01,Cbc_02 -periodic_bc -bc_cycle_period 1.0 -bc_cycle_step 0.0833333333333333 \
+  -periodic_matrix -matrix_cycle_period 1.0 -matrix_cycle_step 0.0833333333333333 \
+  > log
