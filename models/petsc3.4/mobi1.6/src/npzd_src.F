@@ -128,11 +128,11 @@
       do k=1,km
          ztt(k+1)=(-1)*zw(k)
       enddo
-#ifndef O_TMM      
 # if defined O_npzd_fe_limitation
       do k=km,1,-1
          if (zw(k) .gt. 24000) kmfe = k-1
       enddo
+#ifndef O_TMM
 ! read in the dissolved Fe conc from O_dissolved_fe.nc
       fe_dissolved(:,:,:,:) = 0.
       ib(:) = 1
@@ -166,8 +166,8 @@
       else
          print*,"Warning => Cannot find", trim(fname)
       endif
-# endif
 #endif
+# endif
 
 # if defined O_carbon || defined O_npzd_alk
 

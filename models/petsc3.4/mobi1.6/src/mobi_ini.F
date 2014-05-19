@@ -747,8 +747,11 @@ CSPK Now initialize the main MOBI code
       endif
       
       if (debugFlag.eq.1) then
-		print*,'MOBI time steps: dtts=',dtts,' c2dtts=',c2dtts,
+        print*,'MOBI time steps: dtts=',dtts,' c2dtts=',c2dtts,
      &         ' dtnpzd=',dtnpzd
+#ifdef O_npzd_fe_limitation
+        print*,'Iron limitation depth index kmfe=',kmfe
+#endif
       endif     
 
       END
