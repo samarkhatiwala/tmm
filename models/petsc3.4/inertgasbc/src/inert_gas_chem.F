@@ -263,30 +263,46 @@ C % Corrected Eqn (8) of Garcia and Gordon 1992
 
       real*8 S,T
       integer gasID
+
+      real*8 R
+      parameter (R = 8.314510d0)
       
-      real*8 alphaD
+      real*8 alphaD, A, Ea
 
       if (gasID.eq.1) then !, 'Ne')
-        moldiff=((2.33d0 + (.0550d0*T)) + ((5.21d-4*T)*T))*1.d-9
+        A = 1.6080d-6
+        Ea = 14840.d0
       elseif (gasID.eq.2) then !'Ar')
-        moldiff=((1.58d0 + (0.0045d0*T)) + ((0.00125d0*T)*T))*1.d-9
+        A = 2.227d-6
+        Ea = 16680.d0
       elseif (gasID.eq.3) then !'Kr')
-        moldiff=((0.87d0 + (.0287d0*T)) + ((4.25d-4*T)*T))*1.d-9
+        A = 6.3930d-6
+        Ea = 20200.d0
       elseif (gasID.eq.4) then !'Xe')
-        moldiff=((0.636d0 + (.0266d0*T)) + ((3.00d-4*T)*T))*1.d-9
+        A = 9.0070d-6
+        Ea = 21610.d0
       elseif (gasID.eq.5) then !'N2')
-        moldiff=((1.227d0 + (0.0579d0*T)) + ((4.71d-4*T)*T))*1.d-9
+        A = 3.4120d-6
+        Ea = 18500.d0
       elseif (gasID.eq.6) then !'Ar36')
-        moldiff=((1.58d0 + (0.0045d0*T)) + ((0.00125d0*T)*T))*1.d-9
+C     % adjust diffusivity by fractionation factor alpha
+        alphaD = 0.995d0
+        A = 2.227d-6*(1.d0/(alphaD**2))
+        Ea = 16680.d0
 C     % adjust diffusivity by fractionation factor alpha
         alphaD = 0.995d0
         moldiff = moldiff/(alphaD**2)
       elseif (gasID.eq.7) then ! 'O2')
-        moldiff=((1.45d0 + (0.018d0*T)) + ((0.001d0*T)*T))*1.d-9
+        A = 4.286d-6
+        Ea = 18700.d0
+      elseif (gasID.eq.8) then ! 'He')
+        A = 0.8180d-6
+        Ea = 11700.d0        
       else
-        stop 'Gas name must be Ne, Ar, Kr, Xe, N2, O2 or Ar36'
+        stop 'Gas name must be Ne, Ar, Kr, Xe, N2, O2, Ar36 or He'
       endif
+
+      moldiff = (1.d0 - 0.049d0*S/35.5d0)*A*exp(-Ea/(R*(T + 273.16d0)))
 
       return
       end
-

@@ -104,19 +104,33 @@ if ~periodicForcing
   atmospb=mean(atmospb,2);
 end
 
-% Initial condition
-TR=repmat(0,[nbi 1]);
+% Initial condition: initialize with solubility equilibrium concentration if 
+% functions to compute it are available. You can download these from Roberta 
+% Hamme's website: http://web.uvic.ca/~rhamme/download.html. Otherwise initialize 
+% with zero concentration.
+% Ne, Ar, Kr, Xe, N2, O2 or Ar36
+trNames={'Ne','Ar','Kr','Xe','N2','O2','Ar36'};
+numTracers=length(trNames);
+TRini=repmat(0,[nbi numTracers]);
+if exist('Nesol')==2
+  disp('Initial conditions are being set to solubility equilibrium')
+  Tmean=mean(Ts,2);
+  Smean=mean(Ss,2);
+  rho0=1024.5; % nominal density  
+  for itr=1:numTracers
+    gasId=trNames{itr};
+    solFunc=str2func([gasId 'sol']);
+    G_eq=rho0*solFunc(Smean,Tmean)/1e6; % mol/m^3/atm
+    TRini(:,itr)=G_eq*1.0; % multiply by nominal atmospheric pressure of 1 atm to get equilibrium concentration
+  end
+else
+  disp('No functions for computing solubility equilibrium found: Initial conditions set to zero')
+  disp('You can download Matlab code for computing solubility equilibrium from Roberta Hamme''s website:')
+  disp('http://web.uvic.ca/~rhamme/download.html')  
+end
 
 if rearrangeProfiles
-  TR=TR(Ir); % initial condition
-  Xboxnom=Xboxnom(Ir);
-  Yboxnom=Yboxnom(Ir);
-  Zboxnom=Zboxnom(Ir);
-  izBox=izBox(Ir);
-  Ib=find(izBox==1);
-%
-  Ip=Ip_post;
-  Ir=Ir_post;
+  error('ERROR: rearrangeProfiles must be set to 0!')
 end  
 
 if writeFiles
@@ -199,7 +213,11 @@ if writeFiles
 	end
   end	  	  
 % Initial conditions  
-  writePetscBin('trini.petsc',TR)
+  for itr=1:numTracers
+    gasId=trNames{itr};
+    fn=[gasId 'ini.petsc'];
+    writePetscBin(fn,TRini(:,itr))
+  end  
 % Surface forcing data
   if ~periodicForcing
 	writePetscBin('atmosp.bin',atmospb)	
