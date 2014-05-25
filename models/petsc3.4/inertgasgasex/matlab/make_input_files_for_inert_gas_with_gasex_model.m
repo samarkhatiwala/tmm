@@ -1,7 +1,7 @@
 % Set toplevel path to GCMs configuration
-% base_path='/data2/spk/TransportMatrixConfigs/MITgcm_2.8deg';
+base_path='/data2/spk/TransportMatrixConfigs/MITgcm_2.8deg';
 % base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO';
-base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO_v4';
+% base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO_v4';
 
 periodicForcing=1
 periodicMatrix=1
@@ -142,6 +142,31 @@ if ~periodicForcing
   atmospb=mean(atmospb,2);
 end
 
+% Initial condition: initialize with solubility equilibrium concentration if 
+% functions to compute it are available. You can download these from Roberta 
+% Hamme's website: http://web.uvic.ca/~rhamme/download.html. Otherwise initialize 
+% with zero concentration.
+% Ne, Ar, Kr, Xe, N2, O2 or Ar36
+trNames={'Ne','Ar','Kr','Xe','N2','O2','Ar36'};
+numTracers=length(trNames);
+TRini=repmat(0,[nb numTracers]);
+if exist('Nesol')==2
+  disp('Initial conditions are being set to solubility equilibrium')
+  Tmean=mean(Tsteady,2);
+  Smean=mean(Ssteady,2);
+  rho0=1024.5; % nominal density  
+  for itr=1:numTracers
+    gasId=trNames{itr};
+    solFunc=str2func([gasId 'sol']);
+    G_eq=rho0*solFunc(Smean,Tmean)/1e6; % mol/m^3/atm
+    TRini(:,itr)=G_eq*1.0; % multiply by nominal atmospheric pressure of 1 atm to get equilibrium concentration
+  end	
+else
+  disp('No functions for computing solubility equilibrium found: Initial conditions set to zero')
+  disp('You can download Matlab code for computing solubility equilibrium from Roberta Hamme''s website:')
+  disp('http://web.uvic.ca/~rhamme/download.html')
+end
+
 if rearrangeProfiles
   Xboxnom=Xboxnom(Ir);
   Yboxnom=Yboxnom(Ir);
@@ -149,14 +174,12 @@ if rearrangeProfiles
   izBox=izBox(Ir);
   Tsteady=Tsteady(Ir,:);
   Ssteady=Ssteady(Ir,:);
+  TRini=TRini(Ir,:);
   Ib=find(izBox==1);
 %
   Ip=Ip_post;
   Ir=Ir_post;
 end  
-
-% Initial condition
-TR=repmat(0,[nb 1]);
 
 if useCoarseGrainedMatrix
 % Coarse grain initial conditions and forcing data
@@ -246,8 +269,12 @@ if writeFiles
 	  end
 	end
   end	  	  
-% Initial conditions  
-  writePetscBin('trini.petsc',TR)
+% Initial conditions
+  for itr=1:numTracers
+    gasId=trNames{itr};
+    fn=[gasId 'ini.petsc'];
+    writePetscBin(fn,TRini(:,itr))
+  end  
 % Surface forcing data
   if ~periodicForcing
 	write_binary('fice.bin',Ficeb,'real*8')

@@ -293,8 +293,8 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
                           &gasID,&localVgas[ip],&localFinj[ip],&localFex[ip],
                           &localTReq[kl]);
 
-    localFinj[ip]=fluxScaling[0]*localFinj[ip]*(1.0-localfice[ip]);
-    localFex[ip]=fluxScaling[1]*localFex[ip]*(1.0-localfice[ip]);                              
+    localFinj[ip]=fluxScaling[0]*localFinj[ip];
+    localFex[ip]=fluxScaling[1]*localFex[ip];                              
   }
 
   ierr = PetscOptionsHasName(PETSC_NULL,"-calc_diagnostics",&calcDiagnostics);CHKERRQ(ierr);
@@ -374,8 +374,8 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
                             &gasID,&localVgas[ip],&localFinj[ip],&localFex[ip],
                             &localTReq[kl]);
 
-      localFinj[ip]=fluxScaling[0]*localFinj[ip]*(1.0-localfice[ip]);
-      localFex[ip]=fluxScaling[1]*localFex[ip]*(1.0-localfice[ip]);                            
+      localFinj[ip]=fluxScaling[0]*localFinj[ip];
+      localFex[ip]=fluxScaling[1]*localFex[ip];                            
     }
   }
 
@@ -384,7 +384,7 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
     nzloc=lProfileLength[ip];  
     kl=lStartIndices[ip];
     
-    localFgas[ip]=-fluxScaling[2]*localVgas[ip]*(1.0-localfice[ip])*(localTR[kl] - localTReq[kl]);    
+    localFgas[ip]=-fluxScaling[2]*localVgas[ip]*(localTR[kl] - localTReq[kl]);    
     Fas = localFgas[ip] + localFinj[ip] + localFex[ip];
     
     localJTR[kl] = Fas/dzsurf;
@@ -576,8 +576,8 @@ PetscErrorCode reInitializeExternalForcing(PetscScalar tc, PetscInt Iter, PetscI
                           &gasID,&localVgas[ip],&localFinj[ip],&localFex[ip],
                           &localTReq[kl]);
 
-    localFinj[ip]=fluxScaling[0]*localFinj[ip]*(1.0-localfice[ip]);
-    localFex[ip]=fluxScaling[1]*localFex[ip]*(1.0-localfice[ip]);                          
+    localFinj[ip]=fluxScaling[0]*localFinj[ip];
+    localFex[ip]=fluxScaling[1]*localFex[ip];                          
   }
     
   return 0;
