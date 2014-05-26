@@ -1,6 +1,15 @@
 include ${PETSC_DIR}/conf/variables
 include ${PETSC_DIR}/conf/rules
 
+# Modify these as necessary
+XLFCPP=
+XLFFLAGS=
+R8FLAG=-r8
+# if using the IBM XLF compiler, uncomment the following lines
+#XLFCPP=-WF,
+#R8FLAG=-qrealsize=8
+#XLFFLAGS=-qzerosize
+
 STMM = tmm_main.c tmm_forward_step.c tmm_forcing_utils.c \
         tmm_profile_utils.c petsc_signal_utils.c petsc_matvec_utils.c
         
@@ -75,17 +84,6 @@ OBJMOBI = $(SRCMOBI:.c=.o) $(SRFMOBI:.F=.o)
 ARCH = $(shell uname)
 NODE = $(shell uname -n)
 
-FFLAGS=-extend_source
-ifeq ($(NODE),rzcluster.rz.uni-kiel.de)
-FFLAGS=-Mextend -r8
-endif
-ifeq ($(NODE),fats)
-FFLAGS=-Mextend -r8
-endif
-ifeq ($(findstring ranger,$(NODE)),ranger)
-FFLAGS=
-endif
-
 linearsolve: $(OBJLIN) chkopts
 	-${CLINKER} -o $@ $(OBJLIN) ${PETSC_KSP_LIB}
 
@@ -110,17 +108,17 @@ tmmocmipcfcs: $(OBJCFC) chkopts
 directimplicitpc: $(OBJIPC) chkopts
 	-${CLINKER} -o $@ $(OBJIPC) ${PETSC_KSP_LIB}
 
-tmmkielbgc: FPPFLAGS=-DCARBON
+tmmkielbgc: FPPFLAGS=$(XLFCPP)-DCARBON
 tmmkielbgc: CPPFLAGS=-DCARBON
 tmmkielbgc: $(OBJKIELBGC) chkopts
 	-${CLINKER} -o $@ $(OBJKIELBGC) ${PETSC_MAT_LIB}
 
-tmmkielbgcspinup: FPPFLAGS=-DCARBON -DAD_SAFE
+tmmkielbgcspinup: FPPFLAGS=$(XLFCPP)-DCARBON $(XLFCPP)-DAD_SAFE
 tmmkielbgcspinup: CPPFLAGS=-DCARBON -DFORSPINUP
 tmmkielbgcspinup: $(OBJKIELBGC) chkopts
 	-${CLINKER} -o $@ $(OBJKIELBGC) ${PETSC_MAT_LIB}
 
-tmmkielbgcjacobian: FPPFLAGS=-DCARBON -DAD_SAFE
+tmmkielbgcjacobian: FPPFLAGS=$(XLFCPP)-DCARBON $(XLFCPP)-DAD_SAFE
 tmmkielbgcjacobian: CPPFLAGS=-DCARBON -DFORSPINUP
 tmmkielbgcjacobian: $(OBJKIELBGC) chkopts
 	-${CLINKER} -o $@ $(OBJKIELBGC) ${PETSC_MAT_LIB}
@@ -129,12 +127,12 @@ tmminertgas:
 tmminertgas: $(OBJINERTGAS) chkopts
 	-${CLINKER} -o $@ $(OBJINERTGAS) ${PETSC_MAT_LIB}
 
-tmminertgasspinup: FPPFLAGS=-DAD_SAFE
+tmminertgasspinup: FPPFLAGS=$(XLFCPP)-DAD_SAFE
 tmminertgasspinup: CPPFLAGS=-DFORSPINUP
 tmminertgasspinup: $(OBJINERTGAS) chkopts
 	-${CLINKER} -o $@ $(OBJINERTGAS) ${PETSC_MAT_LIB}
 	
-tmminertgasjacobian: FPPFLAGS=-DAD_SAFE
+tmminertgasjacobian: FPPFLAGS=$(XLFCPP)-DAD_SAFE
 tmminertgasjacobian: CPPFLAGS=-DFORJACOBIAN
 tmminertgasjacobian: $(OBJINERTGAS) chkopts
 	-${CLINKER} -o $@ $(OBJINERTGAS) ${PETSC_MAT_LIB}
@@ -143,12 +141,12 @@ tmminertgasbc:
 tmminertgasbc: $(OBJINERTGASBC) chkopts
 	-${CLINKER} -o $@ $(OBJINERTGASBC) ${PETSC_MAT_LIB}
 
-tmminertgasbcspinup: FPPFLAGS=-DAD_SAFE
+tmminertgasbcspinup: FPPFLAGS=$(XLFCPP)-DAD_SAFE
 tmminertgasbcspinup: CPPFLAGS=-DFORSPINUP
 tmminertgasbcspinup: $(OBJINERTGASBC) chkopts
 	-${CLINKER} -o $@ $(OBJINERTGASBC) ${PETSC_MAT_LIB}
 	
-tmminertgasbcjacobian: FPPFLAGS=-DAD_SAFE
+tmminertgasbcjacobian: FPPFLAGS=$(XLFCPP)-DAD_SAFE
 tmminertgasbcjacobian: CPPFLAGS=-DFORJACOBIAN
 tmminertgasbcjacobian: $(OBJINERTGASBC) chkopts
 	-${CLINKER} -o $@ $(OBJINERTGASBC) ${PETSC_MAT_LIB}
@@ -157,12 +155,12 @@ tmmocmipabiolandatm:
 tmmocmipabiolandatm: $(OBJOCMIPLANDATM) chkopts
 	-${CLINKER} -o $@ $(OBJOCMIPLANDATM) ${PETSC_MAT_LIB}
 
-tmmocmipabiolandatmspinup: FPPFLAGS=-DAD_SAFE
+tmmocmipabiolandatmspinup: FPPFLAGS=$(XLFCPP)-DAD_SAFE
 tmmocmipabiolandatmspinup: CPPFLAGS=-DFORSPINUP
 tmmocmipabiolandatmspinup: $(OBJOCMIPLANDATM) chkopts
 	-${CLINKER} -o $@ $(OBJOCMIPLANDATM) ${PETSC_MAT_LIB}
 
-tmmocmipabiolandatmjacobian: FPPFLAGS=-DAD_SAFE
+tmmocmipabiolandatmjacobian: FPPFLAGS=$(XLFCPP)-DAD_SAFE
 tmmocmipabiolandatmjacobian: CPPFLAGS=-DFORJACOBIAN
 tmmocmipabiolandatmjacobian: $(OBJOCMIPLANDATM) chkopts
 	-${CLINKER} -o $@ $(OBJOCMIPLANDATM) ${PETSC_MAT_LIB}
@@ -171,7 +169,8 @@ tmmmitbgc:
 tmmmitbgc: $(OBJMITBGC) chkopts
 	-${CLINKER} -o $@ $(OBJMITBGC) ${PETSC_MAT_LIB}
 
-tmmmobi: FPPFLAGS=-DO_TMM -r8
+tmmmobi: FPPFLAGS=$(XLFCPP)-DO_TMM
+tmmmobi: FFLAGS=$(R8FLAG) $(XLFFLAGS)
 tmmmobi: $(OBJMOBI) chkopts
 	-${CLINKER} -o $@ $(OBJMOBI) ${PETSC_MAT_LIB}
 

@@ -220,10 +220,10 @@
 !     modified to a vertical column model 
       implicit none
       integer k,kmx
-#include "size.h"   ! km maximum # of levels
-#include "coord.h"  ! zt, dzt
-#include "grdvar.h" ! dztr = 1/dzt
-#include "mw.h"     ! ispo4 etc.
+#include "size.h"
+#include "coord.h"
+#include "grdvar.h"
+#include "mw.h"
 #include "npzd.h"
       real snpzd(ntnpzd), tnpzd(km,ntnpzd), src(km,nsrc)
       real dic_npzd_sms(km), twodt, rctheta, gl, impo, expo

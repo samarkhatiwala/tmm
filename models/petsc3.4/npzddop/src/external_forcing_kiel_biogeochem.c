@@ -148,7 +148,7 @@ PetscScalar *localfbgc1, *localfbgc2, *localfbgc3, *localfbgc4, *localfbgc5;
 PetscScalar *localco2airseafluxdiag, *localco2airseafluxdiagavg;
 #endif
 
-PetscBool TRUE = PETSC_TRUE, FALSE = PETSC_FALSE;
+PetscBool TRUEFLAG = PETSC_TRUE, FALSEFLAG = PETSC_FALSE;
 
 #if defined (FORSPINUP) || defined (FORJACOBIAN)
 PetscScalar relaxTau[50], relaxLambda[50], relaxValue[50];
@@ -525,7 +525,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 			 &localTR7[kl],&localTR8[kl],&localph[ip],
 #endif
 			 &localTs[kl],&localSs[kl],&localdz[kl],&drF[0],&nzmax,&nzeuph,
-                         &numBiogeochemStepsPerOceanStep,&TRUE);
+                         &numBiogeochemStepsPerOceanStep,&TRUEFLAG);
   }
 
 /* Read and overwrite default parameter values here */
@@ -553,7 +553,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 			   &localTR7[kl],&localTR8[kl],&localph[ip],
 #endif
 			   &localTs[kl],&localSs[kl],&localdz[kl],&drF[0],&nzmax,&nzeuph,
-                           &numBiogeochemStepsPerOceanStep,&FALSE);
+                           &numBiogeochemStepsPerOceanStep,&FALSEFLAG);
     }
     
   }
@@ -1083,7 +1083,7 @@ PetscErrorCode reInitializeExternalForcing(PetscScalar tc, PetscInt Iter, PetscI
 			   &localTR7[kl],&localTR8[kl],&localph[ip],
 #endif
 			   &localTs[kl],&localSs[kl],&localdz[kl],&drF[0],&nzmax,&nzeuph,
-                           &numBiogeochemStepsPerOceanStep,&FALSE);
+                           &numBiogeochemStepsPerOceanStep,&FALSEFLAG);
     }    
   }
     

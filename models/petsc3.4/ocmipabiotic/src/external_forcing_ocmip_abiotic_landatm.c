@@ -768,10 +768,6 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
     if (useAtmModel) {                 
       localFocean = localFocean + localtotflux*localdA[ip]*(12.0/1.e15)*secPerYear; /* PgC/y */
     }
-//     if (ip==100) {
-//       ierr = PetscPrintf(PETSC_COMM_WORLD,"DIC: %10.5f, CO2: %10.5f, step %d\n", localgasexflux, localtotflux, Iter0+iLoop);CHKERRQ(ierr);
-//     }
-    
     
 	if (calcDiagnostics) {  
 	  if (Iter0+iLoop>=diagStartTimeStep) { /* start time averaging (note: diagStartTimeStep is ABSOLUTE time step) */	

@@ -65,8 +65,8 @@ c very large for polar night
           if (fluxi.lt.0.00001) sfac(j)=0.00001
 c daylength; ensure that it lies between 0 and 1 (may be slightly
 c out of this range in high latitudes)
-          fracmin = MIN(frac,1.0)
-          stau(j) = MAX(fracmin,0.0)
+          fracmin = MIN(frac,1.d0)
+          stau(j) = MAX(fracmin,0.d0)
 
        enddo !j
       return

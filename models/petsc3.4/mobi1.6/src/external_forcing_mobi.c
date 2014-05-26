@@ -84,7 +84,6 @@ PetscScalar *localsgbathy;
 
 PetscScalar daysPerYear, secondsPerYear;
 
-PetscBool useSeparateBiogeochemTimeStepping = PETSC_FALSE;
 PetscInt nzmax;
 PetscScalar DeltaT;
 PetscScalar *drF, *zt;
@@ -137,7 +136,7 @@ PetscScalar *localco2airseafluxdiag, *localco2airseafluxdiagavg;
 PetscMPIInt myId;
 PetscInt debugFlag = 0;
 
-PetscBool TRUE = PETSC_TRUE, FALSE = PETSC_FALSE;
+PetscBool MYTRUE = PETSC_TRUE, MYFALSE = PETSC_FALSE;
 
 #if defined (FORSPINUP) || defined (FORJACOBIAN)
 PetscScalar relaxTau[50], relaxLambda[50], relaxValue[50];
@@ -304,17 +303,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
   ierr = VecGetArrays(v,numTracers,&localTR);CHKERRQ(ierr);
   ierr = VecGetArrays(ut,numTracers,&localJTR);CHKERRQ(ierr);
-
-  ierr = PetscOptionsGetBool(PETSC_NULL,"-separate_biogeochem_time_stepping",&useSeparateBiogeochemTimeStepping,0);CHKERRQ(ierr);
-#if defined (FORSPINUP) || defined (FORJACOBIAN)
-  if (useSeparateBiogeochemTimeStepping) {
-    SETERRQ(PETSC_COMM_WORLD,1,"Cannot use the -separate_biogeochem_time_stepping option with SPINUP or JACOBIAN ");  
-  
-  }
-#endif
-  if (useSeparateBiogeochemTimeStepping) {
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"Biogeochem model will be time-stepped independently\n");CHKERRQ(ierr);
-  }  
   
   ierr = PetscOptionsGetInt(PETSC_NULL,"-nzmax",&nzmax,&flg);CHKERRQ(ierr);
   if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate maximum number of z points with the -nzmax option");  
@@ -635,30 +623,24 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
 
   } /* end loop over profiles */
 
-  if (useSeparateBiogeochemTimeStepping) {  /* return updated tracer field */
-//	ierr = VecSetValues(TR1,lSize,gIndices,localTR1,INSERT_VALUES);CHKERRQ(ierr);
-//	ierr = VecAssemblyBegin(TR1);CHKERRQ(ierr);
-//	ierr = VecAssemblyEnd(TR1);CHKERRQ(ierr);    
-  } else {  /* return tracer tendency */
-	for (itr=0; itr<numTracers; itr++) {  
-	  ierr = VecSetValues(ut[itr],lSize,gIndices,localJTR[itr],INSERT_VALUES);CHKERRQ(ierr);
-	  ierr = VecAssemblyBegin(ut[itr]);CHKERRQ(ierr);
-	  ierr = VecAssemblyEnd(ut[itr]);CHKERRQ(ierr);    
-    }
+  for (itr=0; itr<numTracers; itr++) {  
+	ierr = VecSetValues(ut[itr],lSize,gIndices,localJTR[itr],INSERT_VALUES);CHKERRQ(ierr);
+	ierr = VecAssemblyBegin(ut[itr]);CHKERRQ(ierr);
+	ierr = VecAssemblyEnd(ut[itr]);CHKERRQ(ierr);    
+  }
 #if defined (FORSPINUP) || defined (FORJACOBIAN)
 /* add relaxation term: ut = ut - lambda*(v-vr) = ut -lambda*v + lambda*vr */
-    if (relaxTracer) {
-      for (itr=0; itr<numTracers; itr++) {
-        ierr = VecAXPY(ut[itr],-relaxLambda[itr],v[itr]);CHKERRQ(ierr); /* ut = ut - lambda*v */
-        ierr = VecShift(ut[itr],relaxLambda[itr]*relaxValue[itr]);CHKERRQ(ierr); /* ut = ut + lambda*vr */
-      }
-    }
+  if (relaxTracer) {
+	for (itr=0; itr<numTracers; itr++) {
+	  ierr = VecAXPY(ut[itr],-relaxLambda[itr],v[itr]);CHKERRQ(ierr); /* ut = ut - lambda*v */
+	  ierr = VecShift(ut[itr],relaxLambda[itr]*relaxValue[itr]);CHKERRQ(ierr); /* ut = ut + lambda*vr */
+	}
+  }
 #endif
   
-/*  Convert to discrete tendency */
-	for (itr=0; itr<numTracers; itr++) {
-	  ierr = VecScale(ut[itr],DeltaT);CHKERRQ(ierr);
-	}
+/* Convert to discrete tendency */
+  for (itr=0; itr<numTracers; itr++) {
+	ierr = VecScale(ut[itr],DeltaT);CHKERRQ(ierr);
   }
     
   return 0;
