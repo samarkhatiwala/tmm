@@ -39,7 +39,7 @@ int main(int argc,char **args)
 /* TM's */
   Mat Ae, Ai;
   PeriodicMat Aep, Aip;
-  char mateFile[PETSC_MAX_PATH_LEN], matiFile[PETSC_MAX_PATH_LEN];
+  char mateFile[PETSC_MAX_PATH_LEN], matiFile[PETSC_MAX_PATH_LEN], rfsFile[PETSC_MAX_PATH_LEN];
   PetscScalar *tdpMatrix; /* array for periodic matrix times */
   PetscInt numMatrixPeriods;
   PetscBool periodicMatrix = PETSC_FALSE;
@@ -56,6 +56,10 @@ int main(int argc,char **args)
   PetscScalar forcingCyclePeriod, forcingCycleStep;
   PetscScalar tf0, tf1;
 
+/* Rescale forcing */
+  Vec Rfs;
+  PeriodicVec Rfsp;
+  
 /* BC's */
   Vec *bcc, *bcf;
   PeriodicVec bcp[MAXNUMTRACERS];
@@ -101,6 +105,7 @@ int main(int argc,char **args)
   PetscBool timeDependentBC = PETSC_FALSE;
   PetscBool constantBC = PETSC_FALSE;
   PetscBool doCalcBC = PETSC_FALSE;
+  PetscBool rescaleForcing = PETSC_FALSE;
 
   PetscMPIInt numProcessors, myId;  
   PetscErrorCode ierr;
@@ -209,7 +214,7 @@ int main(int argc,char **args)
     ierr=PetscStrcat(matiFile,"_");CHKERRQ(ierr);
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Ae basename is %s\n", mateFile);CHKERRQ(ierr); 
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Ai basename is %s\n", matiFile);CHKERRQ(ierr);     
-
+    
 /*  read time data */
     ierr = PetscOptionsGetReal(PETSC_NULL,"-matrix_cycle_period",&matrixCyclePeriod,&flg2);CHKERRQ(ierr);
     if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate matrix cycling time with the -matrix_cycle_period option");
@@ -251,6 +256,7 @@ int main(int argc,char **args)
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading Ai from file %s\n", matiFile);CHKERRQ(ierr);  
 	ierr = MatLoad(Ai,fd);CHKERRQ(ierr);    
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);      
+    
   }
 
 /* create template vector here if not using profiles */
@@ -663,6 +669,22 @@ int main(int argc,char **args)
     ierr = PetscPrintf(PETSC_COMM_WORLD,"No prescribed BC's specified\n");CHKERRQ(ierr);  
   }  
 
+  ierr = PetscOptionsGetString(PETSC_NULL,"-rescale_forcing_file",rfsFile,PETSC_MAX_PATH_LEN-1,&rescaleForcing);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"Forcing will be rescaled\n");CHKERRQ(ierr); 	  
+  if (rescaleForcing) {  
+    ierr = VecDuplicate(templateVec,&Rfs);CHKERRQ(ierr);    
+	if (periodicMatrix) {    
+	  ierr=PetscStrcat(rfsFile,"_");CHKERRQ(ierr);
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Rescale forcing factor file basename is %s\n", rfsFile);CHKERRQ(ierr); 	
+	  Rfsp.firstTime = PETSC_TRUE;
+	} else {
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading rescale forcing factor from file %s\n", rfsFile);CHKERRQ(ierr);  	
+	  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,rfsFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	  ierr = VecLoad(Rfs,fd);CHKERRQ(ierr);  
+	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
+	}  
+  }
+
 /* Open files for output and optionally write initial conditions */
 #if !defined (FORSPINUP) && !defined (FORJACOBIAN)
   if (!appendOutput) {
@@ -759,6 +781,9 @@ int main(int argc,char **args)
                                   tdpMatrix,&Aep,mateFile);
       ierr = interpPeriodicMatrix(tc,&Ai,matrixCyclePeriod,numMatrixPeriods,
                                   tdpMatrix,&Aip,matiFile);
+      if (rescaleForcing) {
+		ierr = interpPeriodicVector(tc,&Rfs,matrixCyclePeriod,numMatrixPeriods,tdpMatrix,&Rfsp,rfsFile);
+      }
     }
 
 /*  Forcing     */
@@ -770,11 +795,21 @@ int main(int argc,char **args)
 	  } else if (timeDependentForcing) {
 		ierr = interpTimeDependentVector(tc,uf,numTracers,numForcing,tdfT,utdf);CHKERRQ(ierr);
 	  }
+	  if (rescaleForcing) {
+		for (itr=0; itr<numTracers; itr++) {    
+          ierr = VecPointwiseMult(uf[itr],Rfs,uf[itr]);CHKERRQ(ierr);
+        }  
+	  }
 	}
 #endif
 
     if (useExternalForcing) {
       ierr = calcExternalForcing(tc,Iterc,iLoop,numTracers,v,uef);CHKERRQ(ierr); /* Compute external forcing in uef */
+	  if (rescaleForcing) {
+		for (itr=0; itr<numTracers; itr++) {    
+          ierr = VecPointwiseMult(uef[itr],Rfs,uef[itr]);CHKERRQ(ierr);
+        }  
+	  }      
     }    
 
 #ifndef FORJACOBIAN
@@ -1003,6 +1038,13 @@ int main(int argc,char **args)
   if (periodicMatrix) {
     ierr = destroyPeriodicMat(&Aep);CHKERRQ(ierr);
     ierr = destroyPeriodicMat(&Aip);CHKERRQ(ierr);    
+  }
+
+  if (rescaleForcing) {
+	ierr = VecDestroy(&Rfs);CHKERRQ(ierr);
+	if (periodicMatrix) {
+      ierr = destroyPeriodicVec(&Rfsp);CHKERRQ(ierr);
+    }	
   }
   
   if (useExternalForcing) {
