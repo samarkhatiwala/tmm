@@ -12,8 +12,8 @@
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
 #include "tmm_main.h"
-#include "OCMIP_ABIOTIC_OPTIONS.h"
-#include "ocmip_abiotic_landatm.h"
+#include "OCMIP_ABIOTIC_CARBON_OPTIONS.h"
+#include "ocmip_abiotic_carbon_landatm.h"
 
 /* Macros to map tracer names to vectors */
 /* v[0]=DIC */
@@ -38,9 +38,8 @@ PetscScalar *localJDIC14;
 PetscScalar *localPO4,*localAlk,*localSiO2;
 PetscScalar *localfice,*localxkw, *localatmosp;
 PetscScalar *localVgas;
-PetscScalar DeltaT, dzsurf;
-PetscScalar Sglobavg;
-PetscBool useEmP = PETSC_FALSE;
+PetscScalar DeltaT, *localdzsurf;
+PetscBool useVirtualFlux = PETSC_FALSE;
 PetscScalar *localEmP;
 PeriodicArray localEmPp;
 PetscScalar *pH;
@@ -144,9 +143,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
   ierr = PetscOptionsGetReal(PETSC_NULL,"-biogeochem_deltat",&DeltaT,&flg);CHKERRQ(ierr);
   if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate biogeochemical time step in seconds with the -biogeochem_deltat option");  
-
-  ierr = PetscOptionsGetReal(PETSC_NULL,"-dzsurf",&dzsurf,&flg);CHKERRQ(ierr);
-  if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate surface layer thickness with the -dzsurf option");  
 
 #ifdef ALLOW_C14
   ierr = VecGetArray(DIC14,&localDIC14);CHKERRQ(ierr);
@@ -269,7 +265,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     }
 
 /*Data for diagnostics */
-/*     ierr = PetscOptionsGetTruth(PETSC_NULL,"-calc_atm_diagnostics",&calcAtmDiagnostics,0);CHKERRQ(ierr); */
+/*     ierr = PetscOptionsGetBool(PETSC_NULL,"-calc_atm_diagnostics",&calcAtmDiagnostics,0);CHKERRQ(ierr); */
 /*     if (calcAtmDiagnostics) { */
 /*       ierr = PetscOptionsGetInt(PETSC_NULL,"-atm_diag_start_time_step",&atmDiagStartTimeStep,&flg);CHKERRQ(ierr); */
 /*       if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate (absolute) time step at which to start storing atmospheric diagnostics with the -atm_diag_start_time_step flag"); */
@@ -387,7 +383,11 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 #endif    
   
   }
-    
+
+/* Grid arrays */
+  ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localdzsurf);CHKERRQ(ierr);
+  ierr = readProfileSurfaceScalarData("dzsurf.bin",localdzsurf,1);  
+
 /* Forcing fields */  
   ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&pH);CHKERRQ(ierr);
 
@@ -494,19 +494,17 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     }
   }
 
-  ierr = PetscOptionsHasName(PETSC_NULL,"-use_emp",&useEmP);CHKERRQ(ierr);
-  ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localEmP);CHKERRQ(ierr); /* always need this */
-  for (ip=0; ip<lNumProfiles; ip++) { /* initialize to zero to be safe */
-    localEmP[ip]=0.0;
-  }
-  if (useEmP) {
-    if (periodicBiogeochemForcing) {    
-      localEmPp.firstTime = PETSC_TRUE;
-      localEmPp.arrayLength = lNumProfiles;
-    } else {  
-      ierr = readProfileSurfaceScalarData("EmP.bin",localEmP,1);  
-    }
+  ierr = PetscOptionsHasName(PETSC_NULL,"-use_virtual_flux",&useVirtualFlux);CHKERRQ(ierr);
 
+  ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localEmP);CHKERRQ(ierr);
+  if (periodicBiogeochemForcing) {    
+	localEmPp.firstTime = PETSC_TRUE;
+	localEmPp.arrayLength = lNumProfiles;
+  } else {  
+	ierr = readProfileSurfaceScalarData("EmP.bin",localEmP,1);  
+  }
+
+  if (useVirtualFlux) {
 	ierr = VecDuplicate(DIC,&surfVolFrac);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"surface_volume_fraction.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = VecLoad(surfVolFrac,fd);CHKERRQ(ierr);  
@@ -516,10 +514,8 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   if (periodicBiogeochemForcing) {   
 	ierr = interpPeriodicVector(tc,&Ts,biogeochemCyclePeriod,numBiogeochemPeriods,tdpBiogeochem,&Tsp,"Ts_");
 	ierr = interpPeriodicVector(tc,&Ss,biogeochemCyclePeriod,numBiogeochemPeriods,tdpBiogeochem,&Ssp,"Ss_");	
-	if (useEmP) {
-      ierr = interpPeriodicProfileSurfaceScalarData(tc,localEmP,biogeochemCyclePeriod,numBiogeochemPeriods,
-                                                    tdpBiogeochem,&localEmPp,"EmP_");                                                  
-    }	
+	ierr = interpPeriodicProfileSurfaceScalarData(tc,localEmP,biogeochemCyclePeriod,numBiogeochemPeriods,
+												  tdpBiogeochem,&localEmPp,"EmP_");                                                  
     ierr = interpPeriodicProfileSurfaceScalarData(tc,localfice,biogeochemCyclePeriod,numBiogeochemPeriods,
                                                   tdpBiogeochem,&localficep,"fice_");
     if (useWinds) {
@@ -546,9 +542,11 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   for (ip=0; ip<lNumProfiles; ip++) {
 	kl=lStartIndices[ip];  
 
-    ini_ocmip_abiotic_model_(&Iter,&myTime,&localDIC[kl],&localAlk[ip],&localPO4[ip],&localSiO2[ip],                 
+    ocmip_abiotic_carbon_ini_(&Iter,&myTime,&localDIC[kl],&localAlk[ip],&localPO4[ip],&localSiO2[ip],                 
                            &localTs[kl],&localSs[kl],&pH[ip]);
   }
+
+  ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localpco2diag);CHKERRQ(ierr);  /* always need to pass this */
 
   ierr = PetscOptionsHasName(PETSC_NULL,"-calc_diagnostics",&calcDiagnostics);CHKERRQ(ierr);
   if (calcDiagnostics) {    
@@ -560,7 +558,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed starting at (and including) time step: %d\n", diagStartTimeStep);CHKERRQ(ierr);	
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed over %d time steps\n", diagNumTimeSteps);CHKERRQ(ierr);	
 
-    ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localpco2diag);CHKERRQ(ierr);  
     ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localpco2diagavg);CHKERRQ(ierr);  
 
     ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localgasexfluxdiag);CHKERRQ(ierr);  
@@ -622,7 +619,7 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
 {
 
   PetscErrorCode ierr;
-  static PetscScalar DICglobavg = 0.0, DIC14globavg = 0.0;
+  static PetscScalar DICemp = 0.0, DIC14emp = 0.0;
   PetscScalar Vgas660, Sc;
   PetscInt itr, ip, nzloc, kl;
   PetscScalar myTime;
@@ -639,10 +636,8 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
   if (periodicBiogeochemForcing) {   
 	ierr = interpPeriodicVector(tc,&Ts,biogeochemCyclePeriod,numBiogeochemPeriods,tdpBiogeochem,&Tsp,"Ts_");
 	ierr = interpPeriodicVector(tc,&Ss,biogeochemCyclePeriod,numBiogeochemPeriods,tdpBiogeochem,&Ssp,"Ss_");	
-    if (useEmP) {
-      ierr = interpPeriodicProfileSurfaceScalarData(tc,localEmP,biogeochemCyclePeriod,numBiogeochemPeriods,
-                                                    tdpBiogeochem,&localEmPp,"EmP_");                                                      
-    }
+	ierr = interpPeriodicProfileSurfaceScalarData(tc,localEmP,biogeochemCyclePeriod,numBiogeochemPeriods,
+												  tdpBiogeochem,&localEmPp,"EmP_");                                                      
     ierr = interpPeriodicProfileSurfaceScalarData(tc,localfice,biogeochemCyclePeriod,numBiogeochemPeriods,
                                                   tdpBiogeochem,&localficep,"fice_");
     if (useWinds) {
@@ -731,10 +726,10 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
   ierr = VecSet(JDIC14,zero); CHKERRQ(ierr); /* This is needed for C14 because we are adding an interior source (decay) term */
 #endif
 
-  if (useEmP) {
-    ierr = VecDot(surfVolFrac,DIC,&DICglobavg);CHKERRQ(ierr); /* volume weighted mean surface DIC */									              
+  if (useVirtualFlux) { /* use the global surface mean value to calculate E-P contribution */
+    ierr = VecDot(surfVolFrac,DIC,&DICemp);CHKERRQ(ierr); /* volume weighted mean surface DIC */									              
 #ifdef ALLOW_C14
-    ierr = VecDot(surfVolFrac,DIC14,&DIC14globavg);CHKERRQ(ierr); /* volume weighted mean surface DIC14 */									              
+    ierr = VecDot(surfVolFrac,DIC14,&DIC14emp);CHKERRQ(ierr); /* volume weighted mean surface DIC14 */									              
 #endif    
   }
 
@@ -746,20 +741,27 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
   for (ip=0; ip<lNumProfiles; ip++) {
     kl=lStartIndices[ip];
     nzloc=lProfileLength[ip];
-    ocmip_abiotic_model_(&Iter,&myTime,
+    
+	if (!useVirtualFlux) { /* use the local surface value to calculate E-P contribution */
+      DICemp=localDIC[kl];
+#ifdef ALLOW_C14      
+      DIC14emp=localDIC14[kl];
+#endif
+    }
+    ocmip_abiotic_carbon_model_(&Iter,&myTime,
                          &localDIC[kl],
 #ifdef ALLOW_C14
                          &localDIC14[kl],
 #endif                         
                          &localAlk[ip],&localPO4[ip],&localSiO2[ip],
                          &localTs[kl],&localSs[kl],&pH[ip],&localVgas[ip],
-                         &localatmosp[ip],&pCO2atm,&dzsurf,
-                         &localEmP[ip],&DICglobavg,
+                         &localatmosp[ip],&pCO2atm,&localdzsurf[ip],
+                         &localEmP[ip],&DICemp,
                          &linearChemistryFactor[ip],&linearChemistryCO2[ip],&linearChemistryDIC[ip],
 #ifdef ALLOW_C14
-                         &localDC14atm[ip],&DIC14globavg,
+                         &localDC14atm[ip],&DIC14emp,
 #endif                                                  
-                         &localJDIC[kl],&localgasexflux,&localtotflux
+                         &localJDIC[kl],&localgasexflux,&localtotflux,&localpco2diag[ip]
 #ifdef ALLOW_C14
                          ,&localJDIC14[kl],&localc14gasexflux,&localc14totflux
 #endif                                                                           
@@ -771,7 +773,6 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
     
 	if (calcDiagnostics) {  
 	  if (Iter0+iLoop>=diagStartTimeStep) { /* start time averaging (note: diagStartTimeStep is ABSOLUTE time step) */	
-        ocmip_abiotic_diagnostics_(&nzloc,&Iter,&myTime,&localpco2diag[ip]);
         localgasexfluxdiag[ip]=localgasexflux;
         localtotfluxdiag[ip]=localtotflux;
 #ifdef ALLOW_C14
@@ -1005,16 +1006,14 @@ PetscErrorCode finalizeExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt n
     ierr = destroyPeriodicArray(&localPO4p);CHKERRQ(ierr);
     ierr = destroyPeriodicArray(&localAlkp);CHKERRQ(ierr);    
     ierr = destroyPeriodicArray(&localSiO2p);CHKERRQ(ierr);
-    if (useEmP) {
-      ierr = destroyPeriodicArray(&localEmPp);CHKERRQ(ierr);
-    }    
+	ierr = destroyPeriodicArray(&localEmPp);CHKERRQ(ierr);
   }    
 
   if (useAtmModel) {
     ierr = PetscFClose(PETSC_COMM_WORLD,atmfptime);CHKERRQ(ierr);
   }
   
-  if (useEmP) {
+  if (useVirtualFlux) {
     ierr = VecDestroy(&surfVolFrac);CHKERRQ(ierr);  
   }
 
@@ -1040,10 +1039,8 @@ PetscErrorCode reInitializeExternalForcing(PetscScalar tc, PetscInt Iter, PetscI
   if (periodicBiogeochemForcing) {   
 	ierr = interpPeriodicVector(tc,&Ts,biogeochemCyclePeriod,numBiogeochemPeriods,tdpBiogeochem,&Tsp,"Ts_");
 	ierr = interpPeriodicVector(tc,&Ss,biogeochemCyclePeriod,numBiogeochemPeriods,tdpBiogeochem,&Ssp,"Ss_");	
-	if (useEmP) {
-      ierr = interpPeriodicProfileSurfaceScalarData(tc,localEmP,biogeochemCyclePeriod,numBiogeochemPeriods,
-                                                    tdpBiogeochem,&localEmPp,"EmP_");                                                  
-    }		
+	ierr = interpPeriodicProfileSurfaceScalarData(tc,localEmP,biogeochemCyclePeriod,numBiogeochemPeriods,
+												  tdpBiogeochem,&localEmPp,"EmP_");                                                  
     ierr = interpPeriodicProfileSurfaceScalarData(tc,localfice,biogeochemCyclePeriod,numBiogeochemPeriods,
                                                   tdpBiogeochem,&localficep,"fice_");
     if (useWinds) {
@@ -1070,7 +1067,7 @@ PetscErrorCode reInitializeExternalForcing(PetscScalar tc, PetscInt Iter, PetscI
   for (ip=0; ip<lNumProfiles; ip++) {
 	kl=lStartIndices[ip];  
 
-    ini_ocmip_abiotic_model_(&Iter,&myTime,&localDIC[kl],&localAlk[ip],&localPO4[ip],&localSiO2[ip],                 
+    ocmip_abiotic_carbon_ini_(&Iter,&myTime,&localDIC[kl],&localAlk[ip],&localPO4[ip],&localSiO2[ip],                 
                            &localTs[kl],&localSs[kl],&pH[ip]);
   }
 

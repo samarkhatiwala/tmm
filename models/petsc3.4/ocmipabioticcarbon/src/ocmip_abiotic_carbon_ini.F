@@ -1,8 +1,8 @@
 CBOP
-C !ROUTINE: INI_OCMIP_ABIOTIC_MODEL
+C !ROUTINE: OCMIP_ABIOTIC_CARBON_INI
 
 C !INTERFACE: ==========================================================
-      SUBROUTINE INI_OCMIP_ABIOTIC_MODEL(myIter,myTime,
+      SUBROUTINE OCMIP_ABIOTIC_CARBON_INI(myIter,myTime,
      &                 PTR_DIC,PTR_ALK,PTR_PO4,PTR_SIO2,
      &                 thetaloc,saltloc,pHloc)
 

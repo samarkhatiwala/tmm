@@ -1,45 +1,30 @@
-#include "OCMIP_ABIOTIC_OPTIONS.h"
-
-#ifdef AUTODIFF_INTERFACE
-C stupid hack to deal with cpp
-#include "BLANKS.h"
-#endif
+#include "OCMIP_ABIOTIC_CARBON_OPTIONS.h"
 
 C !INTERFACE: ==========================================================
-      SUBROUTINE OCMIP_ABIOTIC_MODEL(myIter,myTime,
-#ifdef AUTODIFF_INTERFACE      
-     &                 X,
-#else
+      SUBROUTINE OCMIP_ABIOTIC_CARBON_MODEL(myIter,myTime,
      &                 PTR_DIC,
 #ifdef ALLOW_C14
      &                 PTR_DIC14,
 #endif
-#endif
      &                 PTR_ALK,PTR_PO4,PTR_SIO2,
      &                 thetaloc,saltloc,pHloc,Vgasloc,
      &                 atmosploc,pCO2atm_pp,dzsurf,
-     &                 EmPloc,DICglobavg,
+     &                 EmPloc,DICemp,
      &                 linearChemistryFactor,linearChemistryCO2,
      &                 linearChemistryDIC,
 #ifdef ALLOW_C14
-     &                 D14Catm,DIC14globavg,
+     &                 D14Catm,DIC14emp,
 #endif     
-#ifdef AUTODIFF_INTERFACE
-     &                 Y
-#else
-     &                 GDICloc,gasexfluxloc,totfluxloc
+     &                 GDICloc,gasexfluxloc,totfluxloc,pco2loc
 #ifdef ALLOW_C14
      &                 ,GDIC14loc,c14gasexfluxloc,c14totfluxloc
 #endif     
-#endif
      &                          )
 
 C !DESCRIPTION:
 
 C !USES: ===============================================================
       IMPLICIT NONE
-
-#include "DIAGNOSTICS.h"
 
 C !INPUT PARAMETERS: ===================================================
 C  myThid               :: thread number
@@ -54,39 +39,23 @@ c  PTR_O2               :: oxygen
 C  PTR_FE               :: iron
       INTEGER myIter
       real*8 myTime
-#ifdef AUTODIFF_INTERFACE
-#ifndef ALLOW_C14
-      real*8 X(1)
-#else
-      real*8 X(2)
-#endif
-#else
       real*8 PTR_DIC
 #ifdef ALLOW_C14
       real*8 PTR_DIC14
 #endif      
-#endif
       real*8 PTR_ALK,PTR_PO4,PTR_SIO2
       real*8 thetaloc,saltloc,pHloc,Vgasloc,atmosploc,pCO2atm_pp
-      real*8 dzsurf,EmPloc,DICglobavg
+      real*8 dzsurf,EmPloc,DICemp
       real*8 linearChemistryFactor,linearChemistryCO2
       real*8 linearChemistryDIC
 #ifdef ALLOW_C14
-      real*8 D14Catm,DIC14globavg
+      real*8 D14Catm,DIC14emp
 #endif                  
 C     Output variables
-#ifdef AUTODIFF_INTERFACE
-#ifndef ALLOW_C14
-      real*8 Y(1)
-#else
-      real*8 Y(2)
-#endif
-#else
-      real*8 GDICloc,gasexfluxloc,totfluxloc
+      real*8 GDICloc,gasexfluxloc,totfluxloc,pco2loc
 #ifdef ALLOW_C14
       real*8 GDIC14loc,c14gasexfluxloc,c14totfluxloc
 #endif            
-#endif
 
 C !LOCAL VARIABLES: ====================================================
       real*8 DIC,GDIC
@@ -107,15 +76,16 @@ C !LOCAL VARIABLES: ====================================================
 CEOP
 
 C     Copy surface variables
-#ifdef AUTODIFF_INTERFACE                    
-      DIC=X(1) ! PTR_DIC(k)
-#ifdef ALLOW_C14
-      DIC14=X(2)
-#endif      
-#else
       DIC=PTR_DIC
 #ifdef ALLOW_C14
       DIC14=PTR_DIC14
+#endif      
+
+C as per MITgcm pkg/dic
+#ifdef DIC_BOUNDS
+      DIC = max(0.4d0, min(10.d0, PTR_DIC))
+#ifdef ALLOW_C14      
+      DIC14 = max(0.4d0, min(10.d0, PTR_DIC14))
 #endif      
 #endif
 
@@ -170,35 +140,26 @@ C	  dco2ddic(i) = (htotal/k2)/(dic(i)/co2star(i)) ! approximate d(co2star)/d(dic
       endif
       
       gasexfluxloc=-Vgasloc*(co2star - co2starair)
-      totfluxloc=gasexfluxloc+DICglobavg*EmPloc
+      totfluxloc=gasexfluxloc+DICemp*EmPloc
       
       GDIC = totfluxloc/dzsurf
       
-C       GDIC=-Kex*(co2star - co2starair)
 #ifdef ALLOW_C14      
       Rocn=DIC14/DIC
       Ratm=(1.d0 + D14Catm/1000.d0)
 
       c14gasexfluxloc=-Vgasloc*(co2star*Rocn - co2starair*Ratm)
-      c14totfluxloc=c14gasexfluxloc+DIC14globavg*EmPloc
+      c14totfluxloc=c14gasexfluxloc+DIC14emp*EmPloc
       GDIC14=c14totfluxloc/dzsurf
       
-C       GDIC14=-Kex*(co2star*Rocn - co2starair*Ratm)
 #endif
 
 C     Send data back
-#ifdef AUTODIFF_INTERFACE     
-      Y(1)=GDIC ! GDICloc(k)=GDIC(k)
-#ifdef ALLOW_C14
-      Y(2)=GDIC14
-#endif      
-#else
-C	  pHloc=pH(1,1,1,1)
       GDICloc=GDIC
+      pco2loc=co2star/sol      
 #ifdef ALLOW_C14
       GDIC14loc=GDIC14
 #endif            
-#endif
 
 c
 	  RETURN

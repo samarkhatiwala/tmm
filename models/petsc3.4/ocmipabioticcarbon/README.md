@@ -5,7 +5,6 @@ Alk.bin or Alk_**
 PO4.bin or PO4_**
 SiO2.bin or SiO2_**
 atmosp.bin or atmosp_**
-% if using EmP
 EmP.bin or EmP_**
 
 % if annual mean forcing

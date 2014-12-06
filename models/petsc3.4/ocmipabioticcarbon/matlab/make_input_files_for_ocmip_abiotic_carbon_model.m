@@ -1,10 +1,10 @@
 % Set toplevel path to GCMs configuration
 % base_path='/data2/spk/TransportMatrixConfigs/MITgcm_2.8deg';
 % base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO';
-base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO_v4';
+base_path='/glade/p/work/spk/ECCO_CLIVAR_v4/MITgcm/spk/MIT_Matrix_ECCO_CLIVAR_v4';
 
 periodicForcing=1
-periodicMatrix=0
+periodicMatrix=1
 
 dt=3600*8; % time step to use
 
@@ -19,17 +19,18 @@ useAtmModel=0
 useLandModel=0
 useEmissions=0
 doAnthroCalc=1
-doC14calc=0
+doC14calc=1
 % iniConditionFile='preindustrial_steady_state_dic'
-useEmP=1;
+useVirtualFlux=0
+empScaleFactor=1.0
 
-oceanCarbonBasePath='/data2/spk/OceanCarbon';
+oceanCarbonBasePath='/glade/p/work/spk/OceanCarbon';
 %-----------------------------------
 % Options for wind/gas exchange
 % (1) Gas exchange velocity using OCMIP protocol (if periodicForcing==0) or 
 %     exchange coefficient using OCMIP protocol (if periodicForcing==1)
 % (2) Gas exchange computed online from winds; default is to read CORE-2 winds
-gasExchangeType=1;
+gasExchangeType=2;
 corePath=fullfile(oceanCarbonBasePath,'CORE');
 %-----------------------------------
 
@@ -72,7 +73,7 @@ gridFile=fullfile(base_path,'grid');
 boxFile=fullfile(matrixPath,'Data','boxes');
 profilesFile=fullfile(matrixPath,'Data','profile_data');
 
-load(gridFile,'nx','ny','nz','dznom','da','x','y','z','deltaT','gridType')
+load(gridFile,'nx','ny','nz','dznom','dz','da','x','y','z','deltaT','gridType')
 
 dtMultiple=dt/deltaT;
 if rem(dt,deltaT)
@@ -191,48 +192,50 @@ clear Tgcm Sgcm % make some space
 
 % surface area
 dab_surf=gridToMatrix(da,Ib,boxFile,gridFile);
+% surface layer thickness
+dzb_surf=gridToMatrix(dz,Ib,boxFile,gridFile);
 
 % Surface forcing
-if useEmP
 % Compute total E-P for virtual flux:
 % Fv = TRg*(E-P), E-P in m/s
 % d[TR]/dt = ... + Fv/dz
-  load(freshWaterForcingFile,'EmPgcm','Srelaxgcm','saltRelaxTimegcm')
-  zeroNetEmP=1;
-  EmP=get_surface_emp_for_virtual_flux(gridFile,boxFile,EmPgcm,Srelaxgcm,saltRelaxTimegcm,Ssteady,zeroNetEmP);
-%   gV=EmP./dzb;
+load(freshWaterForcingFile,'EmPgcm','Srelaxgcm','saltRelaxTimegcm')
+zeroNetEmP=1;
+EmP=get_surface_emp_for_virtual_flux(gridFile,boxFile,EmPgcm,Srelaxgcm,saltRelaxTimegcm,Ssteady,zeroNetEmP);
+if fixEmP
+  load(empFixFile,'empFixX','empFixY')
+  nEmPFix=length(empFixX);
+% Points to fix: each SET is individually fixed.
+  for k=1:nEmPFix
+	if length(empFixX{k})>1 % polygon  
+	  Ifix{k}=find(inpolygon(Xboxnom(Ib),Yboxnom(Ib),empFixX{k},empFixY{k})); % indexed to Ib
+	else % single point
+	  Ifix{k}=find(Xboxnom(Ib)==empFixX{k} & Yboxnom(Ib)==empFixY{k}); % referenced to Ib
+	end
+  end
+% Rest of ocean (not fixed)
+  Infix=find(~ismember([1:nbb]',cat(1,Ifix{:}))); % Everything else indexed to Ib	
+% Now fix E-P so that annual and spatial integral is 0.
+  for k=1:length(Ifix) % loop over each SET of problematic points
+	if useAreaWeighting
+	  areabfix=dab_surf(Ifix{k});
+	  EmP(Ifix{k},:) = EmP(Ifix{k},:) - mean(areabfix'*EmP(Ifix{k},:))/sum(areabfix);
+	else
+	  EmP(Ifix{k},:) = EmP(Ifix{k},:) - mean(mean(EmP(Ifix{k},:)));
+	end
+  end
+  if useAreaWeighting
+	areabnfix=dab_surf(Infix);
+	EmP(Infix,:) = EmP(Infix,:) - mean(areabnfix'*EmP(Infix,:))/sum(areabnfix);
+  else
+	EmP(Infix,:) = EmP(Infix,:) - mean(mean(EmP(Infix,:)));
+  end
+end
+EmP=EmP*empScaleFactor;
+
+if useVirtualFlux
   volFracSurf=zeros(nb,1);
   volFracSurf(Ib)=volb(Ib)/sum(volb(Ib));  
-
-  if fixEmP
-	load(empFixFile,'empFixX','empFixY')
-	nEmPFix=length(empFixX);
-%   Points to fix: each SET is individually fixed.
-	for k=1:nEmPFix
-	  if length(empFixX{k})>1 % polygon  
-		Ifix{k}=find(inpolygon(Xboxnom(Ib),Yboxnom(Ib),empFixX{k},empFixY{k})); % indexed to Ib
-	  else % single point
-		Ifix{k}=find(Xboxnom(Ib)==empFixX{k} & Yboxnom(Ib)==empFixY{k}); % referenced to Ib
-	  end
-	end
-%   Rest of ocean (not fixed)
-    Infix=find(~ismember([1:nbb]',cat(1,Ifix{:}))); % Everything else indexed to Ib	
-%   Now fix E-P so that annual and spatial integral is 0.
-	for k=1:length(Ifix) % loop over each SET of problematic points
-	  if useAreaWeighting
-		areabfix=dab_surf(Ifix{k});
-		EmP(Ifix{k},:) = EmP(Ifix{k},:) - mean(areabfix'*EmP(Ifix{k},:))/sum(areabfix);
-	  else
-		EmP(Ifix{k},:) = EmP(Ifix{k},:) - mean(mean(EmP(Ifix{k},:)));
-	  end
-	end
-	if useAreaWeighting
-	  areabnfix=dab_surf(Infix);
-	  EmP(Infix,:) = EmP(Infix,:) - mean(areabnfix'*EmP(Infix,:))/sum(areabnfix);
-	else
-	  EmP(Infix,:) = EmP(Infix,:) - mean(mean(EmP(Infix,:)));
-	end
-  end  
 end
 
 if gasExchangeType==1
@@ -256,16 +259,21 @@ if exist('ficeb','var')
   ficeb(ficeb<0.2)=0; % OCMIP-2 howto
 end
 
+if rescaleForcing
+  load(fullfile(base_path,rescaleForcingFile))
+end
+
 % now take annual mean if necessary
 if ~periodicForcing
   Tsteady=mean(Tsteady,2);
   Ssteady=mean(Ssteady,2);
-  if useEmP
-    EmP=mean(EmP,2);
-  end  
+  EmP=mean(EmP,2);
   if gasExchangeType==1
 	Vgas=mean(Vgas,2);
-  end	  
+  end
+  if rescaleForcing
+	Rfs=mean(Rfs,2);    
+  end  
 end
 
 atmospb=load_ocmip_variable([],'P',Xboxnom(Ib),Yboxnom(Ib));  
@@ -312,8 +320,11 @@ if rearrangeProfiles
   Tsteady=Tsteady(Ir,:);
   Ssteady=Ssteady(Ir,:);
   volb=volb(Ir);
-  if useEmP
+  if useVirtualFlux
     volFracSurf=volFracSurf(Ir);
+  end  
+  if rescaleForcing
+    Rfs=Rfs(Ir,:);
   end  
   Ib=find(izBox==1);
 %
@@ -415,6 +426,7 @@ if writeFiles
     writePetscBin('dic14ini.petsc',DIC14)
   end  
 % Biogeochemical parameters
+  write_binary('dzsurf.bin',dzb_surf,'real*8')    
   if ~useAtmModel 
     if doAnthroCalc
       write_binary('TpCO2.bin',Tco2,'real*8')
@@ -475,16 +487,26 @@ if writeFiles
 	  writePetscBin(['Ss_' sprintf('%02d',im-1)],Ssteady(:,im))
     end    
   end    
-  if useEmP
+  if ~periodicForcing
+	write_binary('EmP.bin',EmP,'real*8')
+  else
+	for im=1:nm
+	  write_binary(['EmP_' sprintf('%02d',im-1)],EmP(:,im),'real*8')
+	end
+  end      
+  if useVirtualFlux
     writePetscBin('surface_volume_fraction.petsc',volFracSurf)
-    if ~periodicForcing
-  	  write_binary('EmP.bin',EmP,'real*8')
-    else
+  end  
+  if rescaleForcing
+	if ~periodicForcing
+	  writePetscBin('Rfs.petsc',Rfs)
+	else
 	  for im=1:nm
-  	    write_binary(['EmP_' sprintf('%02d',im-1)],EmP(:,im),'real*8')
-	  end
+		writePetscBin(['Rfs_' sprintf('%02d',im-1)],Rfs(:,im))
+	  end    
 	end    
-  end
+  end  
+  
 % Profile data  
   if rearrangeProfiles
     if ~useCoarseGrainedMatrix
