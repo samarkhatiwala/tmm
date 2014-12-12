@@ -670,8 +670,8 @@ int main(int argc,char **args)
   }  
 
   ierr = PetscOptionsGetString(PETSC_NULL,"-rescale_forcing_file",rfsFile,PETSC_MAX_PATH_LEN-1,&rescaleForcing);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"Forcing will be rescaled\n");CHKERRQ(ierr); 	  
   if (rescaleForcing) {  
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"Forcing will be rescaled\n");CHKERRQ(ierr); 	    
     ierr = VecDuplicate(templateVec,&Rfs);CHKERRQ(ierr);    
 	if (periodicMatrix) {    
 	  ierr=PetscStrcat(rfsFile,"_");CHKERRQ(ierr);
