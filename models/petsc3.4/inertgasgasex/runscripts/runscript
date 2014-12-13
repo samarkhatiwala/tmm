@@ -1,0 +1,9 @@
+mpiexec -np 2 ./tmminertgasgasex -numtracers 1 \
+  -me Ae -mi Ai -t0    0.0 -iter0 0 -deltat_clock 0.0013888888888889 -max_steps 720 -write_steps 720 \
+  -o Ar_0_1_1.petsc \
+  -external_forcing -use_profiles -biogeochem_deltat 43200.0 \
+  -inert_gas_id 2 -flux_scaling 0.0,1.0,1.0 \
+  -periodic_matrix -matrix_cycle_period 1.0 -matrix_cycle_step 0.0833333333333333 \
+  -periodic_biogeochem_forcing -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_cycle_step 0.08333333333333 \
+  -pickup_out pickup_Ar_0_1_1.petsc -time_file output_time_Ar_0_1_1  \
+  -i Arini.petsc > log

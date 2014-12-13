@@ -26,7 +26,7 @@ PetscScalar *localJTR;
 PetscScalar *localfice,*localwind, *localatmosp;
 Vec TReq;
 PetscScalar *localVgas,*localFgas,*localFinj,*localFex,*localTReq;
-PetscScalar DeltaT, dzsurf;
+PetscScalar DeltaT, *localdzsurf;
 PetscInt gasID = 0;
 PetscScalar fluxScaling[3];
 
@@ -119,9 +119,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = PetscOptionsGetReal(PETSC_NULL,"-biogeochem_deltat",&DeltaT,&flg);CHKERRQ(ierr);
   if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate biogeochemical time step in seconds with the -biogeochem_deltat option");  
 
-  ierr = PetscOptionsGetReal(PETSC_NULL,"-dzsurf",&dzsurf,&flg);CHKERRQ(ierr);
-  if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate surface layer thickness with the -dzsurf option");  
-
   fluxScaling[0]=1.0;
   fluxScaling[1]=1.0;
   fluxScaling[2]=1.0;
@@ -185,6 +182,8 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   }  
 
 /* Grid arrays */
+  ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localdzsurf);CHKERRQ(ierr);
+  ierr = readProfileSurfaceScalarData("dzsurf.bin",localdzsurf,1);  
 
 /* Forcing fields */  
   ierr = PetscOptionsHasName(PETSC_NULL,"-use_separate_winds",&useSeparateWinds);CHKERRQ(ierr);
@@ -281,7 +280,8 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 									              tdpBiogeochem,&localatmospp,"atmosp_");
   }  
 
-/* Initialize biogeochem model */
+/* Initialize model: if not using periodicBiogeochemForcing then fluxes and equilibrium */
+/* surface concentrations computed here will be subsequently used */
   myTime = DeltaT*Iter; /* Iter should start at 0 */
   for (ip=0; ip<lNumProfiles; ip++) {
 	kl=lStartIndices[ip];  
@@ -362,7 +362,7 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
     ierr = interpPeriodicProfileSurfaceScalarData(tc,localatmosp,biogeochemCyclePeriod,numBiogeochemPeriods,
 									              tdpBiogeochem,&localatmospp,"atmosp_");
 
-/*  Recompute fluxes */
+/*  Recompute fluxes and surface equilibrium concentration */
     for (ip=0; ip<lNumProfiles; ip++) {
       nzloc=lProfileLength[ip];    
       kl=lStartIndices[ip];  
@@ -387,7 +387,7 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
     localFgas[ip]=-fluxScaling[2]*localVgas[ip]*(localTR[kl] - localTReq[kl]);    
     Fas = localFgas[ip] + localFinj[ip] + localFex[ip];
     
-    localJTR[kl] = Fas/dzsurf;
+    localJTR[kl] = Fas/localdzsurf[ip];
 
 	if (calcDiagnostics) {  
 	  if (Iter0+iLoop>=diagStartTimeStep) { /* start time averaging (note: diagStartTimeStep is ABSOLUTE time step) */	
@@ -564,7 +564,8 @@ PetscErrorCode reInitializeExternalForcing(PetscScalar tc, PetscInt Iter, PetscI
 									              tdpBiogeochem,&localatmospp,"atmosp_");
   }  
 
-/* Initialize biogeochem model */
+/* Initialize model: if not using periodicBiogeochemForcing then fluxes and equilibrium */
+/* surface concentrations computed here will be subsequently used */
   myTime = DeltaT*Iter; /* Iter should start at 0 */
   for (ip=0; ip<lNumProfiles; ip++) {
 	kl=lStartIndices[ip];  

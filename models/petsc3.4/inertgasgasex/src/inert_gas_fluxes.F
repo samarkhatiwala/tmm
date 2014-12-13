@@ -24,6 +24,8 @@ C     Output variables
 C !LOCAL VARIABLES: ====================================================
       real*8 rho0, permil, permeg
       parameter (rho0=1024.5d0, permil=1.d0/rho0, permeg=1.d-6)
+      real*8 cmph2mps
+      parameter (cmph2mps=1.d0/(100.d0*60.d0*60.d0))
       real*8 Ainj, Aex
       parameter (Ainj=2.357d-9, Aex=1.848d-5)      
       real*8 u3,Vgas660,Sc,visc,G_eq,Dgas,T,S,rho
@@ -46,7 +48,11 @@ C 	  Vgas660=(1.d0-ficeloc)*(0.222d0*(u10loc**2) + 0.333d0*u10loc)
 C   DN: Sweeney et. al. 2007 param for gas ex - ice included
 	  Vgas660=(1.d0-ficeloc)*0.27d0*(u10loc**2) 
 C /* % cm/h to m/s */
-	  Vgas=(Vgas660/sqrt(Sc/660.0d0))/(100.d0*60.d0*60.d0)
+	  Vgas=(Vgas660/sqrt(Sc/660.0d0))*cmph2mps
+
+C     Solubility equilibrium concentration
+      G_eq = rho*solfun(S,T,gasID)/1.d6 
+      PTReq = G_eq*atmosploc
 
 C   DN: ice term added here too 
       u3= (1.d0-ficeloc)*(u10loc-2.27d0)**3
@@ -55,9 +61,6 @@ C   DN: ice term added here too
       Finj = Ainj*atmosploc*gas_mol_fract(gasID)*u3
 
       Fex = Aex*sqrt(Dgas)*atmosploc*G_eq*u3
-
-      G_eq = rho*solfun(S,T,gasID)/1.d6 
-      PTReq = G_eq*atmosploc
       
 C     Total air-sea flux: Fas = -Vgas*(PTR - PTReq) + Finj + Fex
       

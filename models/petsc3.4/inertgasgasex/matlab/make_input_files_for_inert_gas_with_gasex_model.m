@@ -60,7 +60,7 @@ gridFile=fullfile(base_path,'grid');
 boxFile=fullfile(matrixPath,'Data','boxes');
 profilesFile=fullfile(matrixPath,'Data','profile_data');
 
-load(gridFile,'nx','ny','nz','dznom','x','y','z','deltaT','gridType')
+load(gridFile,'nx','ny','nz','dznom','dz','x','y','z','deltaT','gridType')
 
 dtMultiple=dt/deltaT;
 if rem(dt,deltaT)
@@ -112,6 +112,9 @@ if ~periodicForcing
   Tsteady=mean(Tsteady,2);
   Ssteady=mean(Ssteady,2);
 end
+
+% surface layer thickness
+dzb_surf=gridToMatrix(dz,Ib,boxFile,gridFile);
 
 % Surface forcing data
 load(iceFile,'Fice')
@@ -305,6 +308,7 @@ if writeFiles
     end    
   end    
 % Grid data
+  write_binary('dzsurf.bin',dzb_surf,'real*8') 
 
 % Profile data
   if rearrangeProfiles
