@@ -11,7 +11,6 @@
 #include "tmm_forcing_utils.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
-#include "tmm_main.h"
 #include "OCMIP_ABIOTIC_CARBON_OPTIONS.h"
 #include "ocmip_abiotic_carbon_landatm.h"
 
@@ -80,7 +79,7 @@ PetscScalar *localdA;
 PetscScalar landState[3], landSource[3];
 PetscScalar deltaTsg = 0.0;
 PetscScalar ppmToPgC=2.1324;
-PetscScalar DeltaTyr;
+PetscScalar atmModelDeltaT;
 PetscScalar secPerYear=86400.0*360.0;
 PetscScalar Fland = 0.0, Focean=0.0;
 
@@ -205,10 +204,8 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 /* Land/Atm model data */
   ierr = PetscOptionsHasName(PETSC_NULL,"-use_atm_model",&useAtmModel);CHKERRQ(ierr);
   ierr = PetscOptionsHasName(PETSC_NULL,"-use_land_model",&useLandModel);CHKERRQ(ierr);
-/*   ierr = PetscOptionsHasName(PETSC_NULL,"-use_emissions",&useEmissions);CHKERRQ(ierr); */
 
   if ((useLandModel) && (!useAtmModel)) SETERRQ(PETSC_COMM_WORLD,1,"ERROR: Land model cannot be used without the atmospheric model");
-/*   if ((useEmissions) && ((!useAtmModel) && (!useAtmModel))) SETERRQ(PETSC_COMM_WORLD,1,"ERROR: Cannot prescribe emissions without turning on atmosphere or land model"); */
 
 #ifdef ALLOW_C14
   if (useAtmModel) SETERRQ(PETSC_COMM_WORLD,1,"ERROR: C14 is not supported with atmospheric model!");
@@ -234,7 +231,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     pCO2atm = pCO2atm_ini;
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Using initial atmospheric pCO2 of %g ppm\n",pCO2atm);CHKERRQ(ierr);
       
-    DeltaTyr = DeltaT/secPerYear; /* time step in years */
+    atmModelDeltaT = DeltaT/secPerYear; /* time step in years */
 
     ierr = PetscOptionsGetInt(PETSC_NULL,"-atm_write_steps",&atmWriteSteps,&flg);CHKERRQ(ierr);
     if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate atmospheric model output step with the -atm_write_steps option");
@@ -287,12 +284,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
       ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
       ierr = PetscBinaryRead(fp,landState,3,PETSC_SCALAR);CHKERRQ(ierr);
       ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
-/*       maxValsToRead = 3; */
-/*       ierr = PetscOptionsGetRealArray(PETSC_NULL,"-land_initial_condition",landState,&maxValsToRead,&flg); */
-/*       if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate land initial condition with the -land_initial_condition option"); */
-/*       if (maxValsToRead != 3) { */
-/*         SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of land initial conditions specified"); */
-/*       } */   
 
       if (!atmAppendOutput) {
         ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing land output at time %10.5f, step %d\n", tc,Iter);CHKERRQ(ierr);  
@@ -596,15 +587,15 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     if (useAtmModel) {
       pCO2atmavg=0.0;
       Foceanavg=0.0;
+
+	  if (useLandModel) {
+		Flandavg=0.0;
+		landStateavg[0]=0.0;
+		landStateavg[1]=0.0;
+		landStateavg[2]=0.0;
+	  }      
     }
     
-    if (useLandModel) {
-      Flandavg=0.0;
-      landStateavg[0]=0.0;
-      landStateavg[1]=0.0;
-      landStateavg[2]=0.0;
-    }
-
 	diagCount=0;
 	
   }
@@ -784,21 +775,18 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
   } /* end loop over profiles */
   
   if (useAtmModel) {
-    MPI_Reduce(&localFocean, &Focean, 1, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD);
-    MPI_Bcast(&Focean, 1, MPI_DOUBLE, 0, PETSC_COMM_WORLD);
-  }
+	MPI_Allreduce(&localFocean, &Focean, 1, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD);    
 
-  if (useLandModel) {
-    landsource_(&landState[0],&pCO2atm,&landUseEmission,&deltaTsg,&Fland,&landSource[0]); /* returns S and Fl in PgC/y */
-/* time step land */
-    for (k=0;k<=2;k++) {
-      landState[k] = landState[k] + DeltaTyr*landSource[k];
-    }
-  }
+	if (useLandModel) {
+	  landsource_(&landState[0],&pCO2atm,&landUseEmission,&deltaTsg,&Fland,&landSource[0]); /* returns S and Fl in PgC/y */
+/*    time step land */
+	  for (k=0;k<=2;k++) {
+		landState[k] = landState[k] + atmModelDeltaT*landSource[k];
+	  }
+	}
 
-  if (useAtmModel) {  
 /* time step atmosphere */
-    pCO2atm = pCO2atm + DeltaTyr*(fossilFuelEmission + landUseEmission - Focean - Fland)/ppmToPgC;
+    pCO2atm = pCO2atm + atmModelDeltaT*(fossilFuelEmission + landUseEmission - Focean - Fland)/ppmToPgC;
   }  
 
   ierr = VecSetValues(JDIC,lSize,gIndices,localJDIC,INSERT_VALUES);CHKERRQ(ierr);
@@ -842,14 +830,14 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
       ierr = PetscFPrintf(PETSC_COMM_WORLD,atmfptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
       ierr = writeBinaryScalarData("pCO2atm_output.bin",&pCO2atm,1,PETSC_TRUE);
     }
-  }
 
-  if (useLandModel) {
-/* write instantaneous land model state */
-    if ((iLoop % atmWriteSteps)==0) {  /*  time to write out */
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing land model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
-      ierr = writeBinaryScalarData("land_state_output.bin",landState,3,PETSC_TRUE);
-    }
+	if (useLandModel) {
+/*    write instantaneous land model state */
+	  if ((iLoop % atmWriteSteps)==0) {  /*  time to write out */
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing land model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+		ierr = writeBinaryScalarData("land_state_output.bin",landState,3,PETSC_TRUE);
+	  }
+	}    
   }
 
   if (calcDiagnostics) {  
@@ -878,13 +866,13 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
         if (useAtmModel) {
           pCO2atmavg=pCO2atm+pCO2atmavg;
           Foceanavg=Focean+Foceanavg;
-        }        
 
-        if (useLandModel) {
-          Flandavg=Fland+Flandavg;
-          landStateavg[0]=landState[0]+landStateavg[0];
-          landStateavg[1]=landState[1]+landStateavg[1];
-          landStateavg[2]=landState[2]+landStateavg[2];          
+		  if (useLandModel) {
+			Flandavg=Fland+Flandavg;
+			landStateavg[0]=landState[0]+landStateavg[0];
+			landStateavg[1]=landState[1]+landStateavg[1];
+			landStateavg[2]=landState[2]+landStateavg[2];          
+		  }                  
         }        
         
 		diagCount = diagCount+1;
@@ -923,14 +911,15 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
           Foceanavg=Foceanavg/diagCount;   
           ierr = writeBinaryScalarData("pCO2atm_avg.bin",&pCO2atmavg,1,appendDiagnostics);  		
           ierr = writeBinaryScalarData("Focean_avg.bin",&Foceanavg,1,appendDiagnostics);  		
-        }
-        if (useLandModel) {
-          Flandavg=Flandavg/diagCount;        
-          landStateavg[0]=landStateavg[0]/diagCount;
-          landStateavg[1]=landStateavg[1]/diagCount;
-          landStateavg[2]=landStateavg[2]/diagCount;           
-          ierr = writeBinaryScalarData("Fland_avg.bin",&Flandavg,1,appendDiagnostics);  		
-          ierr = writeBinaryScalarData("land_state_avg.bin",landStateavg,3,appendDiagnostics);
+
+		  if (useLandModel) {
+			Flandavg=Flandavg/diagCount;        
+			landStateavg[0]=landStateavg[0]/diagCount;
+			landStateavg[1]=landStateavg[1]/diagCount;
+			landStateavg[2]=landStateavg[2]/diagCount;           
+			ierr = writeBinaryScalarData("Fland_avg.bin",&Flandavg,1,appendDiagnostics);  		
+			ierr = writeBinaryScalarData("land_state_avg.bin",landStateavg,3,appendDiagnostics);
+		  }          
         }
 
         appendDiagnostics=PETSC_TRUE;
@@ -953,13 +942,13 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
         if (useAtmModel) {
           pCO2atmavg=0.0;
           Foceanavg=0.0;
-        }
 
-        if (useLandModel) {
-          Flandavg=0.0;
-          landStateavg[0]=0.0;
-          landStateavg[1]=0.0;
-          landStateavg[2]=0.0;          
+		  if (useLandModel) {
+			Flandavg=0.0;
+			landStateavg[0]=0.0;
+			landStateavg[1]=0.0;
+			landStateavg[2]=0.0;          
+		  }          
         }
         
 		diagCount = 0;        
@@ -981,11 +970,11 @@ PetscErrorCode finalizeExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt n
   if (useAtmModel) {
 /* write instantaneous atmos model state */
     ierr = writeBinaryScalarData("pickup_pCO2atm.bin",&pCO2atm,1,PETSC_FALSE);
-  }
 
-  if (useLandModel) {
-/* write instantaneous land model state */
-    ierr = writeBinaryScalarData("pickup_land_state.bin",landState,3,PETSC_FALSE);
+	if (useLandModel) {
+/*   write instantaneous land model state */
+	  ierr = writeBinaryScalarData("pickup_land_state.bin",landState,3,PETSC_FALSE);
+	}    
   }
   
   ierr = VecDestroy(&Ts);CHKERRQ(ierr);
