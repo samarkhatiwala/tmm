@@ -1,12 +1,12 @@
 % Set toplevel path to GCMs configuration
-% base_path='/data2/spk/TransportMatrixConfigs/MITgcm_2.8deg';
+base_path='/data2/spk/TransportMatrixConfigs/MITgcm_2.8deg';
 % base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO';
-base_path='/glade/p/work/spk/ECCO_CLIVAR_v4/MITgcm/spk/MIT_Matrix_ECCO_CLIVAR_v4';
+% base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO_v4';
 
 periodicForcing=1
 periodicMatrix=1
 
-dt=3600*8; % time step to use
+dt=43200; % time step to use
 
 rearrangeProfiles=1
 bigMat=0
@@ -185,8 +185,8 @@ end
 % Use steady state T/S from GCM. Note we always load seasonal data here.
 load(fullfile(gcmDataPath,'Theta_gcm'),'Tgcm')
 load(fullfile(gcmDataPath,'Salt_gcm'),'Sgcm')
-Tsteady=gridToMatrix(Tgcm,[],boxFile,gridFile);
-Ssteady=gridToMatrix(Sgcm,[],boxFile,gridFile);
+Theta=gridToMatrix(Tgcm,[],boxFile,gridFile);
+Salt=gridToMatrix(Sgcm,[],boxFile,gridFile);
 
 clear Tgcm Sgcm % make some space
 
@@ -201,7 +201,7 @@ dzb_surf=gridToMatrix(dz,Ib,boxFile,gridFile);
 % d[TR]/dt = ... + Fv/dz
 load(freshWaterForcingFile,'EmPgcm','Srelaxgcm','saltRelaxTimegcm')
 zeroNetEmP=1;
-EmP=get_surface_emp_for_virtual_flux(gridFile,boxFile,EmPgcm,Srelaxgcm,saltRelaxTimegcm,Ssteady,zeroNetEmP);
+EmP=get_surface_emp_for_virtual_flux(gridFile,boxFile,EmPgcm,Srelaxgcm,saltRelaxTimegcm,Salt,zeroNetEmP);
 if fixEmP
   load(empFixFile,'empFixX','empFixY')
   nEmPFix=length(empFixX);
@@ -244,12 +244,12 @@ if gasExchangeType==1
 	xkwb=load_ocmip_variable([],'XKW',Xboxnom(Ib),Yboxnom(Ib));
  	ficeb=load_ocmip_variable([],'FICE',Xboxnom(Ib),Yboxnom(Ib));
   else 
-    Vgas=calc_ocmip_piston_velocity([],Xboxnom(Ib),Yboxnom(Ib),Tsteady(Ib,:),'CO2');
+    Vgas=calc_ocmip_piston_velocity([],Xboxnom(Ib),Yboxnom(Ib),Theta(Ib,:),'CO2');
   end  
 elseif gasExchangeType==2
 % Compute gas exchange velocity online from winds
-  [u10b,Tcore,lon,lat]=load_core_variable(fullfile(corePath,'u_10.15JUNE2009.nc'),'U_10',Xboxnom(Ib),Yboxnom(Ib));
-  [v10b,Tcore,lon,lat]=load_core_variable(fullfile(corePath,'v_10.15JUNE2009.nc'),'V_10',Xboxnom(Ib),Yboxnom(Ib));
+  [u10b,Tcore,lon,lat]=load_core_variable(fullfile(corePath,'u_10.15JUNE2009.nc'),'U_10_MOD',Xboxnom(Ib),Yboxnom(Ib));
+  [v10b,Tcore,lon,lat]=load_core_variable(fullfile(corePath,'v_10.15JUNE2009.nc'),'V_10_MOD',Xboxnom(Ib),Yboxnom(Ib));
   ficeb=load_ocmip_variable([],'FICE',Xboxnom(Ib),Yboxnom(Ib));  
 else
   error('ERROR: Unknown option for gas exchange')
@@ -265,8 +265,8 @@ end
 
 % now take annual mean if necessary
 if ~periodicForcing
-  Tsteady=mean(Tsteady,2);
-  Ssteady=mean(Ssteady,2);
+  Theta=mean(Theta,2);
+  Salt=mean(Salt,2);
   EmP=mean(EmP,2);
   if gasExchangeType==1
 	Vgas=mean(Vgas,2);
@@ -287,14 +287,14 @@ rho0=1024.5; % kg/m^3 nominal density from OCMIP-2
 SiO2avg=7.7e-3; % mol/m^3 
 PO4avg=5.1e-4; % mol/m^3
 DICavg=2230.0*rho0*1.0e-6; % mol/m^3
-meanSurfaceSalinity=mean((volb(Ib)/sum(volb(Ib)))'*Ssteady(Ib,:)); % volume weighted, annual mean surface salinity
+meanSurfaceSalinity=mean((volb(Ib)/sum(volb(Ib)))'*Salt(Ib,:)); % volume weighted, annual mean surface salinity
 Sbar=meanSurfaceSalinity;
 Alkbar=2310*1e-6*rho0; % ueq/kg -> eq/m^3  OCMIP-2
 alkFunc = @(S) Alkbar*S/Sbar;
 
 SiO2b=repmat(SiO2avg,[nbb nm]);
 PO4b=repmat(PO4avg,[nbb nm]);
-Alkb=alkFunc(Ssteady(Ib,:));
+Alkb=alkFunc(Salt(Ib,:));
 
 % Initial condition
 if exist('iniConditionFile','var')
@@ -317,8 +317,8 @@ if rearrangeProfiles
   Yboxnom=Yboxnom(Ir);
   Zboxnom=Zboxnom(Ir);
   izBox=izBox(Ir);
-  Tsteady=Tsteady(Ir,:);
-  Ssteady=Ssteady(Ir,:);
+  Theta=Theta(Ir,:);
+  Salt=Salt(Ir,:);
   volb=volb(Ir);
   if useVirtualFlux
     volFracSurf=volFracSurf(Ir);
@@ -479,12 +479,12 @@ if writeFiles
     end	  
   end
   if ~periodicForcing
-	writePetscBin('Ts.petsc',Tsteady)
-	writePetscBin('Ss.petsc',Ssteady)
+	writePetscBin('Ts.petsc',Theta)
+	writePetscBin('Ss.petsc',Salt)
   else
     for im=1:nm
-	  writePetscBin(['Ts_' sprintf('%02d',im-1)],Tsteady(:,im))
-	  writePetscBin(['Ss_' sprintf('%02d',im-1)],Ssteady(:,im))
+	  writePetscBin(['Ts_' sprintf('%02d',im-1)],Theta(:,im))
+	  writePetscBin(['Ss_' sprintf('%02d',im-1)],Salt(:,im))
     end    
   end    
   if ~periodicForcing
