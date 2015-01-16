@@ -41,19 +41,8 @@ bgcDataPath=fullfile(base_path,'BiogeochemData');
 freshWaterForcingFile=fullfile(gcmDataPath,'FreshWaterForcing_gcm');
 empFixFile=fullfile(gcmDataPath,empFixFile);
 
-% model specific data
-if strcmp(gcmConfigName,'MITgcm_2.8deg')
-  iceFile=fullfile(bgcDataPath,'fice');
-  windFile=fullfile(bgcDataPath,'tren_speed');
-elseif strcmp(gcmConfigName,'MITgcm_ECCO')
-  iceFile=fullfile(bgcDataPath,'nasa_icefraction_mth-2d');
-  windFile=fullfile(bgcDataPath,'tren_speed_mth-2d');
-elseif strcmp(gcmConfigName,'MITgcm_ECCO_v4')
-  iceFile=fullfile(bgcDataPath,'Fice');
-  windFile=fullfile(bgcDataPath,'EXF_wspeed');
-else
-  error('ERROR: Unknown configuration!')
-end
+iceFile=fullfile(bgcDataPath,'ice_fraction');
+windFile=fullfile(bgcDataPath,'wind_speed');
 
 %
 gridFile=fullfile(base_path,'grid');
@@ -100,17 +89,28 @@ else
 end
 
 % Use steady state T/S from GCM. Note we always load seasonal data here.
-load(fullfile(gcmDataPath,'Theta_gcm'),'Tgcm')
-load(fullfile(gcmDataPath,'Salt_gcm'),'Sgcm')
-Tsteady=gridToMatrix(Tgcm,[],boxFile,gridFile);
-Ssteady=gridToMatrix(Sgcm,[],boxFile,gridFile);
+% load(fullfile(gcmDataPath,'Theta_gcm'),'Tgcm')
+% load(fullfile(gcmDataPath,'Salt_gcm'),'Sgcm')
+% Theta=gridToMatrix(Tgcm,[],boxFile,gridFile);
+% Salt=gridToMatrix(Sgcm,[],boxFile,gridFile);
+% Use steady state T/S propagated from surface into interior using TMM.
+load(fullfile(bgcDataPath,'Theta_bc'),'Tbc')
+load(fullfile(bgcDataPath,'Salt_bc'),'Sbc')
+Theta=gridToMatrix(Tbc,[],boxFile,gridFile);
+Salt=gridToMatrix(Sbc,[],boxFile,gridFile);
 
-clear Tgcm Sgcm % make some space
+if rescaleForcing
+  load(fullfile(base_path,rescaleForcingFile))
+end
 
 % now take annual mean if necessary
 if ~periodicForcing
-  Tsteady=mean(Tsteady,2);
-  Ssteady=mean(Ssteady,2);
+  Theta=mean(Theta,2);
+  Salt=mean(Salt,2);
+
+  if rescaleForcing
+	Rfs=mean(Rfs,2);    
+  end    
 end
 
 % surface layer thickness
@@ -130,11 +130,11 @@ end
 
 if useSeparateWinds
 % Compute winds online from u and v winds
-  [u10b,Tcore,lon,lat]=load_core_variable(fullfile(corePath,'u_10.15JUNE2009.nc'),'U_10',Xboxnom(Ib),Yboxnom(Ib));
-  [v10b,Tcore,lon,lat]=load_core_variable(fullfile(corePath,'v_10.15JUNE2009.nc'),'V_10',Xboxnom(Ib),Yboxnom(Ib));
+  [u10b,Tcore,lon,lat]=load_core_variable(fullfile(corePath,'u_10.15JUNE2009.nc'),'U_10_MOD',Xboxnom(Ib),Yboxnom(Ib));
+  [v10b,Tcore,lon,lat]=load_core_variable(fullfile(corePath,'v_10.15JUNE2009.nc'),'V_10_MOD',Xboxnom(Ib),Yboxnom(Ib));
 else
-  load(windFile,'wind')
-  windb=gridToMatrix(wind,Ib,boxFile,gridFile,1);  
+  load(windFile,'windspeed')
+  windb=gridToMatrix(windspeed,Ib,boxFile,gridFile,1);  
   if ~periodicForcing
 	windb=mean(windb,2);  
   end
@@ -155,8 +155,8 @@ numTracers=length(trNames);
 TRini=repmat(0,[nb numTracers]);
 if exist('Nesol')==2
   disp('Initial conditions are being set to solubility equilibrium')
-  Tmean=mean(Tsteady,2);
-  Smean=mean(Ssteady,2);
+  Tmean=mean(Theta,2);
+  Smean=mean(Salt,2);
   rho0=1024.5; % nominal density  
   for itr=1:numTracers
     gasId=trNames{itr};
@@ -175,9 +175,12 @@ if rearrangeProfiles
   Yboxnom=Yboxnom(Ir);
   Zboxnom=Zboxnom(Ir);
   izBox=izBox(Ir);
-  Tsteady=Tsteady(Ir,:);
-  Ssteady=Ssteady(Ir,:);
+  Theta=Theta(Ir,:);
+  Salt=Salt(Ir,:);
   TRini=TRini(Ir,:);
+  if rescaleForcing
+    Rfs=Rfs(Ir,:);
+  end    
   Ib=find(izBox==1);
 %
   Ip=Ip_post;
@@ -299,14 +302,23 @@ if writeFiles
     end	
   end
   if ~periodicForcing
-	writePetscBin('Ts.petsc',Tsteady)
-	writePetscBin('Ss.petsc',Ssteady)
+	writePetscBin('Ts.petsc',Theta)
+	writePetscBin('Ss.petsc',Salt)
   else
     for im=1:nm
-	  writePetscBin(['Ts_' sprintf('%02d',im-1)],Tsteady(:,im))
-	  writePetscBin(['Ss_' sprintf('%02d',im-1)],Ssteady(:,im))
+	  writePetscBin(['Ts_' sprintf('%02d',im-1)],Theta(:,im))
+	  writePetscBin(['Ss_' sprintf('%02d',im-1)],Salt(:,im))
     end    
   end    
+  if rescaleForcing
+	if ~periodicForcing
+	  writePetscBin('Rfs.petsc',Rfs)
+	else
+	  for im=1:nm
+		writePetscBin(['Rfs_' sprintf('%02d',im-1)],Rfs(:,im))
+	  end    
+	end    
+  end  
 % Grid data
   write_binary('dzsurf.bin',dzb_surf,'real*8') 
 
