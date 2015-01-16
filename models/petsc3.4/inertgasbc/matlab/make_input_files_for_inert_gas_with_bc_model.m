@@ -80,24 +80,27 @@ else
 end
 
 % Use steady state T/S from GCM. Note we always load seasonal data here.
-load(fullfile(gcmDataPath,'Theta_gcm'),'Tgcm')
-load(fullfile(gcmDataPath,'Salt_gcm'),'Sgcm')
-Tsteady=gridToMatrix(Tgcm,[],boxFile,gridFile);
-Ssteady=gridToMatrix(Sgcm,[],boxFile,gridFile);
-
-clear Tgcm Sgcm % make some space
+% load(fullfile(gcmDataPath,'Theta_gcm'),'Tgcm')
+% load(fullfile(gcmDataPath,'Salt_gcm'),'Sgcm')
+% Theta=gridToMatrix(Tgcm,[],boxFile,gridFile);
+% Salt=gridToMatrix(Sgcm,[],boxFile,gridFile);
+% Use steady state T/S propagated from surface into interior using TMM.
+load(fullfile(bgcDataPath,'Theta_bc'),'Tbc')
+load(fullfile(bgcDataPath,'Salt_bc'),'Sbc')
+Theta=gridToMatrix(Tbc,[],boxFile,gridFile);
+Salt=gridToMatrix(Sbc,[],boxFile,gridFile);
 
 % now take annual mean if necessary
 if ~periodicForcing
-  Tsteady=mean(Tsteady,2);
-  Ssteady=mean(Ssteady,2);
+  Theta=mean(Theta,2);
+  Salt=mean(Salt,2);
 end
 
-Tss=Tsteady(Ib,:);
-Sss=Ssteady(Ib,:);
+Tss=Theta(Ib,:);
+Sss=Salt(Ib,:);
 
-Ts=Tsteady(Ii,:);
-Ss=Ssteady(Ii,:);
+Ts=Theta(Ii,:);
+Ss=Salt(Ii,:);
 
 atmospb=load_ocmip_variable([],'P',Xboxnom(Ib),Yboxnom(Ib));  
 if ~periodicForcing
