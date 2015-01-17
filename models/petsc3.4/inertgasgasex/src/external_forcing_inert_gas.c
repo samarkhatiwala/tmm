@@ -11,7 +11,6 @@
 #include "tmm_forcing_utils.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
-#include "tmm_main.h"
 #include "inert_gas.h"
 
 /* Macros to map tracer names to vectors */
