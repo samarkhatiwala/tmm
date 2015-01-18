@@ -1,0 +1,11 @@
+mpiexec -np 2 ./tmmmitgchemdic -numtracers 6 \
+  -i dicini.petsc,alkini.petsc,po4ini.petsc,dopini.petsc,o2ini.petsc,feini.petsc \
+  -me Ae -mi Ai \
+  -t0 0.0 -iter0 0 -deltat_clock 0.0013888888888889 -max_steps 10 -write_steps 1 \
+  -o dic.petsc,alk.petsc,po4.petsc,dop.petsc,o2.petsc,fe.petsc \
+  -external_forcing -use_profiles -biogeochem_deltat 43200.0 \
+  -periodic_matrix -matrix_cycle_period 1.0 -matrix_cycle_step 0.0833333333333333 \
+  -periodic_biogeochem_forcing -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_cycle_step 0.0833333333333333 \
+  > log
+# add this option for configurations in which the forcing is rescaled because of a time-varying free surface 
+#  -rescale_forcing_file Rfs
