@@ -12,61 +12,10 @@
 #include "tmm_forcing_utils.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
-#include "tmm_main.h"
 #include "MOBI_TMM_OPTIONS.h"
 #include "mobi.h"
 
-/* Macros to map tracer names to vectors */
-/* v[0]=DIC,v[1]=Alk,v[2]=PO4,v[3]=DOP,v[4]=O2,v[5]=Fe */
 #define TR1 v[0]
-#define TR2 v[1]
-#define TR3 v[2]
-#define TR4 v[3]
-#define TR5 v[4]
-#define TR6 v[5]
-#define TR7 v[6]
-#define TR8 v[7]
-#define TR9 v[8]
-#define TR10 v[9]
-#define TR11 v[10]
-#define TR12 v[11]
-#define TR13 v[12]
-#define TR14 v[13]
-#define TR15 v[14]
-#define TR16 v[15]
-#define TR17 v[16]
-#define TR18 v[17]
-#define TR19 v[18]
-#define TR20 v[19]
-#define TR21 v[20]
-#define TR22 v[21]
-#define TR23 v[22]
-#define TR24 v[23]
-
-#define JTR1 ut[0]
-#define JTR2 ut[1]
-#define JTR3 ut[2]
-#define JTR4 ut[3]
-#define JTR5 ut[4]
-#define JTR6 ut[5]
-#define JTR7 ut[6]
-#define JTR8 ut[7]
-#define JTR9 ut[8]
-#define JTR10 ut[9]
-#define JTR11 ut[10]
-#define JTR12 ut[11]
-#define JTR13 ut[12]
-#define JTR14 ut[13]
-#define JTR15 ut[14]
-#define JTR16 ut[15]
-#define JTR17 ut[16]
-#define JTR18 ut[17]
-#define JTR19 ut[18]
-#define JTR20 ut[19]
-#define JTR21 ut[20]
-#define JTR22 ut[21]
-#define JTR23 ut[22]
-#define JTR24 ut[23]
 
 Vec Ts,Ss,Fe;
 PetscInt *gIndices;
@@ -198,7 +147,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   }
 #endif
     
-/*   v[0]=TR1,v[1]=TR2,... */
   m = 0;
 # if defined O_carbon
 #define dic v[0]
@@ -304,10 +252,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = VecGetArrays(v,numTracers,&localTR);CHKERRQ(ierr);
   ierr = VecGetArrays(ut,numTracers,&localJTR);CHKERRQ(ierr);
   
-  ierr = PetscOptionsGetInt(PETSC_NULL,"-nzmax",&nzmax,&flg);CHKERRQ(ierr);
-  if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate maximum number of z points with the -nzmax option");  
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of vertical layers is %d \n",nzmax);CHKERRQ(ierr);
-
   ierr = PetscOptionsGetReal(PETSC_NULL,"-biogeochem_deltat",&DeltaT,&flg);CHKERRQ(ierr);
   if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate biogeochemical time step in seconds with the -biogeochem_deltat option");  
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Ocean time step for BGC length is  %12.7f seconds\n",DeltaT);CHKERRQ(ierr);
@@ -388,14 +332,20 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = PetscMalloc(lSize*sizeof(PetscScalar),&localsgbathy);CHKERRQ(ierr);    
   ierr = VecLoadVecIntoArray(TR1,"sgbathy.petsc",localsgbathy);CHKERRQ(ierr);
 
+  ierr = PetscMalloc(lSize*sizeof(PetscScalar),&localdz);CHKERRQ(ierr);    
+  ierr = VecLoadVecIntoArray(TR1,"dz.petsc",localdz);CHKERRQ(ierr);
+
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"zt.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+  ierr = PetscBinaryRead(fp,&nzmax,1,PETSC_INT);CHKERRQ(ierr);  
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of vertical layers is %d \n",nzmax);CHKERRQ(ierr);
   ierr = PetscMalloc(nzmax*sizeof(PetscScalar),&zt);CHKERRQ(ierr); 
   ierr = PetscBinaryRead(fp,zt,nzmax,PETSC_SCALAR);CHKERRQ(ierr);  
   ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"drF.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+  ierr = PetscBinaryRead(fp,&nzmax,1,PETSC_INT);CHKERRQ(ierr);  
   ierr = PetscMalloc(nzmax*sizeof(PetscScalar),&drF);CHKERRQ(ierr); 
   ierr = PetscBinaryRead(fp,drF,nzmax,PETSC_SCALAR);CHKERRQ(ierr);  
   ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
@@ -508,7 +458,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&myId);CHKERRQ(ierr);
   if (myId == 0) debugFlag = 1;
   
-  mobi_ini_(zt,drF,&DeltaT,&Sglobavg,TRglobavg,&debugFlag);  
+  mobi_ini_(&nzmax,zt,drF,&DeltaT,&Sglobavg,TRglobavg,&debugFlag);  
 
   return 0;
 }
@@ -533,8 +483,8 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
   PetscInt itr, ip, nzloc, kl;
   PetscScalar myTime;
   PetscScalar relyr, day;
-  PetscInt toMobi = 1; 
-  PetscInt fromMobi = 2;
+  PetscInt toModel = 1; 
+  PetscInt fromModel = 2;
   PetscInt itf;
   PetscScalar alpha;
   PetscScalar localco2airseaflux = 0.0;
@@ -581,17 +531,13 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
   for (ip=0; ip<lNumProfiles; ip++) {
     nzloc=lProfileLength[ip];
     kl=lStartIndices[ip];
-	for (itr=0; itr<numTracers; itr++) {    	
-	  mobi_copy_data_(&nzloc,&itr,&localTR[itr][kl],&toMobi);
-/* 
-	  if (ip==0) {
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"MOBI IN: %d, %g\n",itr+1,localTR[itr][kl]);CHKERRQ(ierr);
-      }	  
 
- */
+	for (itr=0; itr<numTracers; itr++) {    	
+	  mobi_copy_data_(&nzloc,&itr,&localTR[itr][kl],&toModel);
 	}  
+
     mobi_calc_(&nzloc,&locallatitude[ip],&day,&relyr,
-               &localTs[kl],&localSs[kl],&TRglobavg[0],
+               &localTs[kl],&localSs[kl],&TRglobavg[0],&localdz[kl],zt,
 # if defined O_carbon
                &pCO2atm,&localwind[ip],
 #endif      
@@ -612,13 +558,7 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
                &localEmP[ip], &EmPglobavg, &debugFlag);
 
 	for (itr=0; itr<numTracers; itr++) {    
-	  mobi_copy_data_(&nzloc,&itr,&localJTR[itr][kl],&fromMobi);
-/* 
-	  if (ip==0) {
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"MOBI OUT: %d, %g\n",itr+1,localJTR[itr][kl]);CHKERRQ(ierr);
-      }
-
- */
+	  mobi_copy_data_(&nzloc,&itr,&localJTR[itr][kl],&fromModel);
 	}  
 
   } /* end loop over profiles */

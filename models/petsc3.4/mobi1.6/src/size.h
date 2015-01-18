@@ -24,7 +24,7 @@
       integer imt, jmt, km, nt, nsrc, kpzd, nat, jmz, jmzm1, mnisle
       integer maxipp, jmw, jsmw, jemw
 
-      parameter (imt=  1, jmt=  1, km= 23)
+      parameter (imt=  1, jmt=  1, km= 15)
       parameter (nt=2
 #if defined O_carbon
      $             +1

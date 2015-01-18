@@ -1,7 +1,7 @@
 #include "MOBI_TMM_OPTIONS.h"
 
       SUBROUTINE MOBI_CALC(kmt_loc, tlat_loc, day_loc, relyr_loc, 
-     &     TEMP, SALT, TR_surf_glob,
+     &     TEMP, SALT, TR_surf_glob,dz_loc,z,
 # if defined O_carbon
      &     co2atm, winds_loc,
 #endif      
@@ -27,8 +27,10 @@
 
       integer kmt_loc
       real tlat_loc, day_loc, relyr_loc
-      real TEMP(km), SALT(km)
+      real TEMP(kmt_loc), SALT(kmt_loc)
       real TR_surf_glob(nsrc)
+      real dz_loc(kmt_loc)
+      real z(km)
 C      real TR_loc(km,nsrc), JTR_loc(km,nsrc)
 
 # if defined O_carbon
@@ -36,10 +38,10 @@ C      real TR_loc(km,nsrc), JTR_loc(km,nsrc)
       real winds_loc
 #endif      
 #  if defined O_npzd_nitrogen
-      real sg_bathy_loc(km)
+      real sg_bathy_loc(kmt_loc)
 #  endif
 #  if defined O_npzd_fe_limitation
-      real fe_loc(km) ! only the first three elements are used
+      real fe_loc(kmt_loc) ! only the first three elements are used
 #  endif
 #  if defined O_embm
 	  real swr_loc
@@ -81,6 +83,7 @@ C#include "timeavgs.h"
 C#include "vmixc.h"
 # if defined O_npzd || defined O_carbon_14
 #include "npzd.h"
+#include "calendar.h"
 # endif
 # if defined O_save_convection || defined O_carbon_14
 #include "diaga.h"
@@ -117,15 +120,89 @@ C#include "vmixc.h"
 #   endif
 #  endif
 # endif
-# if defined O_carbon_fnpzd
-#include "calendar.h"
-# endif
+C# if defined O_carbon_fnpzd
+C#include "calendar.h"
+C# endif
 
 # if defined O_npzd || defined O_carbon_14
       real ai, hi, hs, rctheta, dayfrac, swr, declin
       real src(imt,km,jsmw:jemw,nsrc)
       common/mobicomm/src
 # endif
+
+C Recompute local grid-dependent data
+CSPK copy over data/set constants
+#if defined O_mom && defined O_npzd
+      dzt(:) = c0
+      dzw(:) = c0
+      zt(:) = c0
+      zw(:) = c0
+
+      do k=1,kmt_loc
+        dzt(k) = dz_loc(k)
+        zt(k) = z(k)      
+      enddo
+
+      zw(1) = dz_loc(1)      
+      do k=2,kmt_loc
+        zw(k) = zw(k-1) + dz_loc(k)
+      enddo
+      
+      do k=1,kmt_loc-1
+        dzw(k) = zt(k+1) - zt(k)
+      enddo
+      dzw(0) = zt(1)
+      dzw(kmt_loc) = zw(kmt_loc) - zt(kmt_loc)
+
+      do k=1,kmt_loc
+        c2dzt(k) = c2*dzt(k)
+        dzt2r(k) = c1/c2dzt(k)
+      enddo
+
+      dzwr(kmt_loc)  = c1/dzw(kmt_loc)
+      dzw2r(kmt_loc) = p5/dzw(kmt_loc)
+
+      do k=1,kmt_loc
+        dzwr(k-1)    = c1/dzw(k-1)
+        dzw2r(k-1)   = p5/dzw(k-1)
+      enddo
+
+      do k=1,kmt_loc
+        dztr(k)  = c1/dzt(k)
+      enddo
+#endif
+CCCCC
+
+!     calculate sinking speed of detritus divided by grid width
+      do k=1,kmt_loc
+!     linear increase wd0-200m with depth
+         if (zt(k) .lt. 100000) then
+            wd(k) = (wd0+5.5e-2*zt(k))/daylen/dzt(k) ! [s-1]
+         else
+            wd(k) = (wd0+5.5e-2*100000)/daylen/dzt(k) ! [s-1]
+         endif
+         rkwz(k) = 1./(kw*dzt(k))
+      enddo
+      ztt(1)=0.0
+      do k=1,kmt_loc
+         ztt(k+1)=(-1)*zw(k)
+      enddo
+
+# if defined O_carbon || defined O_npzd_alk
+
+!---------------------------------------------------------------------
+!     calculate variables used in calcite remineralization
+!---------------------------------------------------------------------
+
+      rcak(1) = -(exp(-zw(1)/dcaco3)-1.0)/dzt(1)
+      rcab(1) = -1./dzt(1)
+      do k=2,kmt_loc
+        rcak(k) = -(exp(-zw(k)/dcaco3))/dzt(k)
+     &          + (exp(-zw(k-1)/dcaco3))/dzt(k)
+        rcab(k) = (exp(-zw(k-1)/dcaco3))/dzt(k)
+      enddo
+# endif
+C end recompute
 
 	  kmt(1,1) = kmt_loc
 	  tlat(1,1) = tlat_loc

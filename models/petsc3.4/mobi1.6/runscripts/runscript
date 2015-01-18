@@ -1,0 +1,10 @@
+mpiexec -np 2 ./tmmmobi -me Ae -mi Ai -external_forcing -numtracers 24 \
+-t0 0.0 -iter0 0 -deltat_clock 0.0013888888888889 -max_steps 10 -write_steps 1 \
+-periodic_matrix -matrix_cycle_period 1.0 -matrix_cycle_step 0.0833333333333333 \
+-periodic_biogeochem_forcing -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_cycle_step 0.0833333333333333 \
+-o v1out.petsc,v2out.petsc,v3out.petsc,v4out.petsc,v5out.petsc,v6out.petsc,v7out.petsc,v8out.petsc,v9out.petsc,v10out.petsc,v11out.petsc,v12out.petsc,v13out.petsc,v14out.petsc,v15out.petsc,v16out.petsc,v17out.petsc,v18out.petsc,v19out.petsc,v20out.petsc,v21out.petsc,v22out.petsc,v23out.petsc,v24out.petsc \
+-biogeochem_deltat 43200.0 -use_profiles -use_emp \
+-i v1.petsc,v2.petsc,v3.petsc,v4.petsc,v5.petsc,v6.petsc,v7.petsc,v8.petsc,v9.petsc,v10.petsc,v11.petsc,v12.petsc,v13.petsc,v14.petsc,v15.petsc,v16.petsc,v17.petsc,v18.petsc,v19.petsc,v20.petsc,v21.petsc,v22.petsc,v23.petsc,v24.petsc \
+> log
+# add this option for configurations in which the forcing is rescaled because of a time-varying free surface 
+#  -rescale_forcing_file Rfs

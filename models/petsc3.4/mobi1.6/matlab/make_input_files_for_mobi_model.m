@@ -86,10 +86,8 @@ end
 % Use steady state T/S from GCM. Note we always load seasonal data here.
 load(fullfile(gcmDataPath,'Theta_gcm'),'Tgcm')
 load(fullfile(gcmDataPath,'Salt_gcm'),'Sgcm')
-Tsteady=gridToMatrix(Tgcm,[],boxFile,gridFile);
-Ssteady=gridToMatrix(Sgcm,[],boxFile,gridFile);
-
-clear Tgcm Sgcm % make some space
+Theta=gridToMatrix(Tgcm,[],boxFile,gridFile);
+Salt=gridToMatrix(Sgcm,[],boxFile,gridFile);
 
 % surface area
 dab_surf=gridToMatrix(da,Ib,boxFile,gridFile);
@@ -101,7 +99,7 @@ if useEmP
 % d[TR]/dt = ... + Fv/dz
   load(freshWaterForcingFile,'EmPgcm','Srelaxgcm','saltRelaxTimegcm')
   zeroNetEmP=1;
-  EmP=get_surface_emp_for_virtual_flux(gridFile,boxFile,EmPgcm,Srelaxgcm,saltRelaxTimegcm,Ssteady,zeroNetEmP);
+  EmP=get_surface_emp_for_virtual_flux(gridFile,boxFile,EmPgcm,Srelaxgcm,saltRelaxTimegcm,Salt,zeroNetEmP);
 %   gV=EmP./dzb;
   volFracSurf=zeros(nb,1);
   volFracSurf(Ib)=volb(Ib)/sum(volb(Ib));  
@@ -142,8 +140,8 @@ dzb=gridToMatrix(dz,[],boxFile,gridFile);
 
 % now take annual mean if necessary
 if ~periodicForcing
-  Tsteady=mean(Tsteady,2);
-  Ssteady=mean(Ssteady,2);
+  Theta=mean(Theta,2);
+  Salt=mean(Salt,2);
   if useEmP
     EmP=mean(EmP,2);
   end  
@@ -230,8 +228,8 @@ if rearrangeProfiles
   Yboxnom=Yboxnom(Ir);
   Zboxnom=Zboxnom(Ir);
   izBox=izBox(Ir);
-  Tsteady=Tsteady(Ir,:);
-  Ssteady=Ssteady(Ir,:);
+  Theta=Theta(Ir,:);
+  Salt=Salt(Ir,:);
   Feb=Feb(Ir,:);
   sgbathyb=sgbathyb(Ir);
   for itr=1:numTracers
@@ -364,14 +362,14 @@ if writeFiles
 	  end  
     end	
   end
-  Ssteady=(Ssteady-35)/1000; % change to MOBI units
+  Salt=(Salt-35)/1000; % change to MOBI units
   if ~periodicForcing
-	writePetscBin('Ts.petsc',Tsteady)
-	writePetscBin('Ss.petsc',Ssteady)
+	writePetscBin('Ts.petsc',Theta)
+	writePetscBin('Ss.petsc',Salt)
   else
     for im=1:nm
-	  writePetscBin(['Ts_' sprintf('%02d',im-1)],Tsteady(:,im))
-	  writePetscBin(['Ss_' sprintf('%02d',im-1)],Ssteady(:,im))
+	  writePetscBin(['Ts_' sprintf('%02d',im-1)],Theta(:,im))
+	  writePetscBin(['Ss_' sprintf('%02d',im-1)],Salt(:,im))
     end    
   end    
   Feb=Feb*1e9; % change to MOBI units
@@ -402,8 +400,10 @@ if writeFiles
 % Grid data
   z=z*100; % convert to cm
   dznom=dznom*100; % convert to cm
-  write_binary('zt.bin',z,'real*8')
-  write_binary('drF.bin',dznom,'real*8')
+  write_binary('zt.bin',nz,'int')  
+  write_binary('zt.bin',z,'real*8',1)
+  write_binary('drF.bin',nz,'int')  
+  write_binary('drF.bin',dznom,'real*8',1)
   writePetscBin('dz.petsc',dzb)
   write_binary('latitude.bin',latb,'real*8')    
 % Profile data  

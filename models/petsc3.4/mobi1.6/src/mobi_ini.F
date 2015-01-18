@@ -1,5 +1,5 @@
 #include "MOBI_TMM_OPTIONS.h"
-      SUBROUTINE MOBI_INI(z, drF, DeltaT,
+      SUBROUTINE MOBI_INI(nzmax, z, drF, DeltaT,
      &                    S_surf_glob, TR_surf_glob, debugFlag)
 
       implicit none
@@ -15,6 +15,7 @@
 #include "atm.h"
 #include "cembm.h"
 
+      integer nzmax
       real z(km), drF(km), DeltaT
       real S_surf_glob, TR_surf_glob(nsrc)
       integer debugFlag
@@ -29,6 +30,11 @@
       socn = 0.03475
 Csetmom.F:        socn = gaost(isalt)
 
+
+	  if (nzmax.ne.km) then
+		print*,'ERROR in MOBI_INI: number of depth levels incorrect!'
+		stop
+	  endif  
       
 !-----------------------------------------------------------------------
 !     Initialize ocean tracer names
@@ -529,7 +535,7 @@ C        call areaavg (sbc(1,1,isss), dmsk, gaost(isalt))
       enddo
 CSPK check
       if (itr.ne.nsrc) then
-        print*,'ERROR in mobi_ini: number of tracers incorrect!'
+        print*,'ERROR in MOBI_INI: number of tracers incorrect!'
         stop
       endif  
       

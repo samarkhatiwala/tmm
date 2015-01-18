@@ -1,10 +1,11 @@
 extern void mobi_copy_data_(PetscInt *nzloc, PetscInt *itr, PetscScalar localTR[], PetscInt *direction);
 
-extern void mobi_ini_(PetscScalar zt[], PetscScalar drF[], PetscScalar *DeltaT, 
+extern void mobi_ini_(PetscInt *nzmax, PetscScalar zt[], PetscScalar drF[], PetscScalar *DeltaT, 
                PetscScalar *Sglobavg,PetscScalar TRglobavg[], PetscInt *debugFlag);
 
 extern void mobi_calc_(PetscInt *nzloc, PetscScalar *locallatitude, PetscScalar *day, PetscScalar *relyr,
-               PetscScalar localTs[], PetscScalar localSs[], PetscScalar TRglobavg[],
+               PetscScalar localTs[], PetscScalar localSs[], PetscScalar TRglobavg[], PetscScalar localdz[],
+               PetscScalar zt[],
 # if defined O_carbon
                PetscScalar *pCO2atm, PetscScalar *localwind,
 #endif      
