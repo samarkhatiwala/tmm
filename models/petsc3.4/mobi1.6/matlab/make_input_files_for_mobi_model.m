@@ -232,9 +232,7 @@ if rearrangeProfiles
   Salt=Salt(Ir,:);
   Feb=Feb(Ir,:);
   sgbathyb=sgbathyb(Ir);
-  for itr=1:numTracers
-    TRini(:,itr)=TRini(Ir,itr);
-  end  
+  TRini=TRini(Ir,:);
   if useEmP
     volFracSurf=volFracSurf(Ir);
   end  
@@ -335,7 +333,8 @@ if writeFiles
   end	  	  
 % Initial conditions  
   for itr=1:numTracers
-	writePetscBin(['v' int2str(itr) '.petsc'],TRini(:,itr))  
+    fn=[trNames{itr} 'ini.petsc'];
+	writePetscBin(fn,TRini(:,itr))  
   end
   
   if ~periodicForcing
@@ -400,6 +399,7 @@ if writeFiles
 % Grid data
   z=z*100; % convert to cm
   dznom=dznom*100; % convert to cm
+  dzb=dzb*100; % convert to cm  
   write_binary('zt.bin',nz,'int')  
   write_binary('zt.bin',z,'real*8',1)
   write_binary('drF.bin',nz,'int')  
