@@ -1,0 +1,46 @@
+mpiexec -np 2 ./tmmocmipabiolandatm \
+   -numtracers 2 \
+   -i dicini.petsc,dic14ini.petsc \
+   -me Ae \
+   -mi Ai \
+   -t0 0.0 -iter0 0 \
+   -deltat_clock 0.0013888888888889 \
+   -max_steps 720 \
+   -write_steps 720 \
+   -o dic.petsc,dic14.petsc \
+   -external_forcing \
+   -use_profiles \
+   -biogeochem_deltat 43200.0 \
+   -periodic_matrix -matrix_cycle_period 1.0 \
+   -matrix_cycle_step 0.0833333333333333 \
+   -periodic_biogeochem_forcing \
+   -periodic_biogeochem_cycle_period 1.0 \
+   -periodic_biogeochem_cycle_step 0.08333333333333 \
+   -use_winds -piston_velocity 0.24 -periodic_winds_cycle_period 1.0 -periodic_winds_cycle_step 0.0006849315068493151 \
+   > log0
+# driver options:
+#  I/O:
+#   -pickup_out pickup.petsc \
+#   -time_file output_time.txt \
+#  time averaging:
+#   -time_avg -avg_start_time_step 1 -avg_time_steps 60 -avg_files dic_preindustrial_avg_core_0p24.petsc,dic14_preindustrial_avg_core_0p24.petsc \
+#  circulation-specific options:
+#   add this option for configurations in which the forcing is rescaled because of a time-varying free surface:
+#    -rescale_forcing_file Rfs \
+# model-specific options:
+#  diagnostics:
+#   -calc_diagnostics -diag_start_time_step 1 -diag_time_steps 60 \
+#  forcing options:
+#   prescribed atmospheric pCO2:
+#    constant:
+#     -pco2atm 277.62 \
+#     -c14atm DC14atm.bin \
+#    OR
+#    time-varying:
+#     -pco2atm_history TpCO2.bin,pCO2atm.bin \
+#     -c14atm_history TC14atm.bin,DC14atm.bin \
+#   OR
+#   prescribed emissions (C14 not currently supported):
+#    -use_atm_model -pco2atm_ini 280.0 OR -pco2atm_ini_file filename -atm_write_steps 720 -atm_time_file -atm_append \
+#    -emissions_history Tem.bin,fossil_fuel_emissions.bin,land_use_emissions.bin \
+#    -use_land_model \
