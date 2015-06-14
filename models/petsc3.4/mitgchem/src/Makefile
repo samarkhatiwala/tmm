@@ -13,7 +13,7 @@ R8FLAG=-r8
 STMM = tmm_main.c tmm_forward_step.c tmm_forcing_utils.c \
         tmm_profile_utils.c petsc_signal_utils.c petsc_matvec_utils.c
         
-SRCMITGCHEM = $(STMM) tmm_external_bc.c external_forcing_mitgchem_dic.c
+SRCMITGCHEM = $(STMM) tmm_external_bc.c tmm_monitor.c external_forcing_mitgchem_dic.c
 SRFMITGCHEM = gchem_forcing_sep.F gchem_readparms.F gchem_init_fixed.F \
             gchem_init_vari.F dic_atmos.F dic_ini_forcing.F  dic_read_pickup.F \
             dic_surfforcing.F dic_biotic_diags.F  dic_diagnostics_init.F dic_init_fixed.F \
