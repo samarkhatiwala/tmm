@@ -1,0 +1,63 @@
+include ${PETSC_DIR}/conf/variables
+include ${PETSC_DIR}/conf/rules
+
+PROGRAM = mops
+SPROGRAM = smops
+IPROGRAM = imops
+ISPROGRAM = ismops
+
+SRC   = \
+	tmm_main.c \
+	tmm_forward_step.c \
+	tmm_forcing_utils.c \
+	petsc_matvec_utils.c \
+	petsc_signal_utils.c \
+	external_forcing_mops_biogeochem.c \
+	tmm_external_bc.c \
+	tmm_monitor.c \
+	tmm_profile_utils.c
+SRF   = \
+	BGC_MODEL.F \
+	BGC_INI.F \
+        CAR_CHEM.F \
+        CAR_INI.F \
+	mops_biogeochem_ini.F \
+	mops_biogeochem_model.F \
+	mops_biogeochem_diagnostics.F \
+	mops_biogeochem_set_params.F \
+	mops_biogeochem_copy_data.F \
+	insolation.F 
+	
+OBJECTS = $(SRC:.c=.o) $(SRF:.F=.o)
+
+# always couple carbon to the P-core
+
+# use the original mops with river runoff
+$(PROGRAM): FPPFLAGS=-DCARBON -DRUNOFF
+$(PROGRAM): CPPFLAGS=-DCARBON -DRUNOFF
+
+# use the original mops with river runoff and implicit profiles
+$(IPROGRAM): FPPFLAGS=-DCARBON -DRUNOFF -DIMPRO
+$(IPROGRAM): CPPFLAGS=-DCARBON -DRUNOFF -DIMPRO
+
+# use surface supply of buried P
+$(SPROGRAM): FPPFLAGS=-DCARBON
+$(SPROGRAM): CPPFLAGS=-DCARBON
+
+# use surface supply of buried P and implicit profiles
+$(ISPROGRAM): FPPFLAGS=-DCARBON -DIMPRO
+$(ISPROGRAM): CPPFLAGS=-DCARBON -DIMPRO
+
+$(PROGRAM): $(OBJECTS) chkopts
+	-${CLINKER} -o $@ $(OBJECTS) ${PETSC_MAT_LIB}
+
+$(IPROGRAM): $(OBJECTS) chkopts
+	-${CLINKER} -o $@ $(OBJECTS) ${PETSC_MAT_LIB}
+
+$(SPROGRAM): $(OBJECTS) chkopts
+	-${CLINKER} -o $@ $(OBJECTS) ${PETSC_MAT_LIB}
+
+$(ISPROGRAM): $(OBJECTS) chkopts
+	-${CLINKER} -o $@ $(OBJECTS) ${PETSC_MAT_LIB}
+
+
