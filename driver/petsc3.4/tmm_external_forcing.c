@@ -26,7 +26,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
 #undef __FUNCT__
 #define __FUNCT__ "calcExternalForcing"
-PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Vec *v, Vec *ut)
+PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop, PetscInt numTracers, Vec *v, Vec *ut)
 {
 
   PetscErrorCode ierr;

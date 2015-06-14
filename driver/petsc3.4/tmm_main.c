@@ -19,9 +19,12 @@ static char help[] = "\n";
 #include "tmm_external_bc.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
+#include "tmm_monitor.h"
 #include "tmm_main.h"
+
 PetscScalar deltaTClock, time0;
 PetscInt maxSteps, Iter0, writeSteps;
+PetscInt *gIndices, gLow, gHigh;
 
 extern PetscErrorCode forwardStep(PetscScalar tc, PetscInt iLoop, PetscScalar dt, PetscInt numTracers, 
                                   PetscBool useForcingFromFile, PetscBool useExternalForcing, PetscBool usePrescribedBC, 
@@ -106,6 +109,7 @@ int main(int argc,char **args)
   PetscBool constantBC = PETSC_FALSE;
   PetscBool doCalcBC = PETSC_FALSE;
   PetscBool rescaleForcing = PETSC_FALSE;
+  PetscBool useMonitor = PETSC_FALSE;
 
   PetscMPIInt numProcessors, myId;  
   PetscErrorCode ierr;
@@ -118,11 +122,14 @@ int main(int argc,char **args)
   PetscInt fp;
   char tmpFile[PETSC_MAX_PATH_LEN];
   PetscScalar zero = 0.0, one = 1.0;
+  PetscInt il;
   
   PetscInitialize(&argc,&args,(char *)0,help);
   ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&myId);CHKERRQ(ierr);
   ierr = MPI_Comm_size(PETSC_COMM_WORLD,&numProcessors);CHKERRQ(ierr);  
   myId=myId+1; /* process ID (starting at 1) */
+
+  PetscPushErrorHandler(PetscAbortErrorHandler,NULL); /* force code to abort on error */
 
 /* Some defaults */
   time0=0.0;
@@ -268,6 +275,14 @@ int main(int argc,char **args)
   }  
   
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Matrix size is %d x %d\n", n,n);CHKERRQ(ierr);  
+
+/*   Compute global indices for local piece of vectors */
+  ierr = VecGetOwnershipRange(templateVec,&gLow,&gHigh);CHKERRQ(ierr);
+  gHigh = gHigh - 1; /* Note: gHigh is one more than the last local element */
+  ierr = PetscMalloc(lSize*sizeof(PetscInt),&gIndices);CHKERRQ(ierr);  
+  for (il=0; il<lSize; il++) {
+    gIndices[il] = il + gLow;
+  }  
 
 /* Output file */
   for (itr=0; itr<numTracers; itr++) {
@@ -685,6 +700,12 @@ int main(int argc,char **args)
 	}  
   }
 
+/* initialize monitor */
+  ierr = PetscOptionsHasName(PETSC_NULL,"-monitor",&useMonitor);CHKERRQ(ierr);
+  if (useMonitor) {  
+    ierr = iniMonitor(time0,Iter0,numTracers,v);CHKERRQ(ierr);
+  }
+
 /* Open files for output and optionally write initial conditions */
 #if !defined (FORSPINUP) && !defined (FORJACOBIAN)
   if (!appendOutput) {
@@ -843,6 +864,11 @@ int main(int argc,char **args)
                        v,Ae,Ai,Be,Bi,uf,uef,bcc,bcf,vtmp);CHKERRQ(ierr);
 #endif    
     tc=time0 + deltaTClock*iLoop;  /*  time at end of step */    
+
+    if (useMonitor) {
+      ierr = updateMonitor(tc,iLoop,numTracers,v);CHKERRQ(ierr);
+      ierr = writeMonitor(tc,iLoop,numTracers,v);CHKERRQ(ierr);
+    }
 
 /* write output */
 #if !defined (FORSPINUP) && !defined (FORJACOBIAN)
@@ -1045,6 +1071,10 @@ int main(int argc,char **args)
 	if (periodicMatrix) {
       ierr = destroyPeriodicVec(&Rfsp);CHKERRQ(ierr);
     }	
+  }
+  
+  if (useMonitor) {
+	ierr = finalizeMonitor(tc,maxSteps,numTracers);CHKERRQ(ierr);
   }
   
   if (useExternalForcing) {
