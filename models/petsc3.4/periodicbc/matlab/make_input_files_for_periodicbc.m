@@ -39,13 +39,7 @@ if rem(dt,deltaT)
 end
 disp(['dtMultiple is set to ' num2str(dtMultiple)])
 
-if strcmp(gridType,'llc_v4')
-  load(boxFile,'izBoxGlob','nb')
-  nb=sum(nb);
-  izBox=izBoxGlob;
-else
-  load(boxFile,'izBox','nb')
-end
+load(boxFile,'izBox','nb')
 
 Ib=find(izBox==1);
 Ii=find(~ismember([1:nb]',Ib));
