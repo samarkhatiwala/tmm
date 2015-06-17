@@ -46,17 +46,7 @@ if rem(dt,deltaT)
 end
 disp(['dtMultiple is set to ' num2str(dtMultiple)])
 
-if strcmp(gridType,'llc_v4')
-  load(boxFile,'XboxnomGlob','YboxnomGlob','ZboxnomGlob','izBoxGlob','nb','volbglob')
-  nb=sum(nb);
-  Xboxnom=XboxnomGlob;
-  Yboxnom=YboxnomGlob;
-  Zboxnom=ZboxnomGlob;
-  izBox=izBoxGlob;
-  volb=volbglob;
-else
-  load(boxFile,'Xboxnom','Yboxnom','Zboxnom','izBox','nb','volb')
-end
+load(boxFile,'Xboxnom','Yboxnom','Zboxnom','izBox','nb','volb')
 
 Ib=find(izBox==1);
 Ii=find(~ismember([1:nb]',Ib));
