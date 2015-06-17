@@ -1,8 +1,9 @@
-mpiexec -np 2 ./tmm -numtracers 3 \
-  -i Gini_01.petsc,Gini_02.petsc,Gini_03.petsc \
+mpiexec -np 2 ./tmm -numtracers 7 \
+  -i Gini_0001.petsc,Gini_0002.petsc,Gini_0003.petsc,Gini_0004.petsc,Gini_0005.petsc,Gini_0006.petsc,Gini_0007.petsc \
   -me Ae1.petsc -mi Ai1.petsc -mbe Be.petsc -mbi Bi.petsc \
   -t0 0.0 -iter0 0 -dt 0.0013888888888889 \
-  -o G_01.petsc,G_02.petsc,G_03.petsc \
-  -max_steps 7200 -write_steps 720 -prescribed_bc \
-  -bc_files Gbc_01.petsc,Gbc_02.petsc,Gbc_03.petsc \
-  -bc_cutoff_step 720 > log0
+  -o G_0001.petsc,G_0002.petsc,G_0003.petsc,G_0004.petsc,G_0005.petsc,G_0006.petsc,G_0007.petsc \
+  -max_steps 1440 -write_steps 720 \
+  -prescribed_bc -bc_files Gbc_0001.petsc,Gbc_0002.petsc,Gbc_0003.petsc,Gbc_0004.petsc,Gbc_0005.petsc,Gbc_0006.petsc,Gbc_0007.petsc \
+  -bc_cutoff_step 720 \
+  > log0

@@ -1,14 +1,23 @@
 % Set toplevel path to GCMs configuration
 base_path='/data2/spk/TransportMatrixConfigs/MITgcm_2.8deg';
-% base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO';
-% base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO_v4';
+% base_path='/disks/data2/spk/TransportMatrixConfigs/MITgcm_2.8deg';
+% base_path='/disks/data2/spk/TransportMatrixConfigs/MITgcm_ECCO';
+
+regNums=[1:7];
+regionFile='global_plus_regions';
+
+load(regionFile,'numRegions','regionb')
+
+% simulate a subset of regions
+regionb=regionb(:,regNums);
+numRegions=size(regionb,2);
 
 periodicMatrix=0
 
 dt=43200; % time step to use
 
-rearrangeProfiles=0 % DON'T CHANGE!!
 bigMat=0
+rearrangeProfiles=0 % DO NOT CHANGE!
 writeFiles=1
 writeTMs=1
 useCoarseGrainedMatrix=0
@@ -33,67 +42,49 @@ profilesFile=fullfile(matrixPath,'Data','profile_data');
 
 load(gridFile,'nx','ny','nz','x','y','z','deltaT','gridType')
 
+load(boxFile,'nb','ixBox','iyBox','izBox','volb','Xboxnom','Yboxnom','Zboxnom')
+
+Ib=find(izBox==1);
+Ii=find(izBox~=1);
+
+nbb=length(Ib);
+nbi=length(Ii);
+
 dtMultiple=dt/deltaT;
 if rem(dt,deltaT)
   error('ERROR: Incorrect time step specified! dt must be divisible by deltaT.')
 end
 disp(['dtMultiple is set to ' num2str(dtMultiple)])
 
-if strcmp(gridType,'llc_v4')
-  load(boxFile,'YboxnomGlob','izBoxGlob','nb')
-  Yboxnom=YboxnomGlob;  
-  nb=sum(nb);
-  izBox=izBoxGlob;
-else
-  load(boxFile,'Yboxnom','izBox','nb')
+load(explicitAnnualMeanMatrixFile,'Aexpms')
+load(implicitAnnualMeanMatrixFile,'Aimpms')
+if exist('dtMultiple','var')
+  disp(['WARNING: dtMultiple is set to ' num2str(dtMultiple)])
+  disp('Modifying Aimpms')    
+  if bigMat % big matrix. do it a block at a time.
+    load(profilesFile,'Ip_pre')  
+	for is=1:nbb
+	  for is=1:nbb % change time step multiple
+		Aimpms(Ip_pre{is},Ip_pre{is})=Aimpms(Ip_pre{is},Ip_pre{is})^dtMultiple;
+	  end
+	end
+  else
+    Aimpms=Aimpms^dtMultiple;
+  end
 end
-
-Ib=find(izBox==1);
-Ii=find(~ismember([1:nb]',Ib));
-nbb=length(Ib);
-nbi=length(Ii);
-
-if rearrangeProfiles || bigMat
-  load(profilesFile,'Ip_pre','Ir_pre','Ip_post','Ir_post','Irr')
-  Ip=Ip_pre;
-  Ir=Ir_pre;
-end
-
-if useCoarseGrainedMatrix
-  error('NOT FULLY IMPLEMENTED YET!')
-end
-
-% Define surface patches
-% First load basin mask file
-load(fullfile(gcmDataPath,'basin_mask'),'basin_mask','basin_names')
-basin_mask=gridToMatrix(basin_mask,Ib,boxFile,gridFile);
-
-Ybb=Yboxnom(Ib);
-
-numPatches=3;
-patchb=zeros([nbb numPatches]);
-% (1) North Atlantic north of 50 N
-basinIndex=find(strcmp(basin_names,'Atlantic'));
-ipatch=find(basin_mask==basinIndex & Ybb>50);
-patchb(ipatch,1)=1;
-% (2) Southern Ocean south of 55 S
-ipatch=find(Ybb<=-55);
-patchb(ipatch,2)=2;
-% (3) Global surface
-patchb(:,3)=3;
+% make discrete
+I=speye(nb,nb);
+Aexpms=dt*Aexpms;
+Aexpms=I+Aexpms;
 
 % Boundary conditions
-Gbc=zeros([nbb numPatches]);
-for ip=1:numPatches
-  Gbc(find(patchb(:,ip)),ip)=1;
-end
-
-% Initial conditions
-Gini=repmat(0,[nbi numPatches]);
-
-if rearrangeProfiles
-  error('ERROR: rearrangeProfiles must be set to 0!')
+Gbc=zeros([nbb numRegions]);
+for ir=1:numRegions 
+  kr=find(regionb(:,ir));
+  Gbc(kr,ir)=1;
 end  
+% Initial condition
+Gini=zeros([nbi 1]);
 
 if writeFiles
 % Transport matrices
@@ -174,14 +165,14 @@ if writeFiles
 	  end
 	end
   end
-% Initial conditions
-  for ip=1:numPatches
-    writePetscBinOrig(['Gini_' sprintf('%02d',ip) '.petsc'],Gini(:,ip))
+% Initial conditions  
+  for ir=1:numRegions
+    writePetscBin(['Gini_' sprintf('%04d',ir) '.petsc'],Gini)
   end
 % Boundary conditions
-  for ip=1:numPatches  
-    writePetscBinOrig(['Gbc_' sprintf('%02d',ip) '.petsc'],Gbc(:,ip))
-  end  
+  for ir=1:numRegions
+	writePetscBin(['Gbc_' sprintf('%04d',ir) '.petsc'],Gbc(:,ir))
+  end
   
 % Grid data
 
