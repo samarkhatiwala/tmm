@@ -1,17 +1,17 @@
 % Set toplevel path to GCMs configuration
-% base_path='/data2/spk/TransportMatrixConfigs/MITgcm_2.8deg';
+base_path='/data2/spk/TransportMatrixConfigs/MITgcm_2.8deg';
 % base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO';
-base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO_v4';
+% base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO_v4';
 
 periodicForcing=1
-periodicMatrix=0
+periodicMatrix=1
 
-dt=10800; % time step to use
+dt=43200; % time step to use
 
 rearrangeProfiles=1
 bigMat=0
 writeFiles=1
-writeTMs=0
+writeTMs=1
 useCoarseGrainedMatrix=0
 writePCFiles=0
 
@@ -39,19 +39,8 @@ bgcDataPath=fullfile(base_path,'BiogeochemData');
 freshWaterForcingFile=fullfile(gcmDataPath,'FreshWaterForcing_gcm');
 empFixFile=fullfile(gcmDataPath,empFixFile);
 
-% model specific data
-if strcmp(gcmConfigName,'MITgcm_2.8deg')
-  iceFile=fullfile(bgcDataPath,'fice');
-  windFile=fullfile(bgcDataPath,'tren_speed');
-elseif strcmp(gcmConfigName,'MITgcm_ECCO')
-  iceFile=fullfile(bgcDataPath,'nasa_icefraction_mth-2d');
-  windFile=fullfile(bgcDataPath,'tren_speed_mth-2d');
-elseif strcmp(gcmConfigName,'MITgcm_ECCO_v4')
-  iceFile=fullfile(bgcDataPath,'Fice');
-  windFile=fullfile(bgcDataPath,'EXF_wspeed');
-else
-  error('ERROR: Unknown configuration!')
-end
+iceFile=fullfile(bgcDataPath,'ice_fraction');
+windFile=fullfile(bgcDataPath,'wind_speed');
 
 %
 gridFile=fullfile(base_path,'grid');
@@ -66,17 +55,7 @@ if rem(dt,deltaT)
 end
 disp(['dtMultiple is set to ' num2str(dtMultiple)])
 
-if strcmp(gridType,'llc_v4')
-  load(boxFile,'XboxnomGlob','YboxnomGlob','ZboxnomGlob','izBoxGlob','nb','volbglob')
-  nb=sum(nb);
-  Xboxnom=XboxnomGlob;
-  Yboxnom=YboxnomGlob;
-  Zboxnom=ZboxnomGlob;
-  izBox=izBoxGlob;
-  volb=volbglob;
-else
-  load(boxFile,'Xboxnom','Yboxnom','Zboxnom','izBox','nb','volb')
-end
+load(boxFile,'Xboxnom','Yboxnom','Zboxnom','izBox','nb','volb')
 
 Ib=find(izBox==1);
 nbb=length(Ib);
@@ -100,10 +79,8 @@ end
 % Use steady state T/S from GCM. Note we always load seasonal data here.
 load(fullfile(gcmDataPath,'Theta_gcm'),'Tgcm')
 load(fullfile(gcmDataPath,'Salt_gcm'),'Sgcm')
-Tsteady=gridToMatrix(Tgcm,[],boxFile,gridFile);
-Ssteady=gridToMatrix(Sgcm,[],boxFile,gridFile);
-
-clear Tgcm Sgcm % make some space
+Theta=gridToMatrix(Tgcm,[],boxFile,gridFile);
+Salt=gridToMatrix(Sgcm,[],boxFile,gridFile);
 
 if ~useCarbon
   useAtmModel=0;
@@ -120,7 +97,7 @@ if useEmP
 % d[TR]/dt = ... + Fv/dz
   load(freshWaterForcingFile,'EmPgcm','Srelaxgcm','saltRelaxTimegcm')
   zeroNetEmP=1;
-  EmP=get_surface_emp_for_virtual_flux(gridFile,boxFile,EmPgcm,Srelaxgcm,saltRelaxTimegcm,Ssteady,zeroNetEmP);
+  EmP=get_surface_emp_for_virtual_flux(gridFile,boxFile,EmPgcm,Srelaxgcm,saltRelaxTimegcm,Salt,zeroNetEmP);
 %   gV=EmP./dzb;
   volFracSurf=zeros(nb,1);
   volFracSurf(Ib)=volb(Ib)/sum(volb(Ib));  
@@ -159,29 +136,31 @@ end
 % Grid variables
 dzb=gridToMatrix(dz,[],boxFile,gridFile);
 
+% Surface forcing data
+load(iceFile,'Fice')
+load(windFile,'windspeed')
+Ficeb=gridToMatrix(Fice,Ib,boxFile,gridFile,1);
+windb=gridToMatrix(windspeed,Ib,boxFile,gridFile,1);
+
+atmospb=load_ocmip_variable([],'P',Xboxnom(Ib),Yboxnom(Ib));  
+
+if rescaleForcing
+  load(fullfile(base_path,rescaleForcingFile))
+end
+
 % now take annual mean if necessary
 if ~periodicForcing
-  Tsteady=mean(Tsteady,2);
-  Ssteady=mean(Ssteady,2);
+  Theta=mean(Theta,2);
+  Salt=mean(Salt,2);
   if useEmP
     EmP=mean(EmP,2);
   end  
-end
-
-% Surface forcing data
-load(iceFile,'Fice')
-load(windFile,'wind')
-Ficeb=gridToMatrix(Fice,Ib,boxFile,gridFile,1);
-windb=gridToMatrix(wind,Ib,boxFile,gridFile,1);
-
-if ~periodicForcing
   Ficeb=mean(Ficeb,2);
   windb=mean(windb,2);  
-end
-
-atmospb=load_ocmip_variable([],'P',Xboxnom(Ib),Yboxnom(Ib));  
-if ~periodicForcing
   atmospb=mean(atmospb,2);
+  if rescaleForcing
+	Rfs=mean(Rfs,2);    
+  end
 end
 
 if READ_SWRAD
@@ -200,10 +179,13 @@ if rearrangeProfiles
   Yboxnom=Yboxnom(Ir);
   Zboxnom=Zboxnom(Ir);
   izBox=izBox(Ir);
-  Tsteady=Tsteady(Ir,:);
-  Ssteady=Ssteady(Ir,:);
+  Theta=Theta(Ir,:);
+  Salt=Salt(Ir,:);
   if useEmP
     volFracSurf=volFracSurf(Ir);
+  end  
+  if rescaleForcing
+    Rfs=Rfs(Ir,:);
   end  
   dzb=dzb(Ir);
   Ib=find(izBox==1);
@@ -266,8 +248,8 @@ if useCoarseGrainedMatrix
     latb=CG.Ybox(Ibcg); %Beta(Ibcg,Ib)*latb;
   end
 
-  Tsteady=Beta*Tsteady;
-  Ssteady=Beta*Ssteady;
+  Theta=Beta*Theta;
+  Salt=Beta*Salt;
 end
 
 if writeFiles
@@ -382,12 +364,12 @@ if writeFiles
     write_binary('latitude.bin',latb,'real*8')
   end
   if ~periodicForcing
-	writePetscBin('Ts.petsc',Tsteady)
-	writePetscBin('Ss.petsc',Ssteady)
+	writePetscBin('Ts.petsc',Theta)
+	writePetscBin('Ss.petsc',Salt)
   else
     for im=1:nm
-	  writePetscBin(['Ts_' sprintf('%02d',im-1)],Tsteady(:,im))
-	  writePetscBin(['Ss_' sprintf('%02d',im-1)],Ssteady(:,im))
+	  writePetscBin(['Ts_' sprintf('%02d',im-1)],Theta(:,im))
+	  writePetscBin(['Ss_' sprintf('%02d',im-1)],Salt(:,im))
     end    
   end    
   if useEmP
@@ -399,13 +381,23 @@ if writeFiles
   	    write_binary(['EmP_' sprintf('%02d',im-1)],EmP(:,im),'real*8')
 	  end
 	end    
+  end
+  if rescaleForcing
+	if ~periodicForcing
+	  writePetscBin('Rfs.petsc',Rfs)
+	else
+	  for im=1:nm
+		writePetscBin(['Rfs_' sprintf('%02d',im-1)],Rfs(:,im))
+	  end    
+	end    
   end  
 % Grid data
-  write_binary('drF.bin',dznom,'real*8')
+  write_binary('drF.bin',nz,'int')  
+  write_binary('drF.bin',dznom,'real*8',1)
   writePetscBin('dz.petsc',dzb)
+  write_binary('dA.bin',dab_surf,'real*8')      
   if useAtmModel
     write_binary('pCO2atm_ini.bin',pCO2atm_ini,'real*8')
-    write_binary('dA.bin',dab_surf,'real*8')    
   end  
 % Profile data  
   if rearrangeProfiles

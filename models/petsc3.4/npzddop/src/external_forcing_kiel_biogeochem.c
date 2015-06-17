@@ -12,7 +12,6 @@
 #include "tmm_forcing_utils.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
-#include "tmm_main.h"
 #include "kiel_biogeochem.h"
 
 /* Macros to map tracer names to vectors */
@@ -109,6 +108,8 @@ PetscInt numBGCParams = 0;
 char bgcParamsFile[PETSC_MAX_PATH_LEN];
 PetscScalar *bgcparams;
 
+PetscScalar *localdA;
+
 #ifdef CARBON
 /* atmospheric model variables */
 PetscScalar *TpCO2atm_hist, *pCO2atm_hist;
@@ -119,7 +120,6 @@ char pCO2atmIniFile[PETSC_MAX_PATH_LEN];
 PetscBool useAtmModel = PETSC_FALSE;
 PetscScalar pCO2atm_ini = 280.0; /* default initial value */
 PetscScalar pCO2atm = 280.0; /* default initial value */
-PetscScalar *localdA;
 PetscScalar ppmToPgC=2.1324;
 PetscScalar atmModelDeltaT;
 PetscScalar secPerYear=86400.0*360.0;
@@ -134,6 +134,18 @@ FILE *atmfptime;
 PetscViewer atmfd;
 PetscInt atmfp;
 char atmOutTimeFile[PETSC_MAX_PATH_LEN];  
+#endif
+
+#ifdef SEDIMENT
+PetscScalar runoff_ini = 0.0;
+PetscScalar GRunoff; /* Global runoff, calculated from burial */
+PetscScalar *localrunoffvol; /* volume supplied by runoff */
+PetscScalar localFburial = 0.0;
+PetscScalar Fburial=0.0;
+PetscInt burialSumSteps;
+char runoffOutTimeFile[PETSC_MAX_PATH_LEN];  
+char runoffIniFile[PETSC_MAX_PATH_LEN];  
+FILE *runofffptime;
 #endif
 
 PetscBool calcDiagnostics = PETSC_FALSE;
@@ -254,10 +266,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = PetscOptionsGetInt(PETSC_NULL,"-num_biogeochem_steps_per_ocean_step",&numBiogeochemStepsPerOceanStep,&flg);CHKERRQ(ierr);
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of biogeochem model time steps per ocean time step = %d\n",numBiogeochemStepsPerOceanStep);CHKERRQ(ierr);
 
-  ierr = PetscOptionsGetInt(PETSC_NULL,"-nzmax",&nzmax,&flg);CHKERRQ(ierr);
-  if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate maximum number of z points with the -nzmax option");  
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of vertical layers is %d \n",nzmax);CHKERRQ(ierr);
-
   ierr = PetscOptionsGetInt(PETSC_NULL,"-nzeuph",&nzeuph,&flg);CHKERRQ(ierr);
   if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate number of euphotic zone layers with the -nzeuph option");  
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of euphotic zone layers is %d \n",nzeuph);CHKERRQ(ierr);
@@ -299,10 +307,10 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     Ssp.firstTime = PETSC_TRUE;
   } else {
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Ts.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-	ierr = VecLoad(Ts,fd);CHKERRQ(ierr); /* IntoVector */
+	ierr = VecLoad(Ts,fd);CHKERRQ(ierr);  /* IntoVector */ 
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Ss.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-	ierr = VecLoad(Ss,fd);CHKERRQ(ierr); /* IntoVector */
+	ierr = VecLoad(Ss,fd);CHKERRQ(ierr);    /* IntoVector */ 
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
   }  
   ierr = VecGetArray(Ts,&localTs);CHKERRQ(ierr);
@@ -317,14 +325,16 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     gIndices[il] = il + gLow;
   }  
 
+/* in principle, localdA is only used by the atmospheric exchange - but I might also need it for the sediment,
+and who knows what comes next. IK. */
+    ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localdA);CHKERRQ(ierr);
+    ierr = readProfileSurfaceScalarData("dA.bin",localdA,1);  
+
 #ifdef CARBON
   ierr = PetscOptionsHasName(PETSC_NULL,"-use_atm_model",&useAtmModel);CHKERRQ(ierr);
 
   if (useAtmModel) {
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Using interactive atmospheric model\n");CHKERRQ(ierr);  
-
-    ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localdA);CHKERRQ(ierr);
-    ierr = readProfileSurfaceScalarData("dA.bin",localdA,1);  
 
 /* overwrite default value */
 	ierr = PetscOptionsGetReal(PETSC_NULL,"-pco2atm_ini",&pCO2atm_ini,&flg);CHKERRQ(ierr); /* read from command line */
@@ -430,9 +440,66 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
 	ierr = VecDuplicate(TR7,&surfVolFrac);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"surface_volume_fraction.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-	ierr = VecLoad(surfVolFrac,fd);CHKERRQ(ierr); /* IntoVector */
+	ierr = VecLoad(surfVolFrac,fd);CHKERRQ(ierr);  /* IntoVector */ 
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);      
   }
+
+#endif
+
+#ifdef SEDIMENT
+
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"Using Burial-Runoff model\n");CHKERRQ(ierr);  
+
+/* Define the interval over which to integrate global burial */
+  ierr = PetscOptionsGetInt(PETSC_NULL,"-burial_sum_steps",&burialSumSteps,&flg);CHKERRQ(ierr);
+  if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate burial integration interval with the -burial_sum_steps option");
+  if ((maxSteps % burialSumSteps)!=0) {
+    SETERRQ(PETSC_COMM_WORLD,1,"maxSteps not divisible by burialSumSteps!");
+  }
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"Runoff be integrated over and written every %d time steps\n",burialSumSteps);CHKERRQ(ierr);
+
+/* set the name of the runoff time file */
+  ierr = PetscOptionsGetString(PETSC_NULL,"-runoff_time_file",runoffOutTimeFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+  if (!flg) {
+  strcpy(runoffOutTimeFile,"");
+  sprintf(runoffOutTimeFile,"%s","runoff_output_time.txt");
+  }
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"Runoff output times will be written to %s\n",runoffOutTimeFile);CHKERRQ(ierr);
+
+
+/* set inititial runoff: overwrite default value with value from command line*/
+  ierr = PetscOptionsGetReal(PETSC_NULL,"-runoff_ini",&runoff_ini,&flg);CHKERRQ(ierr);
+/* set inititial runoff: overwrite default value with value from file*/
+  if (!flg) {
+    ierr = PetscOptionsGetString(PETSC_NULL,"-runoff_ini_file",runoffIniFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+    if (flg) { /* read from binary file */
+      ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,runoffIniFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
+      ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+      ierr = PetscBinaryRead(fp,&runoff_ini,1,PETSC_SCALAR);CHKERRQ(ierr);
+      ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+    }
+  }
+    
+  GRunoff = runoff_ini;
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"Using initial runoff of %g Gmol P/d\n",GRunoff);CHKERRQ(ierr);
+
+/* if run is continued, always append runoff and output times */
+  if (Iter0>0) {
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"Runoff output will be appended\n");CHKERRQ(ierr);
+      ierr = PetscFOpen(PETSC_COMM_WORLD,runoffOutTimeFile,"a",&runofffptime);CHKERRQ(ierr);  
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"Initial runoff output will not be written\n");CHKERRQ(ierr);
+   } else {
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"Runoff output will overwrite existing file(s)\n");CHKERRQ(ierr);
+      ierr = PetscFOpen(PETSC_COMM_WORLD,runoffOutTimeFile,"w",&runofffptime);CHKERRQ(ierr);  
+      ierr = PetscFPrintf(PETSC_COMM_WORLD,runofffptime,"%d   %10.5f\n",Iter0,time0);CHKERRQ(ierr);     
+      ierr = writeBinaryScalarData("Grunoff_output.bin",&GRunoff,1,PETSC_FALSE);
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing runoff output at time %10.5f, step %d\n", tc,Iter);CHKERRQ(ierr);  
+   }
+
+/* fraction of global river runoff in each box, divided by the box volume (a 3D field) */
+/* Note: VecLoadVecIntoArray resides in petsc_matvec_utils.c and is not a generic petsc function*/
+  ierr = PetscMalloc(lSize*sizeof(PetscScalar),&localrunoffvol);CHKERRQ(ierr);    
+  ierr = VecLoadVecIntoArray(TR1,"runoff_volume_annual.petsc",localrunoffvol);CHKERRQ(ierr);
 
 #endif
 
@@ -442,6 +509,8 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"drF.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+  ierr = PetscBinaryRead(fp,&nzmax,1,PETSC_INT);CHKERRQ(ierr);  
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of vertical layers is %d \n",nzmax);CHKERRQ(ierr);  
   ierr = PetscMalloc(nzmax*sizeof(PetscScalar),&drF);CHKERRQ(ierr); 
   ierr = PetscBinaryRead(fp,drF,nzmax,PETSC_SCALAR);CHKERRQ(ierr);  
   ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
@@ -645,7 +714,11 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
   PetscScalar DICglobavg = 0.0;
   PetscScalar localco2airseaflux = 0.0;
 #endif
-
+  
+#ifdef SEDIMENT
+  PetscScalar localburial = 0.0;
+#endif
+  
   myTime = DeltaT*Iter; /* Iter should start at 0 */
 
   if (periodicBiogeochemForcing) {   
@@ -706,12 +779,20 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
 #ifdef CARBON			   
 			   &localJTR7[kl],&localJTR8[kl],&localph[ip],&localco2airseaflux,
 #endif
+#ifdef SEDIMENT
+                           &localburial,&GRunoff,&localrunoffvol[kl],
+#endif			    
 			   &useSeparateBiogeochemTimeStepping);                            
 
 #ifdef CARBON			   
     if (useAtmModel) {
       localFocean = localFocean + (localco2airseaflux/DeltaT)*localdA[ip]*(12.0/1.e18)*secPerYear; /* PgC/y */
     }
+#endif
+
+#ifdef SEDIMENT
+/* integrate burial in sediment over area and all profiles on each processor */
+      localFburial = localFburial + localburial*localdA[ip]; 
 #endif
 
 	if (calcDiagnostics) {  
@@ -730,7 +811,7 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
     if ((iLoop % atmModelUpdateTimeSteps)==0) {  /*  time to update atmosphere */
   
       Focean = 0.0;
-      
+       
       MPI_Reduce(&localFocean, &Focean, 1, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD);
       MPI_Bcast(&Focean, 1, MPI_DOUBLE, 0, PETSC_COMM_WORLD);
     
@@ -743,11 +824,33 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
       Foceanint = Foceanint + atmModelDeltaT*Focean; /* calculate the time integrated flux */
         
 /*      Focean = 0.0; */     
-      
+     
     }
   }  
 
 #endif  
+
+#ifdef SEDIMENT
+
+/* sum burial in sediment over all processors, and scale by time step etc.*/
+/* do this only once every burialSumSteps , and then take this value for next year's runoff */
+
+    if ((iLoop % burialSumSteps)==0) {
+
+      Fburial = 0.0;
+
+      MPI_Reduce(&localFburial, &Fburial, 1, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD);
+      MPI_Bcast(&Fburial, 1, MPI_DOUBLE, 0, PETSC_COMM_WORLD);
+      
+      GRunoff = Fburial/(1.e12*burialSumSteps)*(86400.0/DeltaT); /* This is Gmol P/day. 
+      Note: localrunoff is scaled with 1e12. Note: GRunoff will be scaled with bgc_dt.*/
+
+      localFburial = 0.0;
+      }
+    
+
+#endif
+
 
   if (useSeparateBiogeochemTimeStepping) {  /* return updated tracer field */
 	ierr = VecSetValues(TR1,lSize,gIndices,localTR1,INSERT_VALUES);CHKERRQ(ierr);
@@ -882,6 +985,16 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
   }
 #endif
 
+#ifdef SEDIMENT
+
+    if ((iLoop % burialSumSteps)==0) {  /*  time to write out */
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing runoff output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+      ierr = PetscFPrintf(PETSC_COMM_WORLD,runofffptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
+      ierr = writeBinaryScalarData("Grunoff_output.bin",&GRunoff,1,PETSC_TRUE);
+    }
+
+#endif
+
   if (calcDiagnostics) {  
 	if (Iter0+iLoop>=diagStartTimeStep) { /* start time averaging (note: diagStartTimeStep is ABSOLUTE time step) */  
   
@@ -971,6 +1084,10 @@ PetscErrorCode finalizeExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt n
   }
 #endif
 
+#ifdef SEDIMENT
+  ierr = writeBinaryScalarData("pickup_runoff.bin",&GRunoff,1,PETSC_FALSE);
+#endif
+  
   ierr = VecDestroy(&Ts);CHKERRQ(ierr);
   ierr = VecDestroy(&Ss);CHKERRQ(ierr);
   ierr = PetscFree(gIndices);CHKERRQ(ierr);  
@@ -1013,6 +1130,10 @@ PetscErrorCode finalizeExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt n
   if (useAtmModel) {
     ierr = PetscFClose(PETSC_COMM_WORLD,atmfptime);CHKERRQ(ierr);
   }
+#endif
+
+#ifdef SEDIMENT
+    ierr = PetscFClose(PETSC_COMM_WORLD,runofffptime);CHKERRQ(ierr);
 #endif
 
   return 0;

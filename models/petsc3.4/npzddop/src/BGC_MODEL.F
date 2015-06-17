@@ -1,5 +1,6 @@
 C The P core of the Kiel BGC model (NPZD-DOP) framework.
 C Written by Iris Kriest (modified Aug-Dec 2010).
+C Iris Kriest added sediment+river runoff option (Dec. 2010)
 
 C Basis for air-sea gas exchange of O2: MIT source code, 
 C modified by Samar Khatiwala, then by Iris Kriest (Aug-Nov. 2010)
@@ -17,6 +18,7 @@ C CALCULATE THE P CORE (BIOGEOCHEMISTRY) AND CHANGES IN ASS. ELEMENTS (O2,C,N); 
 
 C PREPROCESSOR OPTIONS:
 C CARBON	calculate carbon (bio)geochemistry
+C SEDIMENT	calculate burial in sediment and river runoff
  
 C CALLED BY:	kiel_biogeochem_model
 
@@ -35,18 +37,29 @@ C bgc_atmosp	atmospheric pressure
 C bgc_wind	wind speed [cm/hr]
 C bgc_theta()	temperature [degs C]
 C bgc_salt()	salinity [PSU]
+C Option SEDIMENT:
+C bgc_runoffvol()   volume gain for each box due to runoff [m3/day*e-12]
+C bgc_globalrunoff  global runoff from burial [Gmol P]
 
 C INPUT/COMMON BLOCK
 C biogeochemical parameters. See BGC_PARAMS.h and BGC_INI.F.
 C constants for air-sea gas exchange. See BGC_PARAMS.h and BGC_INI.F.
 C bgc_dt	time step length [days]. See BGC_CONTROL.h.
 C bgc_keuph	number of layers in euphotic zone. See BGC_CONTROL.h.
-
+C Option SEDIMENT:
+C sediment (burial) parameters. See BGC_PARAMS.h and BGC_INI.F.
+ 
 C OUTPUT/COMMON BLOCK
 C bgc_tracer(,)	updated tracer fields. See BGC_PARAMS.h
 C f*_out()	biogeochemical fluxes. See BGC_DIAGNOSTICS.h
+C Option SEDIMENT:
+C flux_bury	burial in sediment in this call to BGC_MODEL [mmol P/m2]
+
 
       SUBROUTINE BGC_MODEL(bgc_kloc,bgc_dz,     
+#ifdef SEDIMENT
+     &                     bgc_runoffvol,bgc_globalrunoff,
+#endif
      & bgc_swr,bgc_tau,bgc_seaice,bgc_wind,bgc_atmosp,
      &                     bgc_theta,bgc_salt)
 
@@ -89,10 +102,16 @@ C f*_out()	biogeochemical fluxes. See BGC_DIAGNOSTICS.h
       real*8 eflux,flux_u,flux_l
       real*8 tempscale,TACmuphy,TACik
       real*8 oxicswitch
+      real*8 remindet,remindop
       real*8 phi,glbygd
       
       integer k,kk,n,it,bgc_keuphloc
 
+#ifdef SEDIMENT
+      real*8 bgc_runoffvol(bgc_ktotal),bgc_globalrunoff
+      real*8 runoff(bgc_ktotal)
+      real*8 oxymm,o2req,o2usefrac,fDET
+#endif
 
 ! carbon chemistry
 #ifdef CARBON      
@@ -131,6 +150,12 @@ c      real*8 alkchem(bgc_ktotal)
 
 #endif
       
+#ifdef SEDIMENT
+
+      flux_bury = 0.0d0
+
+#endif
+
 C INTERNAL TIME LOOP FOR BGC
 
       do it=1,bgc_timesteps
@@ -151,6 +176,11 @@ C INTERNAL TIME LOOP FOR BGC
         todic(k)=0.0d0
         toalk(k)=0.0d0
 #endif
+
+#ifdef SEDIMENT
+	runoff(k)=0.0d0 
+#endif
+
       ENDDO
 
 
@@ -325,14 +355,28 @@ C INTERNAL TIME LOOP FOR BGC
 
         enddo
 	
-	flux(bgc_kloc) = flux(bgc_kloc)+flux_u
-	fdiv(bgc_kloc) = fdiv(bgc_kloc)+flux_u/bgc_dz(bgc_kloc)
+        flux_l = 0.0d0
+
+#ifdef SEDIMENT  
+! account for burial in the sediment	
+        DET = MAX(bgc_tracer(bgc_kloc,idet)-alimit*alimit,0.0d0)
+        fDET = wdet(bgc_kloc)*DET
+        flux_l = MIN(1.0d0,burdige_fac*fDET**burdige_exp)*fDET
+        flux_bury = flux_bury + flux_l*bgc_dt
+#endif
+	
+      flux(bgc_kloc) = flux(bgc_kloc)+flux_u
+      fdiv(bgc_kloc) = fdiv(bgc_kloc)+(flux_u-flux_l)/bgc_dz(bgc_kloc)
 
 ! Store flux for diagnostic purposes.
 
+#ifdef SEDIMENT  
+        f3_out(1)  = flux_bury
+#endif
       do k=2,bgc_kloc
         f3_out(k)  = f3_out(k)+flux(k)*bgc_dt
       enddo
+
 
 ! PROCESSES AFFECTING THE ENTIRE WATER COLUMN
 ! PROCESSES AFFECTING THE ENTIRE WATER COLUMN
@@ -347,20 +391,41 @@ C INTERNAL TIME LOOP FOR BGC
       ZOO = MAX(bgc_tracer(k,izoo)-alimit*alimit,0.0d0)
       DET = MAX(bgc_tracer(k,idet)-alimit*alimit,0.0d0)
 
-      topo4(k)=topo4(k)+dlambda*DOP+detlambda*DET
-      todop(k)=todop(k)-dlambda*DOP
+      remindop = dlambda*DOP
+      remindet = detlambda*DET
+
+      topo4(k)=topo4(k)+remindop+remindet
+      todop(k)=todop(k)-remindop
      &                 +plambda*PHY
      &                 +zlambda*ZOO
      
-      tooxy(k)=tooxy(k)-(dlambda*DOP+detlambda*DET)*ro2ut
+      tooxy(k)=tooxy(k)-(remindop+remindet)*ro2ut
       tophy(k)=tophy(k)-plambda*PHY
       tozoo(k)=tozoo(k)-zlambda*ZOO
-      todet(k)=todet(k)-detlambda*DET
+      todet(k)=todet(k)-remindet
 
-      f4_out(k) = f4_out(k) + (dlambda*DOP+detlambda*DET)*bgc_dt
+      f4_out(k) = f4_out(k) + (remindop+remindet)*bgc_dt
 
       ENDDO
 
+
+#ifdef SEDIMENT
+
+! RIVER RUNOFF
+! RIVER RUNOFF
+! RIVER RUNOFF
+! RIVER RUNOFF
+! RIVER RUNOFF
+! RIVER RUNOFF
+
+      DO K=1,bgc_kloc
+      
+        runoff(k) = bgc_globalrunoff * bgc_runoffvol(k)
+        f5_out(k) = f5_out(k) + runoff(k)*bgc_dt
+
+      ENDDO
+       
+#endif
 
 ! UPDATE MASS CONCENTRATIONS 
 ! UPDATE MASS CONCENTRATIONS 
@@ -376,6 +441,9 @@ C INTERNAL TIME LOOP FOR BGC
 
       bgc_tracer(k,ipo4) = bgc_tracer(k,ipo4) +
      &    topo4(k)*bgc_dt
+#ifdef SEDIMENT     
+     &    + runoff(k)*bgc_dt
+#endif     
       bgc_tracer(k,idop) = bgc_tracer(k,idop) +
      &     todop(k)*bgc_dt
 
@@ -394,6 +462,9 @@ C INTERNAL TIME LOOP FOR BGC
 #ifdef CARBON
       bgc_tracer(k,idic)= bgc_tracer(k,idic)  +
      &     rcp*topo4(k)*bgc_dt    
+#ifdef SEDIMENT     
+     &    + rcp*runoff(k)*bgc_dt
+#endif     
       bgc_tracer(k,ialk)= bgc_tracer(k,ialk)   +
      &       0.0d0
 !     &     rcp*topo4(k)*bgc_dt    

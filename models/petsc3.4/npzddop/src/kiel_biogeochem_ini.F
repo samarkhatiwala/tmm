@@ -97,7 +97,7 @@ C Initialize the tracers
 
 ! forc OCMIP constant alkalinity and silicate
 
-      ocmip_alkfac = 2130.0d0*1.0245d0/34.88d0
+      ocmip_alkfac = 2310.0d0*1.0245d0/34.88d0
       ocmip_silfac = 7.7d0 
       
 ! Global mean silicate for surface layer

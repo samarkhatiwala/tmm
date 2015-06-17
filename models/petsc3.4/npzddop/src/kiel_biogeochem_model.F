@@ -14,6 +14,9 @@ C !INTERFACE: ==========================================================
 #ifdef CARBON
      &                  GPTR7loc,GPTR8loc,localph,localco2flux,
 #endif     
+#ifdef SEDIMENT
+     &                 localburial, globalrunoff, localrunoffloc,
+#endif			    
      &                 useSeparateBiogeochemTS)
 
 C !DESCRIPTION:
@@ -45,11 +48,19 @@ C     Output variables
       real*8 GPTR7loc(Nrloc),GPTR8loc(Nrloc),localph,localco2flux
 #endif
 
+#ifdef SEDIMENT
+      real*8 localburial,globalrunoff,localrunoffloc(Nrloc)
+#endif
+
 C !LOCAL VARIABLES: ====================================================
       INTEGER k,bgc_kloc
       REAL*8 bgc_dz(bgc_ktotal)
       REAL*8 bgc_swr,bgc_tau,bgc_seaice,bgc_wind,bgc_atmosp
       REAL*8 bgc_theta(bgc_ktotal),bgc_salt(bgc_ktotal)
+
+#ifdef SEDIMENT
+      REAL*8 bgc_runoffvol(bgc_ktotal),bgc_globalrunoff
+#endif
       
 C     Copy physics and geometry
       bgc_kloc=Nrloc
@@ -58,10 +69,16 @@ C     Copy physics and geometry
       bgc_seaice=FIceloc
       bgc_wind=WINDloc
       bgc_atmosp=ATMOSPloc
+#ifdef SEDIMENT      
+      bgc_globalrunoff = globalrunoff
+#endif      
       DO k=1,Nrloc
         bgc_dz(k)=dzloc(k)
         bgc_theta(k)=thetaloc(k)
         bgc_salt(k)=saltloc(k)
+#ifdef SEDIMENT      
+        bgc_runoffvol(k) = localrunoffloc(k)
+#endif      
       ENDDO
 
 C Assign the tracers in "wet" grid boxes
@@ -84,6 +101,9 @@ C Assign the tracers in "wet" grid boxes
       ENDDO
 
       CALL BGC_MODEL(bgc_kloc,bgc_dz,
+#ifdef SEDIMENT
+     &               bgc_runoffvol,bgc_globalrunoff,
+#endif		           
      &               bgc_swr,bgc_tau,bgc_seaice,bgc_wind,bgc_atmosp,
      &               bgc_theta,bgc_salt)
       
@@ -121,6 +141,9 @@ C     Send data back
       localco2flux=co2airseaflux
 #endif      
 
-c
+#ifdef SEDIMENT
+      localburial=flux_bury
+#endif
+
       RETURN
       END

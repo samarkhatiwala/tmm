@@ -27,6 +27,9 @@ extern void kiel_biogeochem_model_(PetscInt *Nrloc, PetscScalar *DeltaT,
                                    PetscScalar localJTR7[], PetscScalar localJTR8[], PetscScalar *localph,
 				   PetscScalar *localco2airseaflux,
 #endif
+#ifdef SEDIMENT
+                                   PetscScalar *localburial, PetscScalar *GRunoff, PetscScalar localrunoffvol[],
+#endif			    
                                    PetscBool *useSeparateBiogeochemTimeStepping);
 
 extern void kiel_biogeochem_diagnostics_(PetscInt *Nrloc, 

@@ -62,4 +62,9 @@ c the air-sea gas exchange constants
       COMMON/O2SURFACE/sox1,sox2,sox3,sox4,oA0,oA1,oA2,oA3,oA4,oA5,
      &       oB0,oB1,oB2,oB3,oC0
 
-      
+#ifdef SEDIMENT
+c sediment burial and O2 sensitivity of OM degradation
+      real*8 burdige_fac,burdige_exp,flux_bury,ACkbaco2
+      COMMON/BGCSEDPARAMS/burdige_fac,burdige_exp,flux_bury,ACkbaco2
+#endif
+

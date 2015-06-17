@@ -1,5 +1,7 @@
 C Initialization for P core of the Kiel BGC model (NPZD-DOP) framework.
 C Written by Iris Kriest (modified Aug-Nov 2010).
+C Iris Kriest added sediment+river runoff option (Nov 2010)
+C Iris Kriest added impro option for use of implicit profiles (June 2014)
 
 C Basis for air-sea gas exchange of O2: MIT source code, 
 C modified by Samar Khatiwala, then by Iris Kriest (Aug-Nov 2010)
@@ -14,7 +16,8 @@ C INITIALIZE CALCULATE THE P CORE (BIOGEOCHEMISTRY)
 C INITIALIZE CALCULATE THE P CORE (BIOGEOCHEMISTRY) 
 
 C PREPROCESSOR OPTIONS:
- 
+C SEDIMENT	calculate burial in sediment and river runoff
+  
 C CALLED BY:	kiel_biogeochem_ini
 
 C CALLS:	
@@ -38,6 +41,10 @@ C contants for air-sea gas exchange. See BGC_PARAMS.h and BGC_INI.F.
 #include "BGC_CONTROL.h"
 
       real*8 bgc_zu(bgc_ktotal+1)
+
+#ifdef IMPRO
+      real*8 anafacz, anafac0
+#endif
      
       integer k,kk
       logical setDefaults
@@ -115,7 +122,7 @@ C Derived parameters
 
         ACkphy=SQRT(ACmuzoo/1.0d0)/rnp !zoo half-saturation constant [mmol P]
 
-        detwa = detlambda/1.0725d0 !w = a*z+b for aphotic layers
+        detwa = detlambda/0.858d0 !w = a*z+b for aphotic layers
         detwb = 0.0d0 !offset for detritus sinking
 
 C REMINERALISATION LENGTH SCALES
@@ -123,6 +130,38 @@ C REMINERALISATION LENGTH SCALES
       do k=1,bgc_kmax
         wdet(k) = detwb + (bgc_zu(k)+bgc_zu(k+1))*0.5d0*detwa
       enddo
+
+#ifdef IMPRO
+      anafac0 = (1.0d0+detwa*bgc_dt)**(detlambda/detwa)-1.0d0
+      do k=bgc_keuph+1,bgc_kmax
+        anafacz = (bgc_zu(k)/bgc_zu(k+1))**(detlambda/detwa)
+        wdet(k) = ((bgc_zu(k+1)-bgc_zu(k))*anafac0*
+     &            anafacz/(1.0d0-anafacz))/bgc_dt
+      enddo
+#endif
+
+#ifdef SEDIMENT 
+
+C Burial efficiency (percent buried of deposited).
+C Note: Burdige (2007), Chem. Rev. 107(2), 467-485 suggests
+C that this is a function of deposition.
+C His orginal x axis is "net sediment accumulation" in g cm-2 yr-1
+C converting this to mmol P m-2 d-1 (x) via C:P of 106 and 5 wt% Corg
+C I get burial = 4603 * X^0.564
+C To implement this into the model, I would have to refer to annual
+C values, or even longer. This is currently not possible, but it
+C might be worthwhile trying at a later stage ...
+
+      burdige_fac = 1.6828d0
+      burdige_exp = 0.799d0
+
+C half sat.-constant for oxic degradation
+C Note: this is not only for bacterial degradation, but
+C also parameterizes zooplankton processes (somehow)
+
+      ACkbaco2 = 8.0d0 
+
+#endif
 
       return
       end

@@ -1,1 +1,0 @@
-mpiexec -np 1 ./directimplicitpc -i v.petsc -o w.petsc -signalfiles newpcsignalin,newpcsignalout -ksp_rtol 1.e-12 -ksp_monitor -use_mumps -nmax 1000 
