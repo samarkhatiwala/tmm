@@ -20,6 +20,7 @@ static char help[] = "\n";
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
 #include "tmm_monitor.h"
+#include "tmm_misfit.h"
 #include "tmm_main.h"
 
 PetscScalar deltaTClock, time0;
@@ -110,6 +111,7 @@ int main(int argc,char **args)
   PetscBool doCalcBC = PETSC_FALSE;
   PetscBool rescaleForcing = PETSC_FALSE;
   PetscBool useMonitor = PETSC_FALSE;
+  PetscBool doMisfit = PETSC_FALSE;
 
   PetscMPIInt numProcessors, myId;  
   PetscErrorCode ierr;
@@ -706,6 +708,12 @@ int main(int argc,char **args)
     ierr = iniMonitor(time0,Iter0,numTracers,v);CHKERRQ(ierr);
   }
 
+/* initialize misfit */
+  ierr = PetscOptionsHasName(PETSC_NULL,"-calc_misfit",&doMisfit);CHKERRQ(ierr);
+  if (doMisfit) {  
+    ierr = iniMisfit(time0,Iter0,numTracers,v);CHKERRQ(ierr);
+  }
+
 /* Open files for output and optionally write initial conditions */
 #if !defined (FORSPINUP) && !defined (FORJACOBIAN)
   if (!appendOutput) {
@@ -868,6 +876,11 @@ int main(int argc,char **args)
     if (useMonitor) {
       ierr = updateMonitor(tc,iLoop,numTracers,v);CHKERRQ(ierr);
       ierr = writeMonitor(tc,iLoop,numTracers,v);CHKERRQ(ierr);
+    }
+
+    if (doMisfit) {
+      ierr = calcMisfit(tc,iLoop,numTracers,v);CHKERRQ(ierr);
+      ierr = writeMisfit(tc,iLoop,numTracers,v);CHKERRQ(ierr);
     }
 
 /* write output */
@@ -1075,6 +1088,10 @@ int main(int argc,char **args)
   
   if (useMonitor) {
 	ierr = finalizeMonitor(tc,maxSteps,numTracers);CHKERRQ(ierr);
+  }
+
+  if (doMisfit) {
+	ierr = finalizeMisfit(tc,maxSteps,numTracers);CHKERRQ(ierr);
   }
   
   if (useExternalForcing) {

@@ -19,6 +19,7 @@ SRC   = \
 	external_forcing_kiel_biogeochem.c \
 	tmm_external_bc.c \
 	tmm_monitor.c \
+	tmm_misfit.c \
 	tmm_profile_utils.c
 SRF   = \
 	BGC_MODEL.F \

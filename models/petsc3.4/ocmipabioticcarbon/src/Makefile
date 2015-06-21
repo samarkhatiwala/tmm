@@ -13,7 +13,7 @@ R8FLAG=-r8
 STMM = tmm_main.c tmm_forward_step.c tmm_forcing_utils.c \
         tmm_profile_utils.c petsc_signal_utils.c petsc_matvec_utils.c
         
-SRCOCMIPLANDATM = $(STMM) tmm_external_bc.c tmm_monitor.c external_forcing_ocmip_abiotic_carbon_landatm.c
+SRCOCMIPLANDATM = $(STMM) tmm_external_bc.c tmm_monitor.c tmm_misfit.c external_forcing_ocmip_abiotic_carbon_landatm.c
 SRFOCMIPLANDATM = ocmip_abiotic_carbon_model.F carbon_chem.F ocmip_abiotic_carbon_ini.F \
         landsource.F
 
