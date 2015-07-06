@@ -283,6 +283,9 @@ if ~periodicForcing
   if gasExchangeType==1
 	Vgas=mean(Vgas,2);
   end
+end
+
+if ~periodicMatrix
   if rescaleForcing
 	Rfs=mean(Rfs,2);    
   end  
@@ -512,7 +515,7 @@ if writeFiles
     writePetscBin('surface_volume_fraction.petsc',volFracSurf)
   end  
   if rescaleForcing
-	if ~periodicForcing
+	if ~periodicMatrix
 	  writePetscBin('Rfs.petsc',Rfs)
 	else
 	  for im=1:nm

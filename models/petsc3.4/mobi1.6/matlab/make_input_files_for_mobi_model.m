@@ -128,12 +128,22 @@ end
 % Grid variables
 dzb=gridToMatrix(dz,[],boxFile,gridFile);
 
+if rescaleForcing
+  load(fullfile(base_path,rescaleForcingFile))
+end
+
 % now take annual mean if necessary
 if ~periodicForcing
   Theta=mean(Theta,2);
   Salt=mean(Salt,2);
   if useEmP
     EmP=mean(EmP,2);
+  end  
+end
+
+if ~periodicMatrix
+  if rescaleForcing
+	Rfs=mean(Rfs,2);    
   end  
 end
 
@@ -227,6 +237,9 @@ if rearrangeProfiles
     volFracSurf=volFracSurf(Ir);
   end  
   dzb=dzb(Ir);
+  if rescaleForcing
+    Rfs=Rfs(Ir,:);
+  end    
   Ib=find(izBox==1);
 %
   Ip=Ip_post;
@@ -385,7 +398,18 @@ if writeFiles
   	    write_binary(['EmP_' sprintf('%02d',im-1)],EmP(:,im),'real*8')
 	  end
 	end    
+  end
+  
+  if rescaleForcing
+	if ~periodicMatrix
+	  writePetscBin('Rfs.petsc',Rfs)
+	else
+	  for im=1:nm
+		writePetscBin(['Rfs_' sprintf('%02d',im-1)],Rfs(:,im))
+	  end    
+	end    
   end  
+  
 % Grid data
   z=z*100; % convert to cm
   dznom=dznom*100; % convert to cm

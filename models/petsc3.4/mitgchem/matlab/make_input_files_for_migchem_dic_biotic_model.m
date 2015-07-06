@@ -308,7 +308,9 @@ if ~periodicForcing
   if LIGHT_CHL
     chlb=mean(chlb,2);
   end
+end
 
+if ~periodicMatrix
   if rescaleForcing
 	Rfs=mean(Rfs,2);    
   end  
@@ -522,7 +524,7 @@ if writeFiles
 	end
   end      
   if rescaleForcing
-	if ~periodicForcing
+	if ~periodicMatrix
 	  writePetscBin('Rfs.petsc',Rfs)
 	else
 	  for im=1:nm

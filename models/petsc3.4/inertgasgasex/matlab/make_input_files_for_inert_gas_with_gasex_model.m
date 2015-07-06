@@ -97,10 +97,12 @@ end
 if ~periodicForcing
   Theta=mean(Theta,2);
   Salt=mean(Salt,2);
+end
 
+if ~periodicMatrix
   if rescaleForcing
 	Rfs=mean(Rfs,2);    
-  end    
+  end  
 end
 
 % surface layer thickness
@@ -301,7 +303,7 @@ if writeFiles
     end    
   end    
   if rescaleForcing
-	if ~periodicForcing
+	if ~periodicMatrix
 	  writePetscBin('Rfs.petsc',Rfs)
 	else
 	  for im=1:nm
