@@ -8,12 +8,16 @@ questions feel free to email: Samar Khatiwala <samark@earth.ox.ac.uk>
 
 For a quick overview of the TMM and the PETSc driver also have a look at this 
 excellent presentation by Iris Kriest:
-https://ftp.geomar.de/users/ikriest/TMM/TMM-on-linuxcluster-2013-July.pdf
+https://ftp.geomar.de/users/ikriest/TMM/TMM-2015-April.pdf
 
 Quick-start instructions:
 
-1) Install PETSc (http://www.mcs.anl.gov/petsc/). TMM currently supports 
-version 3.4.x and up.
+1) Install PETSc (http://www.mcs.anl.gov/petsc/). The TMM driver code is compatible 
+with PETSc version 3.4.x and up. Note that if you're using version 3.6.x you will 
+need to modify the makefiles in each example directory by replacing the include 
+lines at the top with:
+include ${PETSC_DIR}/lib/petsc/conf/variables
+include ${PETSC_DIR}/lib/petsc/conf/rules
 
 2) Download Matlab scripts and add to your Matlab path:
 http://kelvin.earth.ox.ac.uk/spk/Research/TMM/tmm_matlab_code.tar.gz

@@ -1,65 +1,8 @@
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 
-#include <petsc-private/matimpl.h>        /*I "petscmat.h" I*/
-#include <petsc-private/vecimpl.h>
 #include "petscmat.h"
 #include "petsc_matvec_utils.h"
-
-#undef __FUNCT__
-#define __FUNCT__ "VecValid"
-/*@
-   VecValid - Checks whether a vector object is valid.
-
-   Not Collective
-
-   Input Parameter:
-.  v - the object to check
-
-   Output Parameter:
-.  flg - flag indicating vector status, either
-   PETSC_TRUE if vector is valid, or PETSC_FALSE otherwise.
-
-   Level: developer
-
-@*/
-PetscErrorCode VecValid(Vec v,PetscBool *flg)
-{
-  PetscFunctionBegin;
-  PetscValidIntPointer(flg,2);
-  if (!v)                                          *flg = PETSC_FALSE;
-  else if (((PetscObject)v)->classid != VEC_CLASSID) *flg = PETSC_FALSE;
-  else                                             *flg = PETSC_TRUE;
-  PetscFunctionReturn(0);
-}
-
-#undef __FUNCT__  
-#define __FUNCT__ "MatValid"
-/*@
-   MatValid - Checks whether a matrix object is valid.
-
-   Collective on Mat
-
-   Input Parameter:
-.  m - the matrix to check 
-
-   Output Parameter:
-   flg - flag indicating matrix status, either
-   PETSC_TRUE if matrix is valid, or PETSC_FALSE otherwise.
-
-   Level: developer
-
-   Concepts: matrices^validity
-@*/
-PetscErrorCode MatValid(Mat m,PetscBool *flg)
-{
-  PetscFunctionBegin;
-  PetscValidIntPointer(flg,1);
-  if (!m)                                          *flg = PETSC_FALSE;
-  else if (((PetscObject)m)->classid != MAT_CLASSID) *flg = PETSC_FALSE;
-  else                                             *flg = PETSC_TRUE;
-  PetscFunctionReturn(0);
-}
 
 #undef __FUNCT__
 #define __FUNCT__ "MatAXPBYmy"
@@ -68,15 +11,12 @@ PetscErrorCode MatAXPBYmy(PetscScalar a,PetscScalar b,Mat X,Mat Y,Mat *Z)
 /* Compute Z = a*X + b*Y, where X,Y,Z are matrices, and a,b are scalars */
 /* If Z doesn't already exist, it is created */
 
-   PetscBool flg;
    PetscErrorCode ierr;
 
-   MatValid(*Z,&flg);
-
-   if (!flg) {
-     ierr=MatDuplicate(Y,MAT_COPY_VALUES,Z);CHKERRQ(ierr);
-   } else {
+   if ((*Z)) {
      ierr=MatCopy(Y,*Z,SAME_NONZERO_PATTERN);CHKERRQ(ierr);  /* Z=Y */
+   } else {
+     ierr=MatDuplicate(Y,MAT_COPY_VALUES,Z);CHKERRQ(ierr);   
    }
    
    ierr=MatScale(*Z,b);CHKERRQ(ierr);  /* Z=b*Z */
@@ -92,16 +32,14 @@ PetscErrorCode VecAXPBYmy(PetscScalar a,PetscScalar b,Vec x,Vec y,Vec *z)
 /* Compute z = a*x + b*y, where x,y,z are vectors, and a,b are scalars */
 /* If z doesn't already exist, it is created */
 
-   PetscBool flg;
    PetscErrorCode ierr;
 
-   VecValid(*z,&flg);
-
-   if (!flg) {    
-     ierr=VecDuplicate(y,z);CHKERRQ(ierr);
-   } else {
+   if ((*z)) {    
      ierr=VecCopy(y,*z);CHKERRQ(ierr);  /* z=y */
+   } else {
+     ierr=VecDuplicate(y,z);CHKERRQ(ierr);
    }    
+
    ierr=VecScale(*z,b);CHKERRQ(ierr);  /* z=b*z */ 
    ierr=VecAXPY(*z,a,x); CHKERRQ(ierr); /* z=a*x+z */
 
