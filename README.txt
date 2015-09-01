@@ -6,9 +6,8 @@ code and interface to models are written using the PETSc framework
 Simply skip to step (3) below. Otherwise keep reading and if you have any 
 questions feel free to email: Samar Khatiwala <samark@earth.ox.ac.uk>
 
-For a quick overview of the TMM and the PETSc driver also have a look at this 
-excellent presentation by Iris Kriest:
-https://ftp.geomar.de/users/ikriest/TMM/TMM-2015-April.pdf
+For a quick overview of the TMM and the PETSc driver also have a look at this excellent 
+presentation by Iris Kriest: https://ftp.geomar.de/users/ikriest/TMM/MOPS-TMM.pdf
 
 Quick-start instructions:
 
@@ -34,7 +33,7 @@ We will need it later.
 cd $HOME
 mkdir TMM
 cd TMM/
-git clonehttps://github.com/samarkhatiwala/tmm.git
+git clone https://github.com/samarkhatiwala/tmm.git
 
 5) For each model, e.g., tmm/models/petsc3.4/mitgchem/ there is a Matlab script to generate 
 all input data (e.g., tmm/models/petsc3.4/mitgchem/matlab/make_input_files_for_migchem_dic_biotic_model.m). 
