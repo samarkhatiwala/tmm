@@ -21,9 +21,8 @@ PetscErrorCode iniProfileData(PetscInt myId)
   PetscInt ipro, ip;
   PetscViewer fd;
   PetscInt fp;
-  PetscBool flg;
-  PetscInt avgprofiles, totalprofiles;
   PetscInt dum;
+  Vec templateVec;
 
   useProfiles = PETSC_FALSE;
   ierr = PetscOptionsHasName(PETSC_NULL,"-use_profiles",&useProfiles);CHKERRQ(ierr);
@@ -32,21 +31,7 @@ PetscErrorCode iniProfileData(PetscInt myId)
   
   ierr = MPI_Comm_size(PETSC_COMM_WORLD,&numProcessors);CHKERRQ(ierr);
   
-/*   Read in number of profiles per processor */
-  ierr = PetscMalloc(numProcessors*sizeof(PetscInt),&gNumProfiles);CHKERRQ(ierr);
-/*   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"numprofiles.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr); */
-/*   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr); */
-/*   ierr = PetscBinaryRead(fp,gNumProfiles,numProcessors,PETSC_INT);CHKERRQ(ierr); */
-/*   ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr); */
-/*   ierr = PetscPrintf(PETSC_COMM_WORLD,"Done reading numprofiles.bin\n");CHKERRQ(ierr); */
-
-/*   Compute total number of profiles */
-/*   totalNumProfiles=0; */
-/*   for (ipro=1; ipro<=numProcessors; ipro++) { */
-/*     totalNumProfiles = totalNumProfiles + gNumProfiles[ipro-1]; */
-/*   } */
-/*   ierr=PetscPrintf(PETSC_COMM_WORLD,"totalNumProfiles = %d\n",totalNumProfiles);CHKERRQ(ierr); */
-
+/*   Read in total number of profiles */
   ierr = PetscMalloc(totalNumProfiles*sizeof(PetscInt),&gStartIndices);CHKERRQ(ierr);
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"gStartIndices.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
@@ -70,34 +55,29 @@ PetscErrorCode iniProfileData(PetscInt myId)
 
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Total number of profiles specified: %d\n",totalNumProfiles);CHKERRQ(ierr);
 
-  avgprofiles = floor(totalNumProfiles/numProcessors);
-  totalprofiles = 0;
-  for (ipro=1; ipro<=numProcessors; ipro++) {
-    gNumProfiles[ipro-1] = avgprofiles;
-    totalprofiles = totalprofiles + avgprofiles;
-  }
-  gNumProfiles[0] = gNumProfiles[0] + (totalNumProfiles - totalprofiles);
+/* Figure out optimum partitioning of profiles over processors */
+  ierr = PetscMalloc(numProcessors*sizeof(PetscInt),&gNumProfiles);CHKERRQ(ierr);
+/* Let PETSc do this for us */
+  ierr = VecCreate(PETSC_COMM_WORLD,&templateVec);CHKERRQ(ierr);
+  ierr = VecSetSizes(templateVec,PETSC_DECIDE,totalNumProfiles);CHKERRQ(ierr);
+  ierr = VecSetFromOptions(templateVec);CHKERRQ(ierr);
+  ierr = VecGetLocalSize(templateVec,&lNumProfiles);CHKERRQ(ierr);
+  ierr = VecDestroy(&templateVec);CHKERRQ(ierr);
+
+/* NOTE: myId starts at 1 */  
+  gNumProfiles[myId-1]=lNumProfiles;
+  MPI_Allgather(&lNumProfiles, 1, MPI_INT, gNumProfiles, 1, MPI_INT, PETSC_COMM_WORLD);
+
   for (ipro=1; ipro<=numProcessors; ipro++) {
     ierr=PetscPrintf(PETSC_COMM_WORLD,"Number of profiles on processor %d = %d\n",ipro-1,gNumProfiles[ipro-1]);CHKERRQ(ierr);
   }
   
-/*   for (ip=1; ip<=totalNumProfiles; ip++) { */
-/*     gStartIndices[ip-1]=gStartIndices[ip-1]-1; */
-/*     gEndIndices[ip-1]=gEndIndices[ip-1]-1; */
-/*     ierr=PetscPrintf(PETSC_COMM_WORLD,"gStartIndices=%d, gEndIndices=%d\n",gStartIndices[ip-1],gEndIndices[ip-1]);CHKERRQ(ierr); */
-/*   } */
-
-/*   Compute total number of profiles upto (but not including) current processor */
+/* Compute total number of profiles upto (but not including) current processor */
 /* NOTE: myId starts at 1 */
   numPrevProfiles=0;
   for (ipro=1; ipro<=myId-1; ipro++) {
     numPrevProfiles = numPrevProfiles + gNumProfiles[ipro-1];
   }
-/*   ierr=PetscPrintf(PETSC_COMM_WORLD,"myId = %d\n",myId);CHKERRQ(ierr); */
-/*   ierr=PetscPrintf(PETSC_COMM_WORLD,"nn = %d\n",nn);CHKERRQ(ierr); */
-/*   for (ipro=1; ipro<=myId; ipro++) { */
-/*     ierr=PetscPrintf(PETSC_COMM_WORLD,"ID=%d, gNumProfiles=%d\n",ipro,gNumProfiles[ipro-1]);CHKERRQ(ierr); */
-/*   } */
   
 /*   Compute starting and ending LOCAL indices of profiles on current processor. NOTE: These have a base 0 index. */
   lNumProfiles = gNumProfiles[myId-1];
