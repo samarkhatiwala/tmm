@@ -85,11 +85,9 @@ CPP_OPTIONS.h
 DYNVARS.h
 FFIELDS.h
 GRID.h
-GRID_MACROS.h
-HFACC_MACROS.h
 PARAMS.h
-RECIP_HFACC_MACROS.h
 SIZE.h
+*_MACROS.h
 
 eesupp/src:
 get_periodic_interval.F

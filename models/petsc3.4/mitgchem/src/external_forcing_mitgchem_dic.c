@@ -59,7 +59,7 @@ PetscScalar *localalpha, *localrain_ratio;
 PeriodicVec Tsp, Ssp;
 PeriodicArray localwindp, localatmospp, localsilicap,localficep,localEmPp;
 #ifdef READ_PAR
-PetscScalar *localparp;
+PeriodicArray localparp;
 #endif
 #ifdef ALLOW_FE
 PeriodicArray localinputfep;
@@ -72,8 +72,11 @@ PetscScalar *tdpBiogeochem; /* arrays for periodic forcing */
 PetscBool periodicBiogeochemForcing = PETSC_FALSE;
 PetscScalar biogeochemCyclePeriod, biogeochemCycleStep;
 
-PetscScalar *TpCO2atm_hist, *pCO2atm_hist;
+PetscInt maxValsToRead;
+PetscInt dummyInt = 0;
+char *pCO2atmFiles[2];  
 PetscInt numpCO2atm_hist = 0;
+PetscScalar *TpCO2atm_hist, *pCO2atm_hist;
 PetscBool fixedAtmosCO2 = PETSC_TRUE;
 char pCO2atmIniFile[PETSC_MAX_PATH_LEN];  
 
@@ -81,9 +84,12 @@ char pCO2atmIniFile[PETSC_MAX_PATH_LEN];
 PetscBool useAtmModel = PETSC_FALSE;
 PetscBool useLandModel = PETSC_FALSE;
 PetscBool useEmissions = PETSC_FALSE;
+PetscBool interpEmissions = PETSC_FALSE;
+char *emFiles[3];  
+PetscInt numEmission_hist = 0;
 PetscScalar *Tem_hist, *E_hist, *D_hist;
 PetscScalar fossilFuelEmission = 0.0, landUseEmission = 0.0;
-PetscInt numEmission_hist = 0;
+PetscScalar cumulativeEmissions = 0.0;
 PetscScalar pCO2atm_ini = 280.0; /* default initial value */
 PetscScalar pCO2atm = 280.0; /* default initial value */
 PetscScalar *localdA;
@@ -134,7 +140,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 #if defined (FORSPINUP) || defined (FORJACOBIAN)
   ierr = PetscOptionsHasName(PETSC_NULL,"-relax_tracer",&relaxTracer);CHKERRQ(ierr);
   if (relaxTracer) {  
-    PetscInt maxValsToRead;
 
     maxValsToRead = numTracers;
     ierr = PetscOptionsGetRealArray(PETSC_NULL,"-relax_tau",relaxTau,&maxValsToRead,&flg);
@@ -293,23 +298,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Atmospheric model output will be appended. Initial condition will NOT be written\n");CHKERRQ(ierr);      
     }
 
-/*Data for diagnostics */
-/*     ierr = PetscOptionsGetBool(PETSC_NULL,"-calc_atm_diagnostics",&calcAtmDiagnostics,0);CHKERRQ(ierr); */
-/*     if (calcAtmDiagnostics) { */
-/*       ierr = PetscOptionsGetInt(PETSC_NULL,"-atm_diag_start_time_step",&atmDiagStartTimeStep,&flg);CHKERRQ(ierr); */
-/*       if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate (absolute) time step at which to start storing atmospheric diagnostics with the -atm_diag_start_time_step flag"); */
-/*       ierr = PetscOptionsGetInt(PETSC_NULL,"-atm_diag_time_steps",&atmDiagNumTimeSteps,&flg);CHKERRQ(ierr); */
-/*       if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate number of time averaging diagnostics time steps for atmosphere with the -atm_diag_time_step flag"); */
-/*       ierr = PetscPrintf(PETSC_COMM_WORLD,"Atmospheric diagnostics will be computed starting at (and including) time step: %d\n", atmDiagStartTimeStep);CHKERRQ(ierr);	 */
-/*       ierr = PetscPrintf(PETSC_COMM_WORLD,"Atmospheric diagnostics will be computed over %d time steps\n", atmDiagNumTimeSteps);CHKERRQ(ierr);	 */
-  
-/*       pCO2atmavg=0.0; */
-/*       Foceanavg=0.0; */
-/*       Flandavg[0]=0.0;Flandavg[1];Flandavg[2];  ???? */
-/*        */
-/*       atmDiagCount=0; */
-/*     }         */
-
     if (useLandModel) {
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Using interactive land model\n");CHKERRQ(ierr);      
       ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"land_ini.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
@@ -326,55 +314,80 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
     }
 
-    ierr = PetscOptionsGetInt(PETSC_NULL,"-emission_num_hist",&numEmission_hist,&useEmissions);CHKERRQ(ierr);
+    /* CO2 emissions */
+	maxValsToRead = 3;
+	emFiles[0] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* time file */
+	emFiles[1] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* fossil fuel emissions file */
+	emFiles[2] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* land use emissions file */
+    ierr = PetscOptionsGetStringArray(PETSC_NULL,"-emissions_history",emFiles,&maxValsToRead,&useEmissions);CHKERRQ(ierr);
     if (useEmissions) { /* Read emissions history */
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Using prescribed emissions\n");CHKERRQ(ierr);      
-
+      if (maxValsToRead != 3) {
+        SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of file names specified for emissions");
+      }      
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"Using prescribed emissions\n");CHKERRQ(ierr);     
+      /* read time data */
+	  ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,emFiles[0],FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	  ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+	  ierr = PetscBinaryRead(fp,&numEmission_hist,1,PETSC_INT);CHKERRQ(ierr);  
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of points in emission files is %d \n",numEmission_hist);CHKERRQ(ierr);  
       ierr = PetscMalloc(numEmission_hist*sizeof(PetscScalar),&Tem_hist);CHKERRQ(ierr); 
-      ierr = PetscMalloc(numEmission_hist*sizeof(PetscScalar),&E_hist);CHKERRQ(ierr); 
-      ierr = PetscMalloc(numEmission_hist*sizeof(PetscScalar),&D_hist);CHKERRQ(ierr); 
-  
-      ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"Tem.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-      ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
       ierr = PetscBinaryRead(fp,Tem_hist,numEmission_hist,PETSC_SCALAR);CHKERRQ(ierr);
-      ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
-  
-      ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"fossil_fuel_emissions.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-      ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+      /* read fossil fuel emissions */
+	  ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,emFiles[1],FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	  ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+      ierr = PetscMalloc(numEmission_hist*sizeof(PetscScalar),&E_hist);CHKERRQ(ierr); 
       ierr = PetscBinaryRead(fp,E_hist,numEmission_hist,PETSC_SCALAR);CHKERRQ(ierr);
-      ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
-  
-      ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"land_use_emissions.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-      ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+      /* read land use emissions */
+	  ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,emFiles[2],FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	  ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+      ierr = PetscMalloc(numEmission_hist*sizeof(PetscScalar),&D_hist);CHKERRQ(ierr); 
       ierr = PetscBinaryRead(fp,D_hist,numEmission_hist,PETSC_SCALAR);CHKERRQ(ierr);
-      ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+      ierr = PetscOptionsHasName(PETSC_NULL,"-interp_emissions",&interpEmissions);CHKERRQ(ierr);
+      if (interpEmissions) {      
+        ierr = PetscPrintf(PETSC_COMM_WORLD,"Warning: Emissions will be interpolated in time. If you're prescribing annual emissions\n");CHKERRQ(ierr);     
+        ierr = PetscPrintf(PETSC_COMM_WORLD,"         interpolation may lead to a different net emission input than what is prescribed\n");CHKERRQ(ierr);     
+      } else {
+        ierr = PetscPrintf(PETSC_COMM_WORLD,"Emissions will NOT be interpolated in time. It is assumed that you're prescribing annual emissions and that\n");CHKERRQ(ierr);     
+        ierr = PetscPrintf(PETSC_COMM_WORLD,"the time data in file %s are the beginning of the year for which the corresponding emission is prescribed.\n",emFiles[0]);CHKERRQ(ierr);     
+      }
     }  
         
   } else {  /* not using atm model */
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Using prescribed atmospheric pCO2\n");CHKERRQ(ierr);
-  
-    ierr = PetscOptionsGetInt(PETSC_NULL,"-pco2_num_hist",&numpCO2atm_hist,&flg);CHKERRQ(ierr);
+
+    /* prescribed atmospheric CO2 */
+  	maxValsToRead = 2;
+	pCO2atmFiles[0] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* time file */
+	pCO2atmFiles[1] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* atmospheric pCO2 history file */
+    ierr = PetscOptionsGetStringArray(PETSC_NULL,"-pco2atm_history",pCO2atmFiles,&maxValsToRead,&flg);CHKERRQ(ierr);
     if (flg) { /* Read atmospheric pCO2 history */
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading time-dependent atmospheric pCO2 history\n");CHKERRQ(ierr);
-    
+      if (maxValsToRead != 2) {
+        SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of file names specified for atmospheric pCO2 history");
+      }      
       fixedAtmosCO2 = PETSC_FALSE;
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading time-dependent atmospheric pCO2 history\n");CHKERRQ(ierr);      
+      /* read time data */
+	  ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,pCO2atmFiles[0],FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	  ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+	  ierr = PetscBinaryRead(fp,&numpCO2atm_hist,1,PETSC_INT);CHKERRQ(ierr);  
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of points in atmospheric history file is %d \n",numpCO2atm_hist);CHKERRQ(ierr);  
       ierr = PetscMalloc(numpCO2atm_hist*sizeof(PetscScalar),&TpCO2atm_hist);CHKERRQ(ierr); 
-      ierr = PetscMalloc(numpCO2atm_hist*sizeof(PetscScalar),&pCO2atm_hist);CHKERRQ(ierr); 
-  
-      ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"TpCO2.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-      ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
       ierr = PetscBinaryRead(fp,TpCO2atm_hist,numpCO2atm_hist,PETSC_SCALAR);CHKERRQ(ierr);
-      ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
-  
-      ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"pCO2atm.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-      ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+      /* read atmospheric pCO2 data */
+	  ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,pCO2atmFiles[1],FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	  ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+      ierr = PetscMalloc(numpCO2atm_hist*sizeof(PetscScalar),&pCO2atm_hist);CHKERRQ(ierr); 
       ierr = PetscBinaryRead(fp,pCO2atm_hist,numpCO2atm_hist,PETSC_SCALAR);CHKERRQ(ierr);
-      ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
       
       pCO2atm = pCO2atm_hist[0];
 
     }	else {
-      ierr = PetscOptionsGetReal(PETSC_NULL,"-pco2_atm",&pCO2atm,&flg);CHKERRQ(ierr); /* overwrite default value */
+      ierr = PetscOptionsGetReal(PETSC_NULL,"-pco2atm",&pCO2atm,&flg);CHKERRQ(ierr); /* overwrite default value */
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Using fixed atmospheric pCO2 of %g ppm\n",pCO2atm);CHKERRQ(ierr);
       
     }    
@@ -645,14 +658,21 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
     if (useEmissions) {  
 /*   Interpolate emissions */
       if (tc>=Tem_hist[0]) {
-        ierr = calcInterpFactor(numEmission_hist,tc,Tem_hist,&itf,&interpfac); CHKERRQ(ierr);
-        fossilFuelEmission = interpfac*E_hist[itf] + (1.0-interpfac)*E_hist[itf+1];	  
-        landUseEmission = interpfac*D_hist[itf] + (1.0-interpfac)*D_hist[itf+1];	  
+        if (interpEmissions) {
+		  ierr = calcInterpFactor(numEmission_hist,tc,Tem_hist,&itf,&interpfac); CHKERRQ(ierr);
+		  fossilFuelEmission = interpfac*E_hist[itf] + (1.0-interpfac)*E_hist[itf+1];	  
+		  landUseEmission = interpfac*D_hist[itf] + (1.0-interpfac)*D_hist[itf+1];	          
+        } else {
+          itf=findindex(Tem_hist,numEmission_hist,floor(tc));
+		  fossilFuelEmission = E_hist[itf];
+		  landUseEmission = D_hist[itf];          
+        }
       } else {
         ierr = PetscPrintf(PETSC_COMM_WORLD,"Warning: time < %10.5f. Setting emissions to 0\n",Tem_hist[0]);CHKERRQ(ierr);
         fossilFuelEmission = 0.0;
         landUseEmission = 0.0;
       }
+      cumulativeEmissions = cumulativeEmissions + atmModelDeltaT*(fossilFuelEmission + landUseEmission); /* PgC */
     }
   } else {  
 /* Interpolate atmospheric pCO2   */
@@ -818,6 +838,10 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing atmospheric model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
       ierr = PetscFPrintf(PETSC_COMM_WORLD,atmfptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
       ierr = writeBinaryScalarData("pCO2atm_output.bin",&pCO2atm,1,PETSC_TRUE);
+
+	  if (useEmissions) {
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Cumulative emissions at time %10.5f, step %d = %10.6f PgC\n", tc, Iter0+iLoop, cumulativeEmissions);CHKERRQ(ierr);
+      }  
     }
 
 	if (useLandModel) {
@@ -903,6 +927,7 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
         if (useAtmModel) {
           pCO2atmavg=0.0;
           Foceanavg=0.0;
+
 		  if (useLandModel) {
 			Flandavg=0.0;
 			landStateavg[0]=0.0;
