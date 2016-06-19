@@ -1,14 +1,6 @@
-include ${PETSC_DIR}/conf/variables
-include ${PETSC_DIR}/conf/rules
-
-# Modify these as necessary
-XLFCPP=
-XLFFLAGS=
-R8FLAG=-r8
-# if using the IBM XLF compiler, uncomment the following lines
-#XLFCPP=-WF,
-#R8FLAG=-qrealsize=8
-#XLFFLAGS=-qzerosize
+include ${PETSC_DIR}/lib/petsc/conf/variables
+include ${PETSC_DIR}/lib/petsc/conf/rules
+include ${PETSC_DIR}/lib/petsc/conf/petscvariables
 
 STMM = tmm_main.c tmm_forward_step.c tmm_forcing_utils.c \
         tmm_profile_utils.c petsc_signal_utils.c petsc_matvec_utils.c
