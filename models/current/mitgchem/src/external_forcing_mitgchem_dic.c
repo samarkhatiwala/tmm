@@ -27,7 +27,6 @@
 #define localJAlk localJTR[1]
 
 Vec Ts,Ss;
-PetscInt *gIndices;
 PetscScalar *localTs,*localSs;
 PetscScalar **localTR, **localJTR;
 PetscScalar *pH;
@@ -127,7 +126,6 @@ PetscBool relaxTracer = PETSC_FALSE;
 PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Vec *v, Vec *ut)
 {
   PetscErrorCode ierr;
-  PetscInt gLow, gHigh, il;
   PetscInt ip, kl, nzloc;
   PetscInt itr;  
   PetscViewer fd;
@@ -183,11 +181,14 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = PetscOptionsGetReal(PETSC_NULL,"-biogeochem_deltat",&DeltaT,&flg);CHKERRQ(ierr);
   if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate biogeochemical time step in seconds with the -biogeochem_deltat option");  
 
+/* Note: The mitgchem package always internally time-steps tracers and returns the updated tracer field at the next time step. */
+/* To use this internal time-stepping, switch on the useSeparateBiogeochemTimeStepping flag with -separate_biogeochem_time_stepping. */
+/* Alternatively, we can compute a tendency from the new and old tracer field (done in mitgchem_copy_data) and use that within the */
+/* TMM driver code to time-step tracers. This is the default. */
   ierr = PetscOptionsGetBool(PETSC_NULL,"-separate_biogeochem_time_stepping",&useSeparateBiogeochemTimeStepping,0);CHKERRQ(ierr);
 #if defined (FORSPINUP) || defined (FORJACOBIAN)
   if (useSeparateBiogeochemTimeStepping) {
-    SETERRQ(PETSC_COMM_WORLD,1,"Cannot use the -separate_biogeochem_time_stepping option with SPINUP or JACOBIAN ");  
-  
+    SETERRQ(PETSC_COMM_WORLD,1,"Cannot use the -separate_biogeochem_time_stepping option with SPINUP or JACOBIAN ");    
   }
 #endif
   if (useSeparateBiogeochemTimeStepping) {
@@ -233,14 +234,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = VecGetArray(Ts,&localTs);CHKERRQ(ierr);
   ierr = VecGetArray(Ss,&localSs);CHKERRQ(ierr);
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Done reading T/S\n");CHKERRQ(ierr);
-
-/*   Compute global indices for local piece of vectors */
-  ierr = VecGetOwnershipRange(Ts,&gLow,&gHigh);CHKERRQ(ierr);
-  gHigh = gHigh - 1; /* Note: gHigh is one more than the last local element */
-  ierr = PetscMalloc(lSize*sizeof(PetscInt),&gIndices);CHKERRQ(ierr);  
-  for (il=0; il<lSize; il++) {
-    gIndices[il] = il + gLow;
-  }  
 
 /* Land/Atm model data */
   ierr = PetscOptionsHasName(PETSC_NULL,"-use_atm_model",&useAtmModel);CHKERRQ(ierr);
@@ -693,12 +686,6 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
   for (ip=0; ip<lNumProfiles; ip++) {
     nzloc=lProfileLength[ip];
     kl=lStartIndices[ip];
-/* 
-    if (ip==0) {
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"ip=%d,kl=%d,nzloc=%d,th=%g,s=%g\n",ip,kl,nzloc,localTs[kl],localSs[kl]);CHKERRQ(ierr);    
-    }  
-
- */
 
 	recipdzsurfloc = localrecip_hFacC[kl]/drF[0];
 	localempflux = localEmP[ip]*localDIC[kl]*recipdzsurfloc;
@@ -736,16 +723,6 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
 	for (itr=0; itr<numTracers; itr++) {    
 	  mitgchem_copy_data_(&nzloc,&itr,&localTR[itr][kl],&localJTR[itr][kl],&DeltaT,&fromModel);
 	}  
-
-
-/* 
-    if (ip==0) {
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"dic=%g,alk=%g\n",localDIC[kl],localAlk[kl]);CHKERRQ(ierr);                               
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"jdic=%g,jalk=%g\n",localJDIC[kl],localJAlk[kl]);CHKERRQ(ierr);                           
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"pH=%g,drF=%g\n",pH[ip],drF[0]);CHKERRQ(ierr);      
-    }
-
- */
 
     if (!useSeparateBiogeochemTimeStepping) {
 	  localJDIC[kl] = localJDIC[kl] + localempflux;
@@ -964,7 +941,6 @@ PetscErrorCode finalizeExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt n
   
   ierr = VecDestroy(&Ts);CHKERRQ(ierr);
   ierr = VecDestroy(&Ss);CHKERRQ(ierr);
-  ierr = PetscFree(gIndices);CHKERRQ(ierr);  
 
   if (periodicBiogeochemForcing) {    
     ierr = destroyPeriodicVec(&Tsp);CHKERRQ(ierr);

@@ -18,8 +18,6 @@
 #define BCc bcc[0]
 #define BCf bcf[0]
 
-PetscInt *gIndices,*gBCIndices;
-PetscInt lBCSize,lTRSize;
 PetscScalar *localTs,*localSs;
 PetscScalar *localTR;
 PetscScalar *localBCc,*localBCf;
@@ -51,7 +49,6 @@ PetscErrorCode iniCalcBC(PetscScalar tc, PetscInt Iterc, PetscScalar tf, PetscIn
 {
 
   PetscErrorCode ierr;
-  PetscInt gLow, gHigh, il;
   PetscInt itr;
   PetscViewer fd;
   PetscBool flg;
@@ -96,14 +93,6 @@ PetscErrorCode iniCalcBC(PetscScalar tc, PetscInt Iterc, PetscScalar tf, PetscIn
     }    
   }
   
-  ierr = VecGetLocalSize(BCc,&lBCSize);CHKERRQ(ierr);
-  ierr = VecGetOwnershipRange(BCc,&gLow,&gHigh);CHKERRQ(ierr);
-  gHigh = gHigh - 1; /* Note: gHigh is one more than the last local element */
-  ierr = PetscMalloc(lBCSize*sizeof(PetscInt),&gBCIndices);CHKERRQ(ierr);  
-  for (il=0; il<lBCSize; il++) {
-    gBCIndices[il] = il + gLow;
-  }  
-
 /* Grid arrays */
 
 /* Forcing fields */  
@@ -117,13 +106,13 @@ PetscErrorCode iniCalcBC(PetscScalar tc, PetscInt Iterc, PetscScalar tf, PetscIn
     atmospp.firstTime = PETSC_TRUE;
   } else {
     ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Tss.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-    ierr = VecLoad(Tss,fd);CHKERRQ(ierr); /* IntoVector */
+    ierr = VecLoad(Tss,fd);CHKERRQ(ierr);
     ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
     ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Sss.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-    ierr = VecLoad(Sss,fd);CHKERRQ(ierr); /* IntoVector */
+    ierr = VecLoad(Sss,fd);CHKERRQ(ierr);
     ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
     ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"atmosp.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-    ierr = VecLoad(atmosp,fd);CHKERRQ(ierr); /* IntoVector */
+    ierr = VecLoad(atmosp,fd);CHKERRQ(ierr);
     ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
   }  
   
@@ -146,25 +135,16 @@ PetscErrorCode iniCalcBC(PetscScalar tc, PetscInt Iterc, PetscScalar tf, PetscIn
       
     } else {
 	  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Ts.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-	  ierr = VecLoad(Ts,fd);CHKERRQ(ierr); /* IntoVector */
+	  ierr = VecLoad(Ts,fd);CHKERRQ(ierr);
 	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
 	  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Ss.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-	  ierr = VecLoad(Ss,fd);CHKERRQ(ierr); /* IntoVector */
+	  ierr = VecLoad(Ss,fd);CHKERRQ(ierr);
 	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
     }  
     
     ierr = VecGetArray(Ts,&localTs);CHKERRQ(ierr);
     ierr = VecGetArray(Ss,&localSs);CHKERRQ(ierr);
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Done reading T/S\n");CHKERRQ(ierr);
-
-/*   Compute global indices for local piece of vectors */
-    ierr = VecGetOwnershipRange(Ts,&gLow,&gHigh);CHKERRQ(ierr);
-    gHigh = gHigh - 1; /* Note: gHigh is one more than the last local element */
-    ierr = VecGetLocalSize(Ts,&lTRSize);CHKERRQ(ierr);
-    ierr = PetscMalloc(lTRSize*sizeof(PetscInt),&gIndices);CHKERRQ(ierr);  
-    for (il=0; il<lTRSize; il++) {
-      gIndices[il] = il + gLow;
-    }  
 
     ierr = VecDuplicate(TR,&TReqdiag);CHKERRQ(ierr);
     ierr = VecSet(TReqdiag,zero);CHKERRQ(ierr);
@@ -267,14 +247,14 @@ PetscErrorCode calcBC(PetscScalar tc, PetscInt Iterc, PetscScalar tf, PetscInt I
         ierr = interpPeriodicVector(tc,&Ss,biogeochemCyclePeriod,numBiogeochemPeriods,tdpBiogeochem,&Ssp,"Ss_");	
       }
 
-      inert_gas_diagnostics_(&lTRSize,&Iterc,&myTime,&localTR[0],&localTs[0],&localSs[0],&gasID,
+      inert_gas_diagnostics_(&lSize,&Iterc,&myTime,&localTR[0],&localTs[0],&localSs[0],&gasID,
       &localTReqdiag[0],&localTRsatanomdiag[0]);
       
-      ierr = VecSetValues(TReqdiag,lTRSize,gIndices,localTReqdiag,INSERT_VALUES);CHKERRQ(ierr);
+      ierr = VecSetValues(TReqdiag,lSize,gIndices,localTReqdiag,INSERT_VALUES);CHKERRQ(ierr);
       ierr = VecAssemblyBegin(TReqdiag);CHKERRQ(ierr);
       ierr = VecAssemblyEnd(TReqdiag);CHKERRQ(ierr);    
 
-      ierr = VecSetValues(TRsatanomdiag,lTRSize,gIndices,localTRsatanomdiag,INSERT_VALUES);CHKERRQ(ierr);
+      ierr = VecSetValues(TRsatanomdiag,lSize,gIndices,localTRsatanomdiag,INSERT_VALUES);CHKERRQ(ierr);
       ierr = VecAssemblyBegin(TRsatanomdiag);CHKERRQ(ierr);
       ierr = VecAssemblyEnd(TRsatanomdiag);CHKERRQ(ierr);    
 	}  
@@ -350,7 +330,6 @@ PetscErrorCode finalizeCalcBC(PetscScalar tc, PetscInt Iter, PetscInt numTracers
   ierr = VecDestroy(&Tss);CHKERRQ(ierr);  
   ierr = VecDestroy(&Sss);CHKERRQ(ierr);  
   ierr = VecDestroy(&atmosp);CHKERRQ(ierr);  
-  ierr = PetscFree(gBCIndices);CHKERRQ(ierr);  
 
   if (periodicBiogeochemForcing) {    
     ierr = destroyPeriodicVec(&Tssp);CHKERRQ(ierr);
@@ -365,7 +344,6 @@ PetscErrorCode finalizeCalcBC(PetscScalar tc, PetscInt Iter, PetscInt numTracers
       ierr = destroyPeriodicVec(&Tsp);CHKERRQ(ierr);
       ierr = destroyPeriodicVec(&Ssp);CHKERRQ(ierr);
     }    
-    ierr = PetscFree(gIndices);CHKERRQ(ierr);    
 	ierr = VecDestroy(&TRsatanomdiag);CHKERRQ(ierr);
 	ierr = VecDestroy(&TRsatanomdiagavg);CHKERRQ(ierr);
     ierr = PetscViewerDestroy(&fdTRsatanomdiagavg);CHKERRQ(ierr);	  

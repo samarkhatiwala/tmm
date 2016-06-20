@@ -3,6 +3,7 @@ mpiexec -np 2 ./tmminertgasbc -numtracers 1 \
   -me Ae1 -mi Ai1 -mbe Be -mbi Bi \
   -t0 0.0 -iter0 0 -deltat_clock 0.0013888888888889 -max_steps 720 -write_steps 720 \
   -o Ar.petsc \
+  -obc Arbc.petsc \
   -prescribed_bc -calc_bc -bc_vec_size 4448 -biogeochem_deltat 43200.0 \
   -inert_gas_id 2 \
   -periodic_matrix -matrix_cycle_period 1.0 -matrix_cycle_step 0.0833333333333333 \

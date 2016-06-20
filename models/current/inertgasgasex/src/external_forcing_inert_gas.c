@@ -18,7 +18,6 @@
 #define JTR ut[0]
 
 Vec Ts,Ss;
-PetscInt *gIndices;
 PetscScalar *localTs,*localSs;
 PetscScalar *localTR;
 PetscScalar *localJTR;
@@ -63,7 +62,6 @@ PetscBool relaxTracer = PETSC_FALSE;
 PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Vec *v, Vec *ut)
 {
   PetscErrorCode ierr;
-  PetscInt gLow, gHigh, il;
   PetscInt ip, kl, nzloc;
   PetscInt itr;
   PetscViewer fd;
@@ -171,14 +169,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = VecGetArray(Ts,&localTs);CHKERRQ(ierr);
   ierr = VecGetArray(Ss,&localSs);CHKERRQ(ierr);
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Done reading T/S\n");CHKERRQ(ierr);
-
-/*   Compute global indices for local piece of vectors */
-  ierr = VecGetOwnershipRange(Ts,&gLow,&gHigh);CHKERRQ(ierr);
-  gHigh = gHigh - 1; /* Note: gHigh is one more than the last local element */
-  ierr = PetscMalloc(lSize*sizeof(PetscInt),&gIndices);CHKERRQ(ierr);  
-  for (il=0; il<lSize; il++) {
-    gIndices[il] = il + gLow;
-  }  
 
 /* Grid arrays */
   ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localdzsurf);CHKERRQ(ierr);
@@ -511,7 +501,6 @@ PetscErrorCode finalizeExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt n
   
   ierr = VecDestroy(&Ts);CHKERRQ(ierr);
   ierr = VecDestroy(&Ss);CHKERRQ(ierr);
-  ierr = PetscFree(gIndices);CHKERRQ(ierr);  
 
   if (periodicBiogeochemForcing) {    
     ierr = destroyPeriodicVec(&Tsp);CHKERRQ(ierr);

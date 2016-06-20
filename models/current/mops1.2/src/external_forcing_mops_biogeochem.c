@@ -1034,7 +1034,6 @@ PetscErrorCode finalizeExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt n
   
   ierr = VecDestroy(&Ts);CHKERRQ(ierr);
   ierr = VecDestroy(&Ss);CHKERRQ(ierr);
-  ierr = PetscFree(gIndices);CHKERRQ(ierr);  
 
   if (periodicBiogeochemForcing) {    
     ierr = destroyPeriodicVec(&Tsp);CHKERRQ(ierr);

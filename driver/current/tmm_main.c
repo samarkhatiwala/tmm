@@ -26,6 +26,8 @@ static char help[] = "\n";
 PetscScalar deltaTClock, time0;
 PetscInt maxSteps, Iter0, writeSteps;
 PetscInt *gIndices, gLow, gHigh;
+PetscInt *gBCIndices, lBCSize, gBCSize, gbcLow, gbcHigh;
+PetscBool doMisfit = PETSC_FALSE;
 
 extern PetscErrorCode forwardStep(PetscScalar tc, PetscInt iLoop, PetscScalar dt, PetscInt numTracers, 
                                   PetscBool useForcingFromFile, PetscBool useExternalForcing, PetscBool usePrescribedBC, 
@@ -79,15 +81,16 @@ int main(int argc,char **args)
   PeriodicMat Bep, Bip;
   char matbeFile[PETSC_MAX_PATH_LEN], matbiFile[PETSC_MAX_PATH_LEN];
   Vec bcTemplateVec;
-  PetscInt lBCSize, gBCSize;
   
 /* I/O   */
   char *iniFile[MAXNUMTRACERS];  
   char *outFile[MAXNUMTRACERS];  
+  char *bcoutFile[MAXNUMTRACERS];
   char pickupFile[PETSC_MAX_PATH_LEN];
   char pickupoutFile[PETSC_MAX_PATH_LEN];  
   char outTimeFile[PETSC_MAX_PATH_LEN];  
-  PetscBool appendOutput = PETSC_FALSE;    
+  PetscBool appendOutput = PETSC_FALSE;
+  PetscBool doWriteBC = PETSC_FALSE;    
   PetscBool pickupFromFile = PETSC_FALSE;
   PetscBool doTimeAverage = PETSC_FALSE;
   PetscInt avgNumTimeSteps, avgStartTimeStep, avgCount;
@@ -95,7 +98,7 @@ int main(int argc,char **args)
   Vec *vavg;
   PetscViewer fdavgout[MAXNUMTRACERS];
   FILE *fptime;
-  PetscViewer fd, fdp, fdout[MAXNUMTRACERS], fdin[MAXNUMTRACERS];
+  PetscViewer fd, fdp, fdout[MAXNUMTRACERS], fdin[MAXNUMTRACERS], fdbcout[MAXNUMTRACERS];
 
 /* run time options */
   PetscBool useExternalForcing = PETSC_FALSE;
@@ -111,7 +114,6 @@ int main(int argc,char **args)
   PetscBool doCalcBC = PETSC_FALSE;
   PetscBool rescaleForcing = PETSC_FALSE;
   PetscBool useMonitor = PETSC_FALSE;
-  PetscBool doMisfit = PETSC_FALSE;
 
   PetscMPIInt numProcessors, myId;  
   PetscErrorCode ierr;
@@ -274,6 +276,7 @@ int main(int argc,char **args)
     ierr = VecCreate(PETSC_COMM_WORLD,&templateVec);CHKERRQ(ierr);
     ierr = VecSetSizes(templateVec,PETSC_DECIDE,n);CHKERRQ(ierr);
     ierr = VecSetFromOptions(templateVec);CHKERRQ(ierr);
+    ierr = VecGetLocalSize(templateVec,&lSize);CHKERRQ(ierr); /* lSize is otherwise set in iniProfiles */
   }  
   
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Matrix size is %d x %d\n", n,n);CHKERRQ(ierr);  
@@ -489,17 +492,26 @@ int main(int argc,char **args)
       if ((useProfiles) && (numProcessors>1)) {
         lBCSize = lNumProfiles;
         ierr = VecSetSizes(bcTemplateVec,lBCSize,PETSC_DECIDE);CHKERRQ(ierr);      
-        ierr = VecSetFromOptions(bcTemplateVec);CHKERRQ(ierr);        
+        ierr = VecSetFromOptions(bcTemplateVec);CHKERRQ(ierr);
+        ierr = VecGetSize(bcTemplateVec,&gBCSize);CHKERRQ(ierr);
       } else {
         ierr = PetscOptionsGetInt(PETSC_NULL,"-bc_vec_size",&gBCSize,&flg1);CHKERRQ(ierr);
         if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate size of BC vector with the -bc_vec_size option");
         ierr = VecSetSizes(bcTemplateVec,PETSC_DECIDE,gBCSize);CHKERRQ(ierr);      
         ierr = VecSetFromOptions(bcTemplateVec);CHKERRQ(ierr);
+        ierr = VecGetLocalSize(bcTemplateVec,&lBCSize);CHKERRQ(ierr);    
       }
+
+	  ierr = VecGetOwnershipRange(bcTemplateVec,&gbcLow,&gbcHigh);CHKERRQ(ierr);
+	  gbcHigh = gbcHigh - 1; /* Note: gbcHigh is one more than the last local element */
+	  ierr = PetscMalloc(lBCSize*sizeof(PetscInt),&gBCIndices);CHKERRQ(ierr);  
+	  for (il=0; il<lBCSize; il++) {
+		gBCIndices[il] = il + gbcLow;
+	  }
       
       ierr = VecDuplicateVecs(bcTemplateVec,numTracers,&bcc);CHKERRQ(ierr);    
       ierr = VecDuplicateVecs(bcTemplateVec,numTracers,&bcf);CHKERRQ(ierr);    
-      
+
       ierr = iniCalcBC(time0,Iter0,time0+deltaTClock,Iter0+1,numTracers,v,bcc,bcf);CHKERRQ(ierr);
       
     } else { /* read from file */
@@ -512,8 +524,6 @@ int main(int argc,char **args)
       if (maxValsToRead != numTracers) {
         SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of BC file names specified");
       }    
-/*     ierr = VecDuplicateVecs(templateVec,numTracers,&bcc);CHKERRQ(ierr);     */
-/*     ierr = VecDuplicateVecs(templateVec,numTracers,&bcf);CHKERRQ(ierr);     */
 
 /*    There are 3 possibilities: periodic, constant, and time-dependent BCs */
       ierr = PetscOptionsHasName(PETSC_NULL,"-periodic_bc",&periodicBC);CHKERRQ(ierr);
@@ -611,7 +621,7 @@ int main(int argc,char **args)
       }  /* periodic/nonperiodic BC */
     }
 
-    ierr = VecGetLocalSize(bcTemplateVec,&lBCSize);CHKERRQ(ierr);
+    ierr = VecGetLocalSize(bcTemplateVec,&lBCSize);CHKERRQ(ierr); /* just to be safe */
 
     if ((useProfiles) && (numProcessors>1)) {
       if (lBCSize != lNumProfiles) {
@@ -624,6 +634,22 @@ int main(int argc,char **args)
     ierr = PetscOptionsGetInt(PETSC_NULL,"-bc_cutoff_step",&bcCutOffStep,&flg1);CHKERRQ(ierr);
     if (bcCutOffStep>0) {
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Prescribed BC will be turned off after time step %d\n",bcCutOffStep);CHKERRQ(ierr);    
+    }
+
+/*  BC output file */
+	for (itr=0; itr<numTracers; itr++) {
+	  bcoutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
+	}
+	maxValsToRead = numTracers;
+	ierr = PetscOptionsGetStringArray(PETSC_NULL,"-obc",bcoutFile,&maxValsToRead,&doWriteBC);CHKERRQ(ierr);
+	if (doWriteBC) {
+	  if (maxValsToRead != numTracers) {
+		SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of BC outfile file names specified");
+	  }  
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"BC output will be written to:\n");CHKERRQ(ierr);
+	  for (itr=0; itr<numTracers; itr++) {
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"   Tracer %d: %s\n", itr,bcoutFile[itr]);CHKERRQ(ierr);
+	  }
     }
     
 /*  Matrices */
@@ -724,12 +750,25 @@ int main(int argc,char **args)
       ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,outFile[itr],FILE_MODE_WRITE,&fdout[itr]);CHKERRQ(ierr);
       ierr = VecView(v[itr],fdout[itr]);CHKERRQ(ierr);
     }
+    
+    if (doWriteBC) {
+/*    We only open files here since BCs may not yet have been computed */
+	  for (itr=0; itr<numTracers; itr++) {
+		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,bcoutFile[itr],FILE_MODE_WRITE,&fdbcout[itr]);CHKERRQ(ierr);
+	  }
+    }
   } else {
 	  ierr = PetscFOpen(PETSC_COMM_WORLD,outTimeFile,"a",&fptime);CHKERRQ(ierr);  
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Opening file(s) for output. Initial condition will NOT be written\n");CHKERRQ(ierr);  
       for (itr=0; itr<numTracers; itr++) {       
         ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,outFile[itr],FILE_MODE_APPEND,&fdout[itr]);CHKERRQ(ierr);
       }
+      
+      if (doWriteBC) {
+		for (itr=0; itr<numTracers; itr++) {
+		  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,bcoutFile[itr],FILE_MODE_APPEND,&fdbcout[itr]);CHKERRQ(ierr);
+		}
+      }  
   }
 #endif
 
@@ -846,6 +885,10 @@ int main(int argc,char **args)
       if ((bcCutOffStep>0) && (iLoop==(bcCutOffStep+1))) {
         applyBC = PETSC_FALSE;
         doCalcBC = PETSC_FALSE;
+		for (itr=0; itr<numTracers; itr++) {
+		  VecSet(bcc[itr],zero);
+		  VecSet(bcf[itr],zero);
+		}        
       } else {    
         if (periodicMatrix) {
           ierr = interpPeriodicMatrix(tc,&Be,matrixCyclePeriod,numMatrixPeriods,
@@ -866,6 +909,15 @@ int main(int argc,char **args)
         }
       }
 	  
+    }
+
+/*  Write out BC at first time step */
+	if (doWriteBC) {
+	  if ((iLoop == 1) && (!appendOutput)) {	  
+		for (itr=0; itr<numTracers; itr++) {
+		  ierr = VecView(bcc[itr],fdbcout[itr]);CHKERRQ(ierr);
+		}
+	  }	
     }
         
     ierr = forwardStep(tc,Iterc,deltaTClock,numTracers,useForcingFromFile,useExternalForcing,applyBC,
@@ -889,7 +941,7 @@ int main(int argc,char **args)
       ierr = writeExternalForcing(tc,iLoop,numTracers,v,uef);CHKERRQ(ierr);
     }
     if (doCalcBC) {
-      ierr = writeBC(tc,iLoop,numTracers,v,bcc,bcf);CHKERRQ(ierr);    
+      ierr = writeBC(tc,iLoop,numTracers,v,bcc,bcf);CHKERRQ(ierr); 
     }
     if ((iLoop % writeSteps)==0) {  /*  time to write out */  /* ??? should this be Iter0+iLoop */
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
@@ -897,7 +949,13 @@ int main(int argc,char **args)
 /*       ierr = PetscViewerASCIIPrintf(fdtime,"\n%d   %10.5f",Iter0+iLoop,tc);CHKERRQ(ierr);        */
       for (itr=0; itr<numTracers; itr++) {
         ierr = VecView(v[itr],fdout[itr]);CHKERRQ(ierr);
-      }      
+      }
+      
+	  if (doWriteBC) {
+		for (itr=0; itr<numTracers; itr++) {
+		  ierr = VecView(bcf[itr],fdbcout[itr]);CHKERRQ(ierr);
+		}
+	  }
     }
 #else
 #ifdef FORSPINUP
@@ -1050,6 +1108,12 @@ int main(int argc,char **args)
     ierr = PetscViewerDestroy(&fdout[itr]);CHKERRQ(ierr);
   }
   ierr = PetscFClose(PETSC_COMM_WORLD,fptime);CHKERRQ(ierr);
+  
+  if (doWriteBC) {
+	for (itr=0; itr<numTracers; itr++) {
+	  ierr = PetscViewerDestroy(&fdbcout[itr]);CHKERRQ(ierr);
+	}  
+  }
 #endif
 
   if (doTimeAverage) {
@@ -1130,10 +1194,13 @@ int main(int argc,char **args)
 		ierr = VecDestroyVecs(numBC,&bctd[itr]);CHKERRQ(ierr);
 	  }  
 	} else if (doCalcBC) {
-      ierr = finalizeCalcBC(tc,maxSteps,numTracers);CHKERRQ(ierr);	
+      ierr = finalizeCalcBC(tc,maxSteps,numTracers);CHKERRQ(ierr);
+      ierr = PetscFree(gBCIndices);CHKERRQ(ierr);
 	}
   }
-  
+
+  ierr = PetscFree(gIndices);CHKERRQ(ierr);
+
   ierr = PetscFinalize();CHKERRQ(ierr);
   return 0;
 }
