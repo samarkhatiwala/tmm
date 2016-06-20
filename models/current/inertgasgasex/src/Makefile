@@ -1,14 +1,20 @@
-include ${PETSC_DIR}/conf/variables
-include ${PETSC_DIR}/conf/rules
+include ${PETSC_DIR}/lib/petsc/conf/variables
+include ${PETSC_DIR}/lib/petsc/conf/rules
+include ${PETSC_DIR}/lib/petsc/conf/petscvariables
 
-# Modify these as necessary
-XLFCPP=
-XLFFLAGS=
-R8FLAG=-r8
-# if using the IBM XLF compiler, uncomment the following lines
-#XLFCPP=-WF,
-#R8FLAG=-qrealsize=8
-#XLFFLAGS=-qzerosize
+# Set compiler-dependent flags
+FPPFLAG=
+COMPILER=$(word 1,$(MPIFC_SHOW))
+ifneq (,$(findstring ifort,$(COMPILER)))
+	FFLAGS+=-r8
+endif
+ifneq (,$(findstring gfortran,$(COMPILER)))
+	FFLAGS+=-fdefault-real-8
+endif
+ifneq (,$(findstring xlf,$(COMPILER)))
+	FPPFLAG+=-WF,
+	FFLAGS+=-qrealsize=8 -qzerosize
+endif
 
 STMM = tmm_main.c tmm_forward_step.c tmm_forcing_utils.c \
         tmm_profile_utils.c petsc_signal_utils.c petsc_matvec_utils.c
@@ -22,20 +28,17 @@ OBJINERTGAS = $(SRCINERTGAS:.c=.o) $(SRFINERTGAS:.F=.o)
 .SUFFIXES: 
 .SUFFIXES: .o .f .p .F .c
 
-ARCH = $(shell uname)
-NODE = $(shell uname -n)
-
 tmminertgasgasex:
 tmminertgasgasex: $(OBJINERTGAS) chkopts
 	-${CLINKER} -o $@ $(OBJINERTGAS) ${PETSC_MAT_LIB}
 
-tmminertgasgasexspinup: FPPFLAGS=$(XLFCPP)-DAD_SAFE
-tmminertgasgasexspinup: CPPFLAGS=-DFORSPINUP
+tmminertgasgasexspinup: FPPFLAGS+=$(FPPFLAG)-DAD_SAFE
+tmminertgasgasexspinup: CPPFLAGS+=-DFORSPINUP
 tmminertgasgasexspinup: $(OBJINERTGAS) chkopts
 	-${CLINKER} -o $@ $(OBJINERTGAS) ${PETSC_MAT_LIB}
 	
-tmminertgasgasexjacobian: FPPFLAGS=$(XLFCPP)-DAD_SAFE
-tmminertgasgasexjacobian: CPPFLAGS=-DFORJACOBIAN
+tmminertgasgasexjacobian: FPPFLAGS+=$(FPPFLAG)-DAD_SAFE
+tmminertgasgasexjacobian: CPPFLAGS+=-DFORJACOBIAN
 tmminertgasgasexjacobian: $(OBJINERTGAS) chkopts
 	-${CLINKER} -o $@ $(OBJINERTGAS) ${PETSC_MAT_LIB}
 

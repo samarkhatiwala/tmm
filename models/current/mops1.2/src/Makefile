@@ -1,5 +1,20 @@
-include ${PETSC_DIR}/conf/variables
-include ${PETSC_DIR}/conf/rules
+include ${PETSC_DIR}/lib/petsc/conf/variables
+include ${PETSC_DIR}/lib/petsc/conf/rules
+include ${PETSC_DIR}/lib/petsc/conf/petscvariables
+
+# Set compiler-dependent flags
+FPPFLAG=
+COMPILER=$(word 1,$(MPIFC_SHOW))
+ifneq (,$(findstring ifort,$(COMPILER)))
+	FFLAGS+=-r8
+endif
+ifneq (,$(findstring gfortran,$(COMPILER)))
+	FFLAGS+=-fdefault-real-8
+endif
+ifneq (,$(findstring xlf,$(COMPILER)))
+	FPPFLAG+=-WF,
+	FFLAGS+=-qrealsize=8 -qzerosize
+endif
 
 PROGRAM = mops
 RPROGRAM = rmops
@@ -34,20 +49,20 @@ OBJECTS = $(SRC:.c=.o) $(SRF:.F=.o)
 # option -DCARBON: always couple carbon to the P-core
 
 # use surface supply of buried P
-$(PROGRAM): FPPFLAGS=-DCARBON
-$(PROGRAM): CPPFLAGS=-DCARBON
+$(PROGRAM): FPPFLAGS+=$(FPPFLAG)-DCARBON
+$(PROGRAM): CPPFLAGS+=-DCARBON
 
 # use mops with surface supply of buried P and implicit profiles
-$(IPROGRAM): FPPFLAGS=-DCARBON -DIMPRO
-$(IPROGRAM): CPPFLAGS=-DCARBON -DIMPRO
+$(IPROGRAM): FPPFLAGS+=$(FPPFLAG)-DCARBON $(FPPFLAG)-DIMPRO
+$(IPROGRAM): CPPFLAGS+=-DCARBON -DIMPRO
 
 # use the original mops with river runoff of buried P
-$(RPROGRAM): FPPFLAGS=-DCARBON -DRUNOFF
-$(RPROGRAM): CPPFLAGS=-DCARBON -DRUNOFF
+$(RPROGRAM): FPPFLAGS+=$(FPPFLAG)-DCARBON $(FPPFLAG)-DRUNOFF
+$(RPROGRAM): CPPFLAGS+=-DCARBON -DRUNOFF
 
 # use the original mops with river runoff of buried P and implicit profiles
-$(IRPROGRAM): FPPFLAGS=-DCARBON -DRUNOFF -DIMPRO
-$(IRPROGRAM): CPPFLAGS=-DCARBON -DRUNOFF -DIMPRO
+$(IRPROGRAM): FPPFLAGS+=$(FPPFLAG)-DCARBON $(FPPFLAG)-DRUNOFF $(FPPFLAG)-DIMPRO
+$(IRPROGRAM): CPPFLAGS+=-DCARBON -DRUNOFF -DIMPRO
 
 $(PROGRAM): $(OBJECTS) chkopts
 	-${CLINKER} -o $@ $(OBJECTS) ${PETSC_MAT_LIB}

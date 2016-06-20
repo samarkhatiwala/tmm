@@ -364,21 +364,11 @@ if writeFiles
 % Profile data  
   if rearrangeProfiles
     if ~useCoarseGrainedMatrix
-      gStartIndices=repmat(0,[nbb 1]);
-      gEndIndices=repmat(0,[nbb 1]);
-      for is=1:nbb % loop over each surface point
-        Ipl=Ip{is}; % indices for local profile (globally indexed)  
-        gStartIndices(is)=Ipl(1);
-        gEndIndices(is)=Ipl(end);
-      end
+	  gStartIndices=cellfun(@(x)x(1),Ip);
+	  gEndIndices=cellfun(@(x)x(end),Ip);
     else % useCoarseGrainedMatrix
-      gStartIndices=repmat(0,[nbbcg 1]);
-      gEndIndices=repmat(0,[nbbcg 1]);
-      for is=1:nbbcg % loop over each surface point
-        Ipl=Ipcg{is}; % indices for local profile (globally indexed)  
-        gStartIndices(is)=Ipl(1);
-        gEndIndices(is)=Ipl(end);
-      end  
+	  gStartIndices=cellfun(@(x)x(1),Ipcg);
+	  gEndIndices=cellfun(@(x)x(end),Ipcg);
     end  
     write_binary('gStartIndices.bin',[length(gStartIndices);gStartIndices],'int')
     write_binary('gEndIndices.bin',[length(gEndIndices);gEndIndices],'int')

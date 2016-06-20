@@ -1,14 +1,20 @@
 include ${PETSC_DIR}/lib/petsc/conf/variables
 include ${PETSC_DIR}/lib/petsc/conf/rules
+include ${PETSC_DIR}/lib/petsc/conf/petscvariables
 
-# Modify these as necessary
-XLFCPP=
-XLFFLAGS=
-R8FLAG=-r8
-# if using the IBM XLF compiler, uncomment the following lines
-#XLFCPP=-WF,
-#R8FLAG=-qrealsize=8
-#XLFFLAGS=-qzerosize
+# Set compiler-dependent flags
+FPPFLAG=
+COMPILER=$(word 1,$(MPIFC_SHOW))
+ifneq (,$(findstring ifort,$(COMPILER)))
+	FFLAGS+=-r8
+endif
+ifneq (,$(findstring gfortran,$(COMPILER)))
+	FFLAGS+=-fdefault-real-8
+endif
+ifneq (,$(findstring xlf,$(COMPILER)))
+	FPPFLAG+=-WF,
+	FFLAGS+=-qrealsize=8 -qzerosize
+endif
 
 STMM = tmm_main.c tmm_forward_step.c tmm_forcing_utils.c \
         tmm_profile_utils.c petsc_signal_utils.c petsc_matvec_utils.c
@@ -26,19 +32,16 @@ SRFMITGCHEM = different_multiple.F print.F utils.F write_utils.F open_copy_data_
             mitgcm_stubs.F mitgchem_ini.F mitgchem_model.F mitgchem_copy_data.F \
             mitgchem_diagnostics.F landsource.F \
 
-#OBJMITGCHEM = $(SRCMITGCHEM:.c=.o) $(SRFMITGCHEM:.F=.o)
-
 .SUFFIXES: 
 .SUFFIXES: .o .f .p .F .c
-
-ARCH = $(shell uname)
-NODE = $(shell uname -n)
 
 SRFPPMITGCHEM = $(SRFMITGCHEM:.F=.f)
 OBJMITGCHEM = $(SRCMITGCHEM:.c=.o) $(SRFPPMITGCHEM:.f=.o)
 
-external_forcing_mitgchem_dic.o: external_forcing_mitgchem_dic.c DIC_OPTIONS.h DIC_OPTIONS_TMM.h
-DIC_OPTIONS_TMM.h:
+$(OBJMITGCHEM): DIC_OPTIONS_TMM.h
+$(SRFPPMITGCHEM): DIC_OPTIONS_TMM.h
+
+DIC_OPTIONS_TMM.h: DIC_OPTIONS.h
 	cat DIC_OPTIONS.h | ./stripFortranComments.sh > $@
 
 smallf: $(SRFPPMITGCHEM)

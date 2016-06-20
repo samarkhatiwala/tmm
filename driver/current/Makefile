@@ -2,6 +2,20 @@ include ${PETSC_DIR}/lib/petsc/conf/variables
 include ${PETSC_DIR}/lib/petsc/conf/rules
 include ${PETSC_DIR}/lib/petsc/conf/petscvariables
 
+# Set compiler-dependent flags
+FPPFLAG=
+COMPILER=$(word 1,$(MPIFC_SHOW))
+ifneq (,$(findstring ifort,$(COMPILER)))
+	FFLAGS+=-r8
+endif
+ifneq (,$(findstring gfortran,$(COMPILER)))
+	FFLAGS+=-fdefault-real-8
+endif
+ifneq (,$(findstring xlf,$(COMPILER)))
+	FPPFLAG+=-WF,
+	FFLAGS+=-qrealsize=8 -qzerosize
+endif
+
 STMM = tmm_main.c tmm_forward_step.c tmm_forcing_utils.c \
         tmm_profile_utils.c petsc_signal_utils.c petsc_matvec_utils.c
         
@@ -11,9 +25,6 @@ OBJTMM = $(SRCTMM:.c=.o)
 
 .SUFFIXES: 
 .SUFFIXES: .o .f .p .F .c
-
-ARCH = $(shell uname)
-NODE = $(shell uname -n)
 
 tmm: $(OBJTMM) chkopts
 	-${CLINKER} -o $@ $(OBJTMM) ${PETSC_MAT_LIB}
