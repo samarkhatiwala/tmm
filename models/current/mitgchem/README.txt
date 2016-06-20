@@ -112,7 +112,6 @@ tools:
 set64bitConst.csh
 
 Other required MITgcm files:
-AD_CONFIG.h  (automatically generated; can supply a blank file I think)
 PACKAGES_CONFIG.h (automatically generated; turn on PTRACERS, GCHEM and 
 whichever biogeochemical package you want (e.g., DIC)).
 

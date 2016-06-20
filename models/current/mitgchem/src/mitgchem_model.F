@@ -122,68 +122,28 @@ C       Copy masks
 C       Copy tracers		
         theta(1,1,k,1,1)=thetaloc(k)
         salt(1,1,k,1,1)=saltloc(k)
-C		pTracer(1,1,k,1,1,1)=PTR_DIC(k)
-C		pTracer(1,1,k,1,1,2)=PTR_ALK(k)
-C		pTracer(1,1,k,1,1,3)=PTR_PO4(k)
-C		pTracer(1,1,k,1,1,4)=PTR_DOP(k)
-C		pTracer(1,1,k,1,1,5)=PTR_O2(k)
-C#ifdef ALLOW_FE         
-C		pTracer(1,1,k,1,1,6)=PTR_FE(k)
-C#endif                  
 	  ENDDO
-
-C      if (ip.eq.0) then
-C        write(*,*)'MITGCHEM_MODEL:'
-C        k=1
-C        write(*,*)theta(1,1,k,1,1),salt(1,1,k,1,1)
-C        write(*,*)pTracer(1,1,k,1,1,1),pTracer(1,1,k,1,1,2)
-C        write(*,*)pTracer(1,1,k,1,1,3),pTracer(1,1,k,1,1,4)
-C        write(*,*)pTracer(1,1,k,1,1,5),pTracer(1,1,k,1,1,6)        
-C        write(*,*)InputFe(1,1,1,1)
-C	  endif
 	  
 	  DO k=Nrloc+1,Nr
-C        write(*,*)'Copying profile',k
 		maskC(1,1,k,1,1)=0.d0	  
 		hFacC(1,1,k,1,1)=0.d0
 		recip_hFacC(1,1,k,1,1)=0.d0	 
         theta(1,1,k,1,1)=0.d0
         salt(1,1,k,1,1)=0.d0		
-C		pTracer(1,1,k,1,1,1)=0.d0
-C		pTracer(1,1,k,1,1,2)=0.d0
-C		pTracer(1,1,k,1,1,3)=0.d0
-C		pTracer(1,1,k,1,1,4)=0.d0
-C		pTracer(1,1,k,1,1,5)=0.d0
-C#ifdef ALLOW_FE         
-C		pTracer(1,1,k,1,1,6)=0.d0
-C#endif                  
 	  ENDDO
 
+!     NOTE 1: AtmospCO2 is set above to the (correct) value passed to this routine. 
+!     It will/may be subsequently reset at the end of S/R GCHEM_FORCING_SEP with 
+!     a call to S/R DIC_ATMOS but as that is after the call to the main biogeochemical 
+!     routine (e.g., S/R DIC_BIOTIC_FORCING) it shouldn't matter.
+!     Note 2: Tracers are time-stepped in S/R DIC_BIOTIC_FORCING called by S/R GCHEM_FORCING_SEP.
       CALL GCHEM_FORCING_SEP( myTime, myIter, myThid )
 
 C     Send data back
 	  pHloc=pH(1,1,1,1)
       pco2loc=pCO2(1,1,1,1)*1.d6 ! convert to ppm
       co2fluxloc=FluxCO2(1,1,1,1)
-      
-C	  DO k=1,Nrloc
-C		GDICloc(k)=(pTracer(1,1,k,1,1,1)-PTR_DIC(k))/PTRACERS_dTLev(k)
-C		GALKloc(k)=(pTracer(1,1,k,1,1,2)-PTR_ALK(k))/PTRACERS_dTLev(k)
-C		GPO4loc(k)=(pTracer(1,1,k,1,1,3)-PTR_PO4(k))/PTRACERS_dTLev(k)
-C		GDOPloc(k)=(pTracer(1,1,k,1,1,4)-PTR_DOP(k))/PTRACERS_dTLev(k)
-C		GO2loc(k)=(pTracer(1,1,k,1,1,5)-PTR_O2(k))/PTRACERS_dTLev(k)
-C#ifdef ALLOW_FE
-C		GFEloc(k)=(pTracer(1,1,k,1,1,6)-PTR_FE(k))/PTRACERS_dTLev(k)
-C#endif
-C      ENDDO      
-
-C        write(*,*)'MITGCHEM_MODEL: after GCHEM_FORCING_SEP'
-C        k=1
-C        write(*,*)pTracer(1,1,k,1,1,1),pTracer(1,1,k,1,1,2)
-C        write(*,*)pTracer(1,1,k,1,1,3),pTracer(1,1,k,1,1,4)
-C        write(*,*)pTracer(1,1,k,1,1,5),pTracer(1,1,k,1,1,6)        
-C        write(*,*)GDICloc(k),pTracer(1,1,k,1,1,1),PTR_DIC(k)
-      
+            
 #endif
 #endif
 

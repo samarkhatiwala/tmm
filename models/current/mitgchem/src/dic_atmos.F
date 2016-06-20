@@ -1,4 +1,4 @@
-C $Header: /u/gcmpack/MITgcm/pkg/dic/dic_atmos.F,v 1.17 2014/08/30 00:48:49 jmc Exp $
+C $Header: /u/gcmpack/MITgcm/pkg/dic/dic_atmos.F,v 1.19 2016/01/02 02:57:15 jmc Exp $
 C $Name:  $
 
 #include "DIC_OPTIONS.h"
@@ -107,6 +107,13 @@ C for 278ppmv we need total_atmos_carbon=4.9206e+16
         DO bi=myBxLo(myThid),myBxHi(myThid)
          tile_flux(bi,bj)   = 0.
          tile_carbon(bi,bj) = 0.
+         DO j=1,sNy
+           DO i=1,sNx
+             tile_flux(bi,bj) = tile_flux(bi,bj)
+     &                        + fluxCO2(i,j,bi,bj)*rA(i,j,bi,bj)
+     &                         *maskC(i,j,1,bi,bj)*dTtracerLev(1)
+           ENDDO
+         ENDDO
          DO k=1,Nr
           DO j=1,sNy
            DO i=1,sNx
@@ -189,7 +196,7 @@ C if end of forcing cycle, find total change in ocean carbon
       ENDIF
 
 #ifndef ALLOW_AUTODIFF
-      IF ( dic_int1.EQ.0 .OR. dic_int1.EQ.1 ) THEN
+      IF ( dic_int1.EQ.2 .OR. dic_int1.EQ.3 ) THEN
 #endif
 C--    Set AtmospCO2 for next iteration:
        DO bj=myByLo(myThid),myByHi(myThid)

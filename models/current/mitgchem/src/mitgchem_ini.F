@@ -57,12 +57,6 @@ CEOP
 
 C NEW
 
-C      if (ip.eq.0) then
-C        write(*,*)'This is a test'
-CC        k=1
-CC        write(*,*)theta(1,1,k,1,1),salt(1,1,k,1,1)
-C	  endif
-
       IF (firstTime) THEN
 C       Set tile indices              
         myBxLo(1)=1
@@ -177,39 +171,14 @@ C       Copy masks
 C       Copy tracers		
         theta(1,1,k,1,1)=thetaloc(k)
         salt(1,1,k,1,1)=saltloc(k)
-C		pTracer(1,1,k,1,1,1)=PTR_DIC(k)
-C		pTracer(1,1,k,1,1,2)=PTR_ALK(k)
-C		pTracer(1,1,k,1,1,3)=PTR_PO4(k)
-C		pTracer(1,1,k,1,1,4)=PTR_DOP(k)
-C		pTracer(1,1,k,1,1,5)=PTR_O2(k)
-C#ifdef ALLOW_FE         
-C		pTracer(1,1,k,1,1,6)=PTR_FE(k)
-C#endif                  
 	  ENDDO
 
-C      if (ip.eq.0) then
-C        write(*,*)'This is a test'
-C        k=1
-C        write(*,*)theta(1,1,k,1,1),salt(1,1,k,1,1)
-C        write(*,*)pTracer(1,1,k,1,1,1),pTracer(1,1,k,1,1,2)
-C        write(*,*)pTracer(1,1,k,1,1,3),pTracer(1,1,k,1,1,4)
-C        write(*,*)pTracer(1,1,k,1,1,5),pTracer(1,1,k,1,1,6)        
-C	  endif
-	  
 	  DO k=Nrloc+1,Nr
 		maskC(1,1,k,1,1)=0.d0	  
 		hFacC(1,1,k,1,1)=0.d0
 		recip_hFacC(1,1,k,1,1)=0.d0
         theta(1,1,k,1,1)=0.d0
         salt(1,1,k,1,1)=0.d0		
-C		pTracer(1,1,k,1,1,1)=0.d0
-C		pTracer(1,1,k,1,1,2)=0.d0
-C		pTracer(1,1,k,1,1,3)=0.d0
-C		pTracer(1,1,k,1,1,4)=0.d0
-C		pTracer(1,1,k,1,1,5)=0.d0
-C#ifdef ALLOW_FE         
-C		pTracer(1,1,k,1,1,6)=0.d0
-C#endif         		
 	  ENDDO
 
 C     initialise_varia.F->        

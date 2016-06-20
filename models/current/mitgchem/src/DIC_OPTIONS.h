@@ -1,4 +1,4 @@
-C $Header: /u/gcmpack/MITgcm/pkg/dic/DIC_OPTIONS.h,v 1.13 2015/01/11 21:16:04 jmc Exp $
+C $Header: /u/gcmpack/MITgcm/pkg/dic/DIC_OPTIONS.h,v 1.12 2014/12/05 01:43:40 jmc Exp $
 C $Name:  $
 
 #ifndef DIC_OPTIONS_H
@@ -11,11 +11,10 @@ C     Package-specific Options & Macros go here
 
 #define DIC_BIOTIC
 #define ALLOW_O2
-#undef ALLOW_FE
+#define ALLOW_FE
 #undef READ_PAR
-#undef MINFE
-#undef DIC_NO_NEG
-#undef DIC_BOUNDS
+#define MINFE
+#define DIC_NO_NEG
 C these all need to be defined for coupling to atmospheric model:
 #undef USE_QSW
 #undef USE_QSW_UNDERICE
@@ -34,7 +33,7 @@ C dissolution only below saturation horizon following method by Karsten Friis
 C Include self-shading effect by phytoplankton
 #undef LIGHT_CHL
 C Include iron sediment source using DOP flux
-#undef SEDFE
+#define SEDFE
 
 #endif /* ALLOW_DIC */
 #endif /* DIC_OPTIONS_H */
