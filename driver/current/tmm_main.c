@@ -97,6 +97,9 @@ int main(int argc,char **args)
   char *avgOutFile[MAXNUMTRACERS];  
   Vec *vavg;
   PetscViewer fdavgout[MAXNUMTRACERS];
+  char *bcavgOutFile[MAXNUMTRACERS];
+  Vec *bcavg;
+  PetscViewer fdbcavgout[MAXNUMTRACERS];
   FILE *fptime;
   PetscViewer fd, fdp, fdout[MAXNUMTRACERS], fdin[MAXNUMTRACERS], fdbcout[MAXNUMTRACERS];
 
@@ -650,6 +653,21 @@ int main(int argc,char **args)
 	  for (itr=0; itr<numTracers; itr++) {
 		ierr = PetscPrintf(PETSC_COMM_WORLD,"   Tracer %d: %s\n", itr,bcoutFile[itr]);CHKERRQ(ierr);
 	  }
+      if (doTimeAverage) {
+		for (itr=0; itr<numTracers; itr++) {
+		  bcavgOutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
+		}
+		maxValsToRead = numTracers;
+		ierr = PetscOptionsGetStringArray(PETSC_NULL,"-bcavg_files",bcavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+		if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate file name(s) for writing time averages with the -bcavg_files option");
+		if (maxValsToRead != numTracers) {
+		  SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of BC time average file names specified");
+		}  
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"BC time averages will be written to:\n");CHKERRQ(ierr);
+		for (itr=0; itr<numTracers; itr++) {
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"   Tracer %d: %s\n", itr,bcavgOutFile[itr]);CHKERRQ(ierr);
+		}      
+	  }
     }
     
 /*  Matrices */
@@ -777,7 +795,14 @@ int main(int argc,char **args)
 	for (itr=0; itr<numTracers; itr++) {
 	  ierr = VecSet(vavg[itr],zero); CHKERRQ(ierr);
       ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,avgOutFile[itr],FILE_MODE_WRITE,&fdavgout[itr]);CHKERRQ(ierr);
-    }    
+    }
+	if (doWriteBC) {
+      ierr = VecDuplicateVecs(bcTemplateVec,numTracers,&bcavg);CHKERRQ(ierr);  	
+	  for (itr=0; itr<numTracers; itr++) {
+		ierr = VecSet(bcavg[itr],zero); CHKERRQ(ierr);
+		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,bcavgOutFile[itr],FILE_MODE_WRITE,&fdbcavgout[itr]);CHKERRQ(ierr);
+	  }
+	}    
     avgCount=0;
   }
 
@@ -1086,7 +1111,12 @@ int main(int argc,char **args)
 /*           ierr = PetscPrintf(PETSC_COMM_WORLD,"Accumulating for time average\n");CHKERRQ(ierr);               */
 		  for (itr=0; itr<numTracers; itr++) {
 			ierr = VecAXPY(vavg[itr],one,v[itr]);CHKERRQ(ierr);
-		  }          
+		  }   
+		  if (doWriteBC) {
+			for (itr=0; itr<numTracers; itr++) {
+				ierr = VecAXPY(bcavg[itr],one,bcf[itr]);CHKERRQ(ierr);
+			}
+		  }	
 		  avgCount = avgCount+1;
         }
         if (avgCount==avgNumTimeSteps) { /* time to write averages to file */
@@ -1095,8 +1125,15 @@ int main(int argc,char **args)
 			ierr = VecScale(vavg[itr],1.0/avgCount);CHKERRQ(ierr);
             ierr = VecView(vavg[itr],fdavgout[itr]);CHKERRQ(ierr);
             ierr = VecSet(vavg[itr],zero); CHKERRQ(ierr);
-		  }          
-          avgCount = 0;        
+		  }
+		  if (doWriteBC) {
+			for (itr=0; itr<numTracers; itr++) {		  
+			  ierr = VecScale(bcavg[itr],1.0/avgCount);CHKERRQ(ierr);
+			  ierr = VecView(bcavg[itr],fdbcavgout[itr]);CHKERRQ(ierr);
+			  ierr = VecSet(bcavg[itr],zero); CHKERRQ(ierr);
+			}
+		  }
+          avgCount = 0; 
         }
       }
     }
@@ -1119,7 +1156,14 @@ int main(int argc,char **args)
   if (doTimeAverage) {
 	for (itr=0; itr<numTracers; itr++) {
 	  ierr = PetscViewerDestroy(&fdavgout[itr]);CHKERRQ(ierr);
-	}  
+	}
+	ierr = VecDestroyVecs(numTracers,&vavg);CHKERRQ(ierr);
+	if (doWriteBC) {
+	  for (itr=0; itr<numTracers; itr++) {
+		ierr = PetscViewerDestroy(&fdbcavgout[itr]);CHKERRQ(ierr);
+	  }
+	  ierr = VecDestroyVecs(numTracers,&bcavg);CHKERRQ(ierr);
+	}
   }
   
 /* write final pickup */  

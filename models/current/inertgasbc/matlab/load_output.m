@@ -30,12 +30,12 @@ end
 for itr=1:numTr
   varName=trNames{itr}
   fn=[bcNames{itr} '.petsc'];
-  bc=readPetscBinVec(fn,1);  
+  bc=readPetscBinVec(fn,-1);  
   fn=[trNames{itr} '.petsc'];
   tmptr=readPetscBinVec(fn,-1);
   nt=size(tmptr,2);
   tr=zeros([nb nt]);
-  tr(Ib,:)=repmat(bc,[1 nt]);
+  tr(Ib,:)=bc;
   tr(Ii,:)=tmptr;
   TR=matrixToGrid(tr,[],boxFile,gridFile);
 
