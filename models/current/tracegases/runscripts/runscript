@@ -1,0 +1,50 @@
+mpiexec -np 2 ./tmmtracegases \
+   -numtracers 1 \
+   -i trini.petsc \
+   -me Ae \
+   -mi Ai \
+   -t0 1945.0 -iter0 0 \
+   -deltat_clock 0.0013888888888889 \
+   -max_steps 720 \
+   -write_steps 720 \
+   -o trout.petsc \
+   -pickup_out pickup.petsc \
+   -time_file output_time.txt \
+   -external_forcing \
+   -use_profiles \
+   -biogeochem_deltat 43200.0 \
+   -periodic_matrix -matrix_cycle_period 1.0 \
+   -matrix_cycle_step 0.0833333333333333 \
+   -periodic_biogeochem_forcing \
+   -periodic_biogeochem_cycle_period 1.0 \
+   -periodic_biogeochem_cycle_step 0.08333333333333 \
+   -use_winds -piston_velocity 0.24 -periodic_winds_cycle_period 1.0 -periodic_winds_cycle_step 0.0006849315068493151 \
+   -gas_id 2 -mixing_ratio_scale_factor 1.e-12 \
+   -xTRatm_history TxTR.bin,xTRatm.bin -spatially_variable_mixing_ratio \
+   > log
+# driver options:
+#  I/O:
+#   -pickup_out pickup.petsc \
+#   -time_file output_time.txt \
+#  time averaging:
+#   -time_avg -avg_start_time_step 1 -avg_time_steps 60 -avg_files tr_avg.petsc \
+#  circulation-specific options:
+#   add this option for configurations in which the forcing is rescaled because of a time-varying free surface:
+#    -rescale_forcing_file Rfs \
+# model-specific options:
+#  diagnostics:
+#   -calc_diagnostics -diag_start_time_step 1 -diag_time_steps 60 \
+#  forcing options:
+#   prescribed atmospheric mixing ratio:
+#    constant:
+#     -xTRatm 270.0
+#    OR
+#    time-varying (spatially-uniform)
+#     -xTRatm_history TxTR.bin,xTRatm.bin
+#    OR
+#    time-varying and spatially-varying
+#     -xTRatm_history TxTR.bin,xTRatm.bin -spatially_variable_mixing_ratio
+#   OR
+#   prescribed emissions:
+#    -use_atm_model -xTRatm_ini 0.0 OR -xTRatm_ini_file filename -atm_write_steps 720 -atm_time_file -atm_append \
+#    -emissions_history Tem.bin,emissions.bin
