@@ -22,9 +22,12 @@ choice: http://kelvin.earth.ox.ac.uk/spk/Research/TMM/TransportMatrixConfigs/
 Currently, there are 3 configurations of MITgcm available online (and several 
 others based on the UVic Earth System Model that I am happy to make available). 
 For each, download the TMs (e.g., MITgcm_ECCO.tar) and other associated data 
-(MITgcm_ECCO_model_data.tar). Unpack both. Then move the contents of the second 
-directory into that of the first. Make a note of the path to this directory 
-(e.g., /mydisk/somewhere/MITgcm_ECCO).We will need it later.
+(e.g., MITgcm_ECCO_model_data.tar). Unpack both. Then move the contents of the 
+second directory into that of the first. Make a note of the path to this directory 
+(e.g., /mydisk/somewhere/MITgcm_ECCO). We will need it later. For some experiments 
+you may also find it useful to download some miscellaneous data here (and adjust 
+paths accordingly in the provided Matlab scripts): 
+http://kelvin.earth.ox.ac.uk/spk/Research/TMM/MiscData/
 
 4) Make a local directory and checkout the TMM driver and model codes:
 cd $HOME
