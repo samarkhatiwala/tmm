@@ -86,11 +86,14 @@ int main(int argc,char **args)
   char *iniFile[MAXNUMTRACERS];  
   char *outFile[MAXNUMTRACERS];  
   char *bcoutFile[MAXNUMTRACERS];
+  char *ufoutFile[MAXNUMTRACERS], *uefoutFile[MAXNUMTRACERS];
   char pickupFile[PETSC_MAX_PATH_LEN];
   char pickupoutFile[PETSC_MAX_PATH_LEN];  
   char outTimeFile[PETSC_MAX_PATH_LEN];  
   PetscBool appendOutput = PETSC_FALSE;
-  PetscBool doWriteBC = PETSC_FALSE;    
+  PetscBool doWriteBC = PETSC_FALSE;
+  PetscBool doWriteUF = PETSC_FALSE;
+  PetscBool doWriteUEF = PETSC_FALSE;
   PetscBool pickupFromFile = PETSC_FALSE;
   PetscBool doTimeAverage = PETSC_FALSE;
   PetscInt avgNumTimeSteps, avgStartTimeStep, avgCount;
@@ -100,8 +103,12 @@ int main(int argc,char **args)
   char *bcavgOutFile[MAXNUMTRACERS];
   Vec *bcavg;
   PetscViewer fdbcavgout[MAXNUMTRACERS];
+  char *ufavgOutFile[MAXNUMTRACERS], *uefavgOutFile[MAXNUMTRACERS];
+  Vec *ufavg, *uefavg;
+  PetscViewer fdufavgout[MAXNUMTRACERS], fduefavgout[MAXNUMTRACERS];
   FILE *fptime;
-  PetscViewer fd, fdp, fdout[MAXNUMTRACERS], fdin[MAXNUMTRACERS], fdbcout[MAXNUMTRACERS];
+  PetscViewer fd, fdp, fdout[MAXNUMTRACERS], fdin[MAXNUMTRACERS]; 
+  PetscViewer fdbcout[MAXNUMTRACERS], fdufout[MAXNUMTRACERS], fduefout[MAXNUMTRACERS];
 
 /* run time options */
   PetscBool useExternalForcing = PETSC_FALSE;
@@ -166,9 +173,10 @@ int main(int argc,char **args)
 
 /*Data for time averaging */
   ierr = PetscOptionsHasName(PETSC_NULL,"-time_avg",&doTimeAverage);CHKERRQ(ierr);
-  if (doTimeAverage) {  
+  if (doTimeAverage) {
+    avgStartTimeStep = Iter0 + 1; /* by default we start accumulating at first time step */
     ierr = PetscOptionsGetInt(PETSC_NULL,"-avg_start_time_step",&avgStartTimeStep,&flg1);CHKERRQ(ierr);
-    if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate (absolute) time step at which to start time averaging with the -avg_start_time_step flag");
+//     if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate (absolute) time step at which to start time averaging with the -avg_start_time_step flag");
     ierr = PetscOptionsGetInt(PETSC_NULL,"-avg_time_steps",&avgNumTimeSteps,&flg1);CHKERRQ(ierr);
     if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate number of time averaging time steps with the -avg_time_step flag");
 	for (itr=0; itr<numTracers; itr++) {
@@ -300,7 +308,7 @@ int main(int argc,char **args)
   ierr = PetscOptionsGetStringArray(PETSC_NULL,"-o",outFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
   if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate output file name(s) with the -o option");
   if (maxValsToRead != numTracers) {
-    SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of outfile file names specified");
+    SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of output file names specified");
   }  
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Output will be written to:\n");CHKERRQ(ierr);
   for (itr=0; itr<numTracers; itr++) {
@@ -469,6 +477,41 @@ int main(int argc,char **args)
 		}
       }  /* TD/constant forcing */
     }  /* periodic/nonperiodic forcing */
+
+/*  Initialize data to write out uf */
+    if ((periodicForcing) || (timeDependentForcing)) {
+	  for (itr=0; itr<numTracers; itr++) {
+		ufoutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
+	  }
+	  maxValsToRead = numTracers;
+	  ierr = PetscOptionsGetStringArray(PETSC_NULL,"-ouf",ufoutFile,&maxValsToRead,&doWriteUF);CHKERRQ(ierr);
+	  if (doWriteUF) {
+		if (maxValsToRead != numTracers) {
+		  SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of forcing-from-file (uf) output file names specified");
+		}  
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Forcing-from-file (uf) output will be written to:\n");CHKERRQ(ierr);
+		for (itr=0; itr<numTracers; itr++) {
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"   Tracer %d: %s\n", itr,ufoutFile[itr]);CHKERRQ(ierr);
+		}
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Note: forcing-from-file (uf) output is discrete in time. Divide by the appropriate time step to obtain a tendency\n");CHKERRQ(ierr);
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Note: forcing-from-file (uf) output is shifted by one time step relative to the stated output time step\n");CHKERRQ(ierr);
+		if (doTimeAverage) {
+		  for (itr=0; itr<numTracers; itr++) {
+			ufavgOutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
+		  }
+		  maxValsToRead = numTracers;
+		  ierr = PetscOptionsGetStringArray(PETSC_NULL,"-ufavg_files",ufavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+		  if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate file name(s) for writing time averages with the -ufavg_files option");
+		  if (maxValsToRead != numTracers) {
+			SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of forcing-from-file (uf) time average file names specified");
+		  }  
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Forcing-from-file (uf) time averages will be written to:\n");CHKERRQ(ierr);
+		  for (itr=0; itr<numTracers; itr++) {
+			ierr = PetscPrintf(PETSC_COMM_WORLD,"   Tracer %d: %s\n", itr,ufavgOutFile[itr]);CHKERRQ(ierr);
+		  }      
+		}
+	  }
+    }
   } else {  /* no forcing */
     numForcing=0;
     ierr = PetscPrintf(PETSC_COMM_WORLD,"No forcing from file(s) specified\n");CHKERRQ(ierr);    
@@ -478,6 +521,40 @@ int main(int argc,char **args)
     ierr = PetscPrintf(PETSC_COMM_WORLD,"External forcing is being used\n");CHKERRQ(ierr);    
     ierr = VecDuplicateVecs(templateVec,numTracers,&uef);CHKERRQ(ierr);        
     ierr = iniExternalForcing(time0,Iter0,numTracers,v,uef);CHKERRQ(ierr);
+
+/*  Initialize data to write out uef */
+	for (itr=0; itr<numTracers; itr++) {
+	  uefoutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
+	}
+	maxValsToRead = numTracers;
+	ierr = PetscOptionsGetStringArray(PETSC_NULL,"-ouef",uefoutFile,&maxValsToRead,&doWriteUEF);CHKERRQ(ierr);
+	if (doWriteUEF) {
+	  if (maxValsToRead != numTracers) {
+		SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of external forcing (uef) output file names specified");
+	  }  
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"External forcing (uef) output will be written to:\n");CHKERRQ(ierr);
+	  for (itr=0; itr<numTracers; itr++) {
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"   Tracer %d: %s\n", itr,uefoutFile[itr]);CHKERRQ(ierr);
+	  }
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"Note: external forcing (uef) output is discrete in time. Divide by the appropriate time step to obtain a tendency\n");CHKERRQ(ierr);	  
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"Note: external forcing (uef) output is shifted by one time step relative to the stated output time step\n");CHKERRQ(ierr);
+      if (doTimeAverage) {
+		for (itr=0; itr<numTracers; itr++) {
+		  uefavgOutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
+		}
+		maxValsToRead = numTracers;
+		ierr = PetscOptionsGetStringArray(PETSC_NULL,"-uefavg_files",uefavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+		if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate file name(s) for writing time averages with the -uefavg_files option");
+		if (maxValsToRead != numTracers) {
+		  SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of external forcing (uef) time average file names specified");
+		}  
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"External forcing (uef) time averages will be written to:\n");CHKERRQ(ierr);
+		for (itr=0; itr<numTracers; itr++) {
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"   Tracer %d: %s\n", itr,uefavgOutFile[itr]);CHKERRQ(ierr);
+		}      
+	  }
+    }
+    
   } else {
     ierr = PetscPrintf(PETSC_COMM_WORLD,"No external forcing is being used\n");CHKERRQ(ierr);  
   }  
@@ -647,7 +724,7 @@ int main(int argc,char **args)
 	ierr = PetscOptionsGetStringArray(PETSC_NULL,"-obc",bcoutFile,&maxValsToRead,&doWriteBC);CHKERRQ(ierr);
 	if (doWriteBC) {
 	  if (maxValsToRead != numTracers) {
-		SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of BC outfile file names specified");
+		SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of BC output file names specified");
 	  }  
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"BC output will be written to:\n");CHKERRQ(ierr);
 	  for (itr=0; itr<numTracers; itr++) {
@@ -768,6 +845,20 @@ int main(int argc,char **args)
       ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,outFile[itr],FILE_MODE_WRITE,&fdout[itr]);CHKERRQ(ierr);
       ierr = VecView(v[itr],fdout[itr]);CHKERRQ(ierr);
     }
+
+    if (doWriteUF) {
+/*    We only open files here since uf may not yet have been updated */
+	  for (itr=0; itr<numTracers; itr++) {
+		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,ufoutFile[itr],FILE_MODE_WRITE,&fdufout[itr]);CHKERRQ(ierr);
+	  }
+    }
+
+    if (doWriteUEF) {
+/*    We only open files here since uef may not yet have been updated */
+	  for (itr=0; itr<numTracers; itr++) {
+		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,uefoutFile[itr],FILE_MODE_WRITE,&fduefout[itr]);CHKERRQ(ierr);
+	  }
+    }
     
     if (doWriteBC) {
 /*    We only open files here since BCs may not yet have been computed */
@@ -781,6 +872,18 @@ int main(int argc,char **args)
       for (itr=0; itr<numTracers; itr++) {       
         ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,outFile[itr],FILE_MODE_APPEND,&fdout[itr]);CHKERRQ(ierr);
       }
+
+      if (doWriteUF) {
+		for (itr=0; itr<numTracers; itr++) {
+		  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,ufoutFile[itr],FILE_MODE_APPEND,&fdufout[itr]);CHKERRQ(ierr);
+		}
+      }  
+
+      if (doWriteUEF) {
+		for (itr=0; itr<numTracers; itr++) {
+		  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,uefoutFile[itr],FILE_MODE_APPEND,&fduefout[itr]);CHKERRQ(ierr);
+		}
+      }  
       
       if (doWriteBC) {
 		for (itr=0; itr<numTracers; itr++) {
@@ -796,6 +899,20 @@ int main(int argc,char **args)
 	  ierr = VecSet(vavg[itr],zero); CHKERRQ(ierr);
       ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,avgOutFile[itr],FILE_MODE_WRITE,&fdavgout[itr]);CHKERRQ(ierr);
     }
+	if (doWriteUF) {
+      ierr = VecDuplicateVecs(templateVec,numTracers,&ufavg);CHKERRQ(ierr);  	
+	  for (itr=0; itr<numTracers; itr++) {
+		ierr = VecSet(ufavg[itr],zero); CHKERRQ(ierr);
+		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,ufavgOutFile[itr],FILE_MODE_WRITE,&fdufavgout[itr]);CHKERRQ(ierr);
+	  }
+	}
+	if (doWriteUEF) {
+      ierr = VecDuplicateVecs(templateVec,numTracers,&uefavg);CHKERRQ(ierr);  	
+	  for (itr=0; itr<numTracers; itr++) {
+		ierr = VecSet(uefavg[itr],zero); CHKERRQ(ierr);
+		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,uefavgOutFile[itr],FILE_MODE_WRITE,&fduefavgout[itr]);CHKERRQ(ierr);
+	  }
+	}
 	if (doWriteBC) {
       ierr = VecDuplicateVecs(bcTemplateVec,numTracers,&bcavg);CHKERRQ(ierr);  	
 	  for (itr=0; itr<numTracers; itr++) {
@@ -975,6 +1092,18 @@ int main(int argc,char **args)
       for (itr=0; itr<numTracers; itr++) {
         ierr = VecView(v[itr],fdout[itr]);CHKERRQ(ierr);
       }
+
+	  if (doWriteUF) {
+		for (itr=0; itr<numTracers; itr++) {
+		  ierr = VecView(uf[itr],fdufout[itr]);CHKERRQ(ierr);
+		}
+	  }
+
+	  if (doWriteUEF) {
+		for (itr=0; itr<numTracers; itr++) {
+		  ierr = VecView(uef[itr],fduefout[itr]);CHKERRQ(ierr);
+		}
+	  }
       
 	  if (doWriteBC) {
 		for (itr=0; itr<numTracers; itr++) {
@@ -1112,6 +1241,16 @@ int main(int argc,char **args)
 		  for (itr=0; itr<numTracers; itr++) {
 			ierr = VecAXPY(vavg[itr],one,v[itr]);CHKERRQ(ierr);
 		  }   
+		  if (doWriteUF) {
+			for (itr=0; itr<numTracers; itr++) {
+				ierr = VecAXPY(ufavg[itr],one,uf[itr]);CHKERRQ(ierr);
+			}
+		  }
+		  if (doWriteUEF) {
+			for (itr=0; itr<numTracers; itr++) {
+				ierr = VecAXPY(uefavg[itr],one,uef[itr]);CHKERRQ(ierr);
+			}
+		  }
 		  if (doWriteBC) {
 			for (itr=0; itr<numTracers; itr++) {
 				ierr = VecAXPY(bcavg[itr],one,bcf[itr]);CHKERRQ(ierr);
@@ -1125,6 +1264,20 @@ int main(int argc,char **args)
 			ierr = VecScale(vavg[itr],1.0/avgCount);CHKERRQ(ierr);
             ierr = VecView(vavg[itr],fdavgout[itr]);CHKERRQ(ierr);
             ierr = VecSet(vavg[itr],zero); CHKERRQ(ierr);
+		  }
+		  if (doWriteUF) {
+			for (itr=0; itr<numTracers; itr++) {		  
+			  ierr = VecScale(ufavg[itr],1.0/avgCount);CHKERRQ(ierr);
+			  ierr = VecView(ufavg[itr],fdufavgout[itr]);CHKERRQ(ierr);
+			  ierr = VecSet(ufavg[itr],zero); CHKERRQ(ierr);
+			}
+		  }
+		  if (doWriteUEF) {
+			for (itr=0; itr<numTracers; itr++) {		  
+			  ierr = VecScale(uefavg[itr],1.0/avgCount);CHKERRQ(ierr);
+			  ierr = VecView(uefavg[itr],fduefavgout[itr]);CHKERRQ(ierr);
+			  ierr = VecSet(uefavg[itr],zero); CHKERRQ(ierr);
+			}
 		  }
 		  if (doWriteBC) {
 			for (itr=0; itr<numTracers; itr++) {		  
@@ -1145,6 +1298,18 @@ int main(int argc,char **args)
     ierr = PetscViewerDestroy(&fdout[itr]);CHKERRQ(ierr);
   }
   ierr = PetscFClose(PETSC_COMM_WORLD,fptime);CHKERRQ(ierr);
+
+  if (doWriteUF) {
+	for (itr=0; itr<numTracers; itr++) {
+	  ierr = PetscViewerDestroy(&fdufout[itr]);CHKERRQ(ierr);
+	}  
+  }
+
+  if (doWriteUEF) {
+	for (itr=0; itr<numTracers; itr++) {
+	  ierr = PetscViewerDestroy(&fduefout[itr]);CHKERRQ(ierr);
+	}  
+  }
   
   if (doWriteBC) {
 	for (itr=0; itr<numTracers; itr++) {
@@ -1158,6 +1323,18 @@ int main(int argc,char **args)
 	  ierr = PetscViewerDestroy(&fdavgout[itr]);CHKERRQ(ierr);
 	}
 	ierr = VecDestroyVecs(numTracers,&vavg);CHKERRQ(ierr);
+	if (doWriteUF) {
+	  for (itr=0; itr<numTracers; itr++) {
+		ierr = PetscViewerDestroy(&fdufavgout[itr]);CHKERRQ(ierr);
+	  }
+	  ierr = VecDestroyVecs(numTracers,&ufavg);CHKERRQ(ierr);
+	}
+	if (doWriteUEF) {
+	  for (itr=0; itr<numTracers; itr++) {
+		ierr = PetscViewerDestroy(&fduefavgout[itr]);CHKERRQ(ierr);
+	  }
+	  ierr = VecDestroyVecs(numTracers,&uefavg);CHKERRQ(ierr);
+	}
 	if (doWriteBC) {
 	  for (itr=0; itr<numTracers; itr++) {
 		ierr = PetscViewerDestroy(&fdbcavgout[itr]);CHKERRQ(ierr);
