@@ -1,3 +1,6 @@
+# Set this to the top level path of the MITgcm code base
+MITGCMBASE = /data2/spk/MITgcm_latest/MITgcm
+
 include ${PETSC_DIR}/lib/petsc/conf/variables
 include ${PETSC_DIR}/lib/petsc/conf/rules
 include ${PETSC_DIR}/lib/petsc/conf/petscvariables
@@ -16,8 +19,14 @@ ifneq (,$(findstring xlf,$(COMPILER)))
 	FFLAGS+=-qrealsize=8 -qzerosize
 endif
 
+MYPATHS = $(MITGCMBASE)/model/src:$(MITGCMBASE)/model/inc:$(MITGCMBASE)/eesupp/src:$(MITGCMBASE)/eesupp/inc:$(MITGCMBASE)/pkg/ptracers:$(MITGCMBASE)/pkg/gchem:$(MITGCMBASE)/pkg/dic
+   
+INCLUDEPATHS = $(addprefix -I,$(subst :, ,$(MYPATHS)))
+
+VPATH = $(MYPATHS)
+
 STMM = tmm_main.c tmm_forward_step.c tmm_forcing_utils.c \
-        tmm_profile_utils.c petsc_signal_utils.c petsc_matvec_utils.c
+        tmm_profile_utils.c tmm_timer.c petsc_signal_utils.c petsc_matvec_utils.c
         
 SRCMITGCHEM = $(STMM) tmm_external_bc.c tmm_monitor.c tmm_misfit.c external_forcing_mitgchem_dic.c
 SRFMITGCHEM = different_multiple.F print.F utils.F write_utils.F open_copy_data_file.F \
@@ -45,7 +54,7 @@ DIC_OPTIONS_TMM.h: DIC_OPTIONS.h
 	cat DIC_OPTIONS.h | ./stripFortranComments.sh > $@
 
 smallf: $(SRFPPMITGCHEM)
-CPPCMD = cat $< |  cpp  -traditional -P -DWORDLENGTH=4 -DALLOW_TMM | ./set64bitConst.sh
+CPPCMD = cat $< |  cpp  -traditional -P -I. $(INCLUDEPATHS) -DWORDLENGTH=4 -DALLOW_TMM | $(MITGCMBASE)/tools/set64bitConst.sh
 .F.f:
 	$(CPPCMD)  > $@
 

@@ -1,8 +1,11 @@
 This is the TMM interface to the MITgcm 'gchem' package. It provides hooks to 
 the various biogeochemical models implemented within MITgcm making it possible 
-to use them without modification of the original code. Currently (as of Jan 17, 
-2015) only pkg/dic is supported but other models (e.g., BLING, Darwin, ...) 
+to use them without modification of the original code. Currently (as of Jan 3, 
+2016) only pkg/dic is supported but other models (e.g., BLING, Darwin, ...) 
 can be easily used by appropriately adapting external_forcing_mitgchem_dic.c.
+
+You will need a recent copy of MITgcm for the required header and source files 
+not distributed with this package.
 
 List of required files:
 
@@ -27,9 +30,11 @@ commented out. The build process generates it automatically using the script
 stripFortranComments.sh. This isn't the most robust solution so if you run into 
 problems trying doing it manually.
 
-The following are needed from the main MITgcm source tree. Of these only 
-SIZE.h, PTRACERS_SIZE.h and dic_biotic_forcing.F need to be modified (as 
-described below). The rest can be used without change.
+The following source files are needed from the main MITgcm source tree. Of these 
+only SIZE.h, PTRACERS_SIZE.h and dic_biotic_forcing.F need to be modified (as 
+described below) and are supplied here. The rest are used without change by 
+setting the path to the top level of the MITgcm source in Makefile.
+
 pkg/dic:
 alk_surfforcing.F
 bio_export.F
@@ -115,7 +120,7 @@ Other required MITgcm files:
 PACKAGES_CONFIG.h (automatically generated; turn on PTRACERS, GCHEM and 
 whichever biogeochemical package you want (e.g., DIC)).
 
-MITgcm files that need to be changed:
+MITgcm files that need to be changed and supplied here:
 SIZE.h (set all s* and n* variables to 1, OL* to 0 and Nr to number of depth levels)
 PTRACERS_SIZE.h (set PTRACERS_num to 6 for pkg/dic, 7 for pkg/bling etc)
 dic_biotic_forcing.F (add lines to include TMM_MITGCHEM_DIAGS.h)
