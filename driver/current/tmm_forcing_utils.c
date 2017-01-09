@@ -99,11 +99,11 @@ PetscInt findindex(PetscScalar x[], PetscInt n, PetscScalar xf)
 #undef __FUNCT__
 #define __FUNCT__ "interpPeriodicMatrix"
 PetscErrorCode interpPeriodicMatrix(PetscScalar tc, Mat *A, PetscScalar cyclePeriod,
-                                    PetscInt numPeriods, PetscScalar *tdp, 
+                                    PetscInt numPerPeriod, PetscScalar *tdp, 
                                     PeriodicMat *user, char *filename)
 {
 /* Function to interpolate a matrix that is periodic in time with period cyclePeriod.  */
-/* tc is the current time and numPeriods is the number of instances per period   */
+/* tc is the current time and numPerPeriod is the number of instances per period   */
 /* at which data are available (to be read from files). */
 /* IMPORTANT: Matrix *A MUST have been created and preallocated before  */
 /* calling this routine. All other matrices will be created using *A as a template.  */
@@ -119,11 +119,11 @@ PetscErrorCode interpPeriodicMatrix(PetscScalar tc, Mat *A, PetscScalar cyclePer
   PetscViewer fd;
 
   if (user->firstTime) {
-    if (numPeriods>MAX_MATRIX_PERIODS) {
-      SETERRQ(PETSC_COMM_WORLD,1,"Number of allowable matrices in PeriodicMat struct exceeded by requested number ! Increase MAX_MATRIX_PERIODS.");
+    if (numPerPeriod>MAX_MATRIX_NUM_PER_PERIOD) {
+      SETERRQ(PETSC_COMM_WORLD,1,"Number of allowable matrices in PeriodicMat struct exceeded by requested number ! Increase MAX_MATRIX_NUM_PER_PERIOD.");
     }    
-    user->numPeriods = numPeriods;
-    for (im=0; im<numPeriods; im++) {
+    user->numPerPeriod = numPerPeriod;
+    for (im=0; im<numPerPeriod; im++) {
       ierr = MatDuplicate(*A,MAT_DO_NOT_COPY_VALUES,&user->Ap[im]);CHKERRQ(ierr);        
 	  strcpy(tmpFile,"");
 	  sprintf(tmpFile,"%s%02d",filename,im);	  
@@ -138,7 +138,7 @@ PetscErrorCode interpPeriodicMatrix(PetscScalar tc, Mat *A, PetscScalar cyclePer
   t=tc; /* current time */
   if (t<0.) t=cyclePeriod+t;
   t1=t-cyclePeriod*floor(t/cyclePeriod);
-  ierr=calcPeriodicInterpFactor(numPeriods,t1,tdp,&it0,&it1,&alpha[0],&alpha[1]);  CHKERRQ(ierr);  
+  ierr=calcPeriodicInterpFactor(numPerPeriod,t1,tdp,&it0,&it1,&alpha[0],&alpha[1]);  CHKERRQ(ierr);  
 /*   ierr = PetscPrintf(PETSC_COMM_WORLD,"tc=%lf,t1=%lf,it0=%d,it1=%d,a1=%17.16lf,a2=%17.16lf\n",tc,t1,it0,it1,alpha[0],alpha[1]);CHKERRQ(ierr);   */
   
 /* interpolate to current time   */
@@ -150,11 +150,11 @@ PetscErrorCode interpPeriodicMatrix(PetscScalar tc, Mat *A, PetscScalar cyclePer
 #undef __FUNCT__
 #define __FUNCT__ "interpPeriodicVector"
 PetscErrorCode interpPeriodicVector(PetscScalar tc, Vec *u, PetscScalar cyclePeriod,
-                                    PetscInt numPeriods, PetscScalar *tdp, 
+                                    PetscInt numPerPeriod, PetscScalar *tdp, 
                                     PeriodicVec *user, char *filename)
 {
 /* Function to interpolate a vector that is periodic in time with period cyclePeriod.  */
-/* tc is the current time and numPeriods is the number of instances per period   */
+/* tc is the current time and numPerPeriod is the number of instances per period   */
 /* at which data are available (to be read from files). */
 /* IMPORTANT: Vectors u0 and u1 MUST have been created and preallocated before  */
 /* calling this routine. Use VecDuplicate to do this.  */
@@ -170,9 +170,9 @@ PetscErrorCode interpPeriodicVector(PetscScalar tc, Vec *u, PetscScalar cyclePer
   PetscViewer fd;
 
   if (user->firstTime) {
-    user->numPeriods = numPeriods;  
-    ierr = VecDuplicateVecs(*u,numPeriods,&user->up);CHKERRQ(ierr);    
-    for (im=0; im<numPeriods; im++) {
+    user->numPerPeriod = numPerPeriod;  
+    ierr = VecDuplicateVecs(*u,numPerPeriod,&user->up);CHKERRQ(ierr);    
+    for (im=0; im<numPerPeriod; im++) {
 	  strcpy(tmpFile,"");
 	  sprintf(tmpFile,"%s%02d",filename,im);
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading vector from file %s\n", tmpFile);CHKERRQ(ierr);  
@@ -186,7 +186,7 @@ PetscErrorCode interpPeriodicVector(PetscScalar tc, Vec *u, PetscScalar cyclePer
   t=tc; /* current time */
   if (t<0.) t=cyclePeriod+t;
   t1=t-cyclePeriod*floor(t/cyclePeriod);
-  ierr=calcPeriodicInterpFactor(numPeriods,t1,tdp,&it0,&it1,&alpha[0],&alpha[1]);  CHKERRQ(ierr);  
+  ierr=calcPeriodicInterpFactor(numPerPeriod,t1,tdp,&it0,&it1,&alpha[0],&alpha[1]);  CHKERRQ(ierr);  
 /*   ierr = PetscPrintf(PETSC_COMM_WORLD,"tc=%lf,t1=%lf,it0=%d,it1=%d,a1=%17.16lf,a2=%17.16lf\n",tc,t1,it0,it1,alpha[0],alpha[1]);CHKERRQ(ierr);   */
   
 /* interpolate to current time   */
@@ -203,7 +203,7 @@ PetscErrorCode destroyPeriodicVec(PeriodicVec *user)
 
   PetscErrorCode ierr;
 
-  ierr = VecDestroyVecs(user->numPeriods,&(user->up));CHKERRQ(ierr);
+  ierr = VecDestroyVecs(user->numPerPeriod,&(user->up));CHKERRQ(ierr);
 
   return 0;
 }
@@ -217,7 +217,7 @@ PetscErrorCode destroyPeriodicMat(PeriodicMat *user)
   PetscErrorCode ierr;
   PetscInt im;
   
-  for (im=0; im<user->numPeriods; im++) {
+  for (im=0; im<user->numPerPeriod; im++) {
     ierr = MatDestroy(&(user->Ap[im]));CHKERRQ(ierr);
   }
   
@@ -233,7 +233,7 @@ PetscErrorCode destroyPeriodicArray(PeriodicArray *user)
   PetscErrorCode ierr;
   PetscInt im;
   
-  for (im=0; im<user->numPeriods; im++) {  
+  for (im=0; im<user->numPerPeriod; im++) {  
     ierr = PetscFree(user->up[im]);CHKERRQ(ierr);    
   }
   

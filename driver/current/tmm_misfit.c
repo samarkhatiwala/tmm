@@ -11,8 +11,9 @@
 #include "tmm_forcing_utils.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
+#include "tmm_timer.h"
 
-PetscInt misfitStartTimeStep, misfitWriteSteps;
+StepTimer misfitTimer;
 
 #undef __FUNCT__
 #define __FUNCT__ "iniMisfit"
@@ -21,14 +22,10 @@ PetscErrorCode iniMisfit(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Vec
 
   PetscErrorCode ierr;
   PetscBool flg;
-  
-  ierr = PetscOptionsGetInt(PETSC_NULL,"-misfit_start_time_step",&misfitStartTimeStep,&flg);CHKERRQ(ierr);
-  if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate (absolute) time step at which to start computing misfit with the -misfit_start_time_step flag");
-  ierr = PetscOptionsGetInt(PETSC_NULL,"-misfit_write_steps",&misfitWriteSteps,&flg);CHKERRQ(ierr);
-  if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate frequency at which misfit data is written out with the -misfit_write_steps flag");
 
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"Misfit will be computed starting at time step: %d\n", misfitStartTimeStep);CHKERRQ(ierr);	
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"Misfit will be written out every %d time steps\n", misfitWriteSteps);CHKERRQ(ierr);	
+  ierr = iniStepTimer("misfit_", Iter0, &misfitTimer);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"Misfit will be computed starting at (and including) time step: %d\n", misfitTimer.startTimeStep);CHKERRQ(ierr);	
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"Misfit will be computed over %d time steps\n", misfitTimer.numTimeSteps);CHKERRQ(ierr);
 
 /* Add your code here */
 
@@ -45,7 +42,7 @@ PetscErrorCode calcMisfit(PetscScalar tc, PetscInt iLoop, PetscInt numTracers, V
 
   PetscErrorCode ierr;
 
-  if (Iter0+iLoop>=misfitStartTimeStep) { /* start computing misfit (note: misfitStartTimeStep is ABSOLUTE time step) */	
+  if (Iter0+iLoop>=misfitTimer.startTimeStep) { /* start computing misfit (note: startTimeStep is ABSOLUTE time step) */	
 /* Add your code here */
   }
 
@@ -61,7 +58,7 @@ PetscErrorCode writeMisfit(PetscScalar tc, PetscInt iLoop, PetscInt numTracers, 
 
   PetscErrorCode ierr;
 
-  if (Iter0+iLoop>=misfitStartTimeStep) { /* note: misfitStartTimeStep is ABSOLUTE time step */	
+  if (Iter0+iLoop>=misfitTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */	
 /* Add your code here */
   }
 

@@ -261,11 +261,11 @@ PetscErrorCode readProfileSurfaceScalarDataRecord(char *fileName, PetscScalar *a
 #undef __FUNCT__
 #define __FUNCT__ "interpPeriodicProfileSurfaceScalarData"
 PetscErrorCode interpPeriodicProfileSurfaceScalarData(PetscScalar tc, PetscScalar *uarr, PetscScalar cyclePeriod,
-                                    PetscInt numPeriods, PetscScalar *tdp, 
+                                    PetscInt numPerPeriod, PetscScalar *tdp, 
                                     PeriodicArray *user, char *fileName)
 {
 /* Function to interpolate an array that is periodic in time with period cyclePeriod.  */
-/* tc is the current time and numPeriods is the number of instances per period   */
+/* tc is the current time and numPerPeriod is the number of instances per period   */
 /* at which data are available (to be read from files). */
 /* IMPORTANT: Arrays u0 and u1 MUST have been created and preallocated before  */
 /* calling this routine.  */
@@ -282,11 +282,11 @@ PetscErrorCode interpPeriodicProfileSurfaceScalarData(PetscScalar tc, PetscScala
   PetscInt ip;
 
   if (user->firstTime) {
-    if (numPeriods>MAX_FORCING_PERIODS) {
-      SETERRQ(PETSC_COMM_WORLD,1,"Number of allowable arrays in PeriodicArray struct exceeded by requested number ! Increase MAX_FORCING_PERIODS.");
+    if (numPerPeriod>MAX_FORCING_NUM_PER_PERIOD) {
+      SETERRQ(PETSC_COMM_WORLD,1,"Number of allowable arrays in PeriodicArray struct exceeded by requested number ! Increase MAX_FORCING_NUM_PER_PERIOD.");
     }      
-    user->numPeriods = numPeriods;  
-    for (im=0; im<numPeriods; im++) {
+    user->numPerPeriod = numPerPeriod;  
+    for (im=0; im<numPerPeriod; im++) {
       ierr = PetscMalloc((user->arrayLength)*sizeof(PetscScalar),&user->up[im]);CHKERRQ(ierr);    
       strcpy(tmpFile,"");
       sprintf(tmpFile,"%s%02d",fileName,im);
@@ -299,7 +299,7 @@ PetscErrorCode interpPeriodicProfileSurfaceScalarData(PetscScalar tc, PetscScala
   t=tc; /* current time */
   if (t<0.) t=cyclePeriod+t;
   t1=t-cyclePeriod*floor(t/cyclePeriod);
-  ierr=calcPeriodicInterpFactor(numPeriods,t1,tdp,&it0,&it1,&alpha[0],&alpha[1]);  CHKERRQ(ierr);  
+  ierr=calcPeriodicInterpFactor(numPerPeriod,t1,tdp,&it0,&it1,&alpha[0],&alpha[1]);  CHKERRQ(ierr);  
 /*   ierr = PetscPrintf(PETSC_COMM_WORLD,"tc=%lf,t1=%lf,it0=%d,it1=%d,a1=%17.16lf,a2=%17.16lf\n",tc,t1,it0,it1,alpha[0],alpha[1]);CHKERRQ(ierr);   */
   
 /* interpolate to current time   */
