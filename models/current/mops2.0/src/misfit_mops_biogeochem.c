@@ -14,6 +14,7 @@
 #include "tmm_forcing_utils.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
+#include "tmm_timer.h"
 
 #include "mops_biogeochem_misfit_data.h"
 
@@ -47,12 +48,10 @@ PetscErrorCode iniMisfit(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Vec
 
   ierr = PetscOptionsHasName(PETSC_NULL,"-average_cost",&averageCost);CHKERRQ(ierr);
 	if (averageCost) {
-	ierr = PetscOptionsGetInt(PETSC_NULL,"-cost_start_time_step",&costStartTimeStep,&flg);CHKERRQ(ierr);
-	if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate (absolute) time step at which to start calculating cost function -cost_start_time_step flag");
-	ierr = PetscOptionsGetInt(PETSC_NULL,"-cost_time_steps",&costNumTimeSteps,&flg);CHKERRQ(ierr);
-	if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate number of time averaging cost time steps with the -cost_time_steps flag");
-	ierr = PetscPrintf(PETSC_COMM_WORLD,"Cost for misfit function will be computed starting at (and including) time step: %d\n", costStartTimeStep);CHKERRQ(ierr);	
-	ierr = PetscPrintf(PETSC_COMM_WORLD,"Cost for misfit function will be computed over %d time steps\n", costNumTimeSteps);CHKERRQ(ierr);	
+
+    ierr = iniStepTimer("cost_", Iter0, &costTimer);CHKERRQ(ierr);
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Cost for misfit function will be computed starting at (and including) time step: %d\n", costTimer.startTimeStep);CHKERRQ(ierr);	
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Cost for misfit function will be computed over %d time steps\n", costTimer.numTimeSteps);CHKERRQ(ierr);	
 
 /* Read fractional volume of each box for scaling according to box size */
 
@@ -62,6 +61,33 @@ PetscErrorCode iniMisfit(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Vec
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);      
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Read volume file for weighting\n");CHKERRQ(ierr);	
 
+/* Read vector of weights for individual tracer types and gridboxes */
+	ierr = VecDuplicate(TR,&wbgc1);CHKERRQ(ierr);
+	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"weights.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	ierr = VecLoad(wbgc1,fd);CHKERRQ(ierr);  /* IntoVector */ 
+	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);      
+	
+        ierr = VecDuplicate(TR,&wbgc2);CHKERRQ(ierr);
+	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"weights.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	ierr = VecLoad(wbgc2,fd);CHKERRQ(ierr);  /* IntoVector */ 
+	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);      
+	
+	ierr = VecDuplicate(TR,&wbgc3);CHKERRQ(ierr);
+	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"weights.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	ierr = VecLoad(wbgc3,fd);CHKERRQ(ierr);  /* IntoVector */ 
+	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);      
+	
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Read misfit file(s) for weighting\n");CHKERRQ(ierr);	
+
+/* construct total weight: for now, multiply weight with fractional volume */
+
+      ierr = VecDuplicate(TR,&w1);CHKERRQ(ierr);
+      ierr = VecDuplicate(TR,&w2);CHKERRQ(ierr);
+      ierr = VecDuplicate(TR,&w3);CHKERRQ(ierr);
+      ierr = VecPointwiseMult(w1,wbgc1,globVolFrac);
+      ierr = VecPointwiseMult(w2,wbgc2,globVolFrac);
+      ierr = VecPointwiseMult(w3,wbgc3,globVolFrac);
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"Set up weight arrays\n");CHKERRQ(ierr);	
 /* Read the observations */ 
 
   ierr = VecDuplicate(TR,&obgc1);CHKERRQ(ierr);
@@ -114,15 +140,13 @@ PetscErrorCode iniMisfit(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Vec
   ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"cbgc2.petsc",FILE_MODE_WRITE,&fdcbgc2avg);CHKERRQ(ierr);
   ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"cbgc3.petsc",FILE_MODE_WRITE,&fdcbgc3avg);CHKERRQ(ierr);
 
-   costCount=0;
+//    costCount=0;
 
         } else {
 
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Only average cost function available, currently.\n");CHKERRQ(ierr);	        
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Specify -average_cost, and start time step and number of time steps to average.\n");CHKERRQ(ierr);	        
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"No misfit will be computed. \n");CHKERRQ(ierr);	        
-        costStartTimeStep=10000000;
-        costNumTimeSteps=-1;
         
         }
  /* IK: added for misfit function - end */
@@ -146,7 +170,7 @@ PetscErrorCode calcMisfit(PetscScalar tc, PetscInt iLoop, PetscInt numTracers, V
   PetscErrorCode ierr;
   PetscScalar zero = 0.0, one = 1.0, minusone = -1.0 ;  
 
-  if (Iter0+iLoop>=costStartTimeStep) { /* note: costStartTimeStep is ABSOLUTE time step */	
+  if (Iter0+iLoop>=costTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */	
 
 /* Add your code here */
 
@@ -154,11 +178,11 @@ PetscErrorCode calcMisfit(PetscScalar tc, PetscInt iLoop, PetscInt numTracers, V
 
 /* IK : Add all tracer snapshots, and increase counter by one */ 
  
-    if (costCount<=costNumTimeSteps) {
+    if (costTimer.count<=costTimer.numTimeSteps) {
 	  ierr = VecAXPY(mbgc1avg,one,mbgc1);CHKERRQ(ierr);
 	  ierr = VecAXPY(mbgc2avg,one,mbgc2);CHKERRQ(ierr);
 	  ierr = VecAXPY(mbgc3avg,one,mbgc3);CHKERRQ(ierr);
-	  costCount = costCount+1;
+	  costTimer.count++; // costCount+1;
 	}
    }
  }
@@ -182,7 +206,7 @@ PetscErrorCode writeMisfit(PetscScalar tc, PetscInt iLoop, PetscInt numTracers, 
   PetscErrorCode ierr;
   PetscScalar zero = 0.0, one = 1.0, minusone = -1.0 ;  
 
-  if (Iter0+iLoop>=costStartTimeStep) { /* note: costStartTimeStep is ABSOLUTE time step */	
+  if (Iter0+iLoop>=costTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */	
 
 /* Add your code here */
 
@@ -190,15 +214,15 @@ PetscErrorCode writeMisfit(PetscScalar tc, PetscInt iLoop, PetscInt numTracers, 
 
 /* IK : added for misfit function : start */
 
-	  if (costCount==costNumTimeSteps) { /* time to compute cost function and write to file */
+	  if (costTimer.count==costTimer.numTimeSteps) { /* time to compute cost function and write to file */
 	  
-		ierr = PetscPrintf(PETSC_COMM_WORLD,"Computing cost function of time average over %d steps at time %10.5f, step %d\n", costCount, tc, Iter0+iLoop);CHKERRQ(ierr);                      
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Computing cost function of time average over %d steps at time %10.5f, step %d\n", costTimer.count, tc, Iter0+iLoop);CHKERRQ(ierr);                      
 
 /* IK : average model over a year; this will be stored again in mbgc1avg, ... */
 
-		ierr = VecScale(mbgc1avg,1.0/costCount);CHKERRQ(ierr);
-		ierr = VecScale(mbgc2avg,1.0/costCount);CHKERRQ(ierr);
-		ierr = VecScale(mbgc3avg,1.0/costCount);CHKERRQ(ierr);
+		ierr = VecScale(mbgc1avg,1.0/costTimer.count);CHKERRQ(ierr);
+		ierr = VecScale(mbgc2avg,1.0/costTimer.count);CHKERRQ(ierr);
+		ierr = VecScale(mbgc3avg,1.0/costTimer.count);CHKERRQ(ierr);
 
 		ierr = PetscPrintf(PETSC_COMM_WORLD,"Computed annual average concentrations \n");CHKERRQ(ierr);                      
 
@@ -242,10 +266,10 @@ possible, e.g., use functions proposed by Evans, 2003; result is again in cbgcav
 
 /* IK : sum all local misfits, and scale with fractional volume at the same time; result is scalar value Gavecost1, ... */
 
-		ierr = VecDot(cbgc1,globVolFrac,&Gavecost1);CHKERRQ(ierr);
-		ierr = VecDot(cbgc2,globVolFrac,&Gavecost2);CHKERRQ(ierr);
-		ierr = VecDot(cbgc3,globVolFrac,&Gavecost3);CHKERRQ(ierr);
-		ierr = PetscPrintf(PETSC_COMM_WORLD,"Computed overall sum, weighted by volume  \n");CHKERRQ(ierr);                      
+		ierr = VecDot(cbgc1,w1,&Gavecost1);CHKERRQ(ierr);
+		ierr = VecDot(cbgc2,w2,&Gavecost2);CHKERRQ(ierr);
+		ierr = VecDot(cbgc3,w3,&Gavecost3);CHKERRQ(ierr);
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Computed overall sum, weighted by volume and weight \n");CHKERRQ(ierr);                      
 
 /* IK : get global average observed concentrations Gavebgc1, ... for normalization 
 (needed to sum up different quantities; could use any other scaling, e.g., global variance */
@@ -275,7 +299,8 @@ possible, e.g., use functions proposed by Evans, 2003; result is again in cbgcav
 		ierr = PetscPrintf(PETSC_COMM_WORLD,"Average model tracers are PO4 %10.5f O2 %10.5f NO3 %10.5f\n", Gavembgc1,Gavembgc2,Gavembgc3);CHKERRQ(ierr);                      
                 ierr = PetscFPrintf(PETSC_COMM_WORLD,misfitf,"%10.5f\n",Gcost);CHKERRQ(ierr);           
 
-                costCount = 0;
+        ierr = updateStepTimer("cost_", Iter0+iLoop, &costTimer);CHKERRQ(ierr);
+//                 costCount = 0;
 
       } /* costCount==costNumTimeSteps */ 
       
@@ -284,7 +309,7 @@ possible, e.g., use functions proposed by Evans, 2003; result is again in cbgcav
      ierr = PetscPrintf(PETSC_COMM_WORLD,"No cost function available \n");CHKERRQ(ierr);                      
    }
 
-} /* Iter0+iLoop>=costStartTimeStep */
+} /* Iter0+iLoop>=costTimer.startTimeStep */
 
 /* IK : added for misfit function : end */
 

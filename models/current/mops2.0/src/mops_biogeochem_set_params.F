@@ -56,10 +56,10 @@ C that consists of npar=three parameters ACMUphy, graztodop and detmartin:
 
 ! Third version for Volkmar's optimization tests, 16 October 2015
          ro2ut = parvec(1)
-         ACik = parvec(2)
-         ACkpo4 = parvec(3)
-         ACmuzoo =parvec(4)
-         AComniz = parvec(5)
+         ACkbaco2 = parvec(2)
+         ACkbacdin =parvec(3)
+         subdin = parvec(4)
+         nfix = parvec(5)
          detmartin = parvec(6)
         
       RETURN

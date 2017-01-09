@@ -4,7 +4,12 @@ include ${PETSC_DIR}/lib/petsc/conf/petscvariables
 
 # Set compiler-dependent flags
 FPPFLAG=
-COMPILER=$(word 1,$(MPIFC_SHOW))
+ifeq ($(strip $(MPIFC_SHOW)),)
+	COMPILER=$(FC)
+else
+	COMPILER=$(word 1,$(MPIFC_SHOW))
+endif
+
 ifneq (,$(findstring ifort,$(COMPILER)))
 	FFLAGS+=-r8
 endif
@@ -17,7 +22,7 @@ ifneq (,$(findstring xlf,$(COMPILER)))
 endif
 
 STMM = tmm_main.c tmm_forward_step.c tmm_forcing_utils.c \
-        tmm_profile_utils.c petsc_signal_utils.c petsc_matvec_utils.c
+        tmm_profile_utils.c tmm_timer.c petsc_signal_utils.c petsc_matvec_utils.c
         
 SRCOCMIPLANDATM = $(STMM) tmm_external_bc.c tmm_monitor.c tmm_misfit.c external_forcing_ocmip_abiotic_carbon_landatm.c
 SRFOCMIPLANDATM = ocmip_abiotic_carbon_model.F carbon_chem.F ocmip_abiotic_carbon_ini.F \

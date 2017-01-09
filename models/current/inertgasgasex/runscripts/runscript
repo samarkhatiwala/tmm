@@ -1,21 +1,59 @@
-mpiexec -np 2 ./tmminertgasgasex -numtracers 1 \
+## 365 days per year:
+mpiexec -np 2 ./tmminertgasgasex \
+  -numtracers 1 \
   -i Arini.petsc \
-  -me Ae -mi Ai -t0    0.0 -iter0 0 -deltat_clock 0.0013888888888889 -max_steps 720 -write_steps 720 \
+  -me Ae \
+  -mi Ai \
+  -t0 0.0 -iter0 0 \
+  -deltat_clock 0.0013698630136986 \
+  -max_steps 730 \
+  -write_steps 730 \
   -o Ar_0_1_1.petsc \
-  -external_forcing -use_profiles -biogeochem_deltat 43200.0 \
+  -external_forcing \
+  -use_profiles \
+  -biogeochem_deltat 43200.0 \
   -inert_gas_id 2 -flux_scaling 0.0,1.0,1.0 \
-  -periodic_matrix -matrix_cycle_period 1.0 -matrix_cycle_step 0.0833333333333333 \
-  -periodic_biogeochem_forcing -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_cycle_step 0.08333333333333 \
+  -periodic_matrix \
+  -matrix_cycle_period 1.0 -matrix_num_per_period 12 -matrix_periodic_times_file periodic_times_365d.bin \
+  -periodic_biogeochem_forcing \
+  -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_num_per_period 12 -periodic_biogeochem_periodic_times_file periodic_times_365d.bin \
+  -use_separate_winds \
+  -periodic_winds_cycle_period 1.0 -periodic_winds_num_per_period 1460 -periodic_winds_periodic_times_file periodic_times_6hourly.bin \
+  -time_avg -avg_start_time_step 1 -avg_time_steps -avg_time_steps 62,56,62,60,62,60,62,62,60,62,60,62 -avg_files Ar_0_1_1_avg.petsc \
+  -calc_diagnostics -diag_start_time_step 1 -diag_time_steps 62,56,62,60,62,60,62,62,60,62,60,62 \
+  > log
+
+## 360 days per year:
+mpiexec -np 2 ./tmminertgasgasex \
+  -numtracers 1 \
+  -i Arini.petsc \
+  -me Ae \
+  -mi Ai \
+  -t0 0.0 -iter0 0 \
+  -deltat_clock 0.0013888888888889 \
+  -max_steps 720 \
+  -write_steps 720 \
+  -o Ar_0_1_1.petsc \
+  -external_forcing \
+  -use_profiles \
+  -biogeochem_deltat 43200.0 \
+  -inert_gas_id 2 -flux_scaling 0.0,1.0,1.0 \
+  -periodic_matrix \
+  -matrix_cycle_period 1.0 -matrix_num_per_period 12 \
+  -periodic_biogeochem_forcing \
+  -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_num_per_period 12 \
+  -use_separate_winds \
+  -periodic_winds_cycle_period 1.0 -periodic_winds_num_per_period 1460 \
+  -time_avg -avg_start_time_step 1 -avg_time_steps -avg_time_steps 60 -avg_files Ar_0_1_1_avg.petsc \
+  -calc_diagnostics -diag_start_time_step 1 -diag_time_steps 60 \
    > log
+
+
 # driver options:
 #  I/O:
 #   -pickup_out pickup.petsc \
 #   -time_file output_time.txt \
-#  time averaging:
-#   -time_avg -avg_start_time_step 1 -avg_time_steps 60 -avg_files Ar_0_1_1_avg.petsc \
 #  circulation-specific options:
 #   add this option for configurations in which the forcing is rescaled because of a time-varying free surface:
 #    -rescale_forcing_file Rfs \
 # model-specific options:
-#  diagnostics:
-#   -calc_diagnostics -diag_start_time_step 1 -diag_time_steps 60 \

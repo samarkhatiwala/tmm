@@ -10,12 +10,14 @@
 #endif  
 
 ISEXTERN PetscBool averageCost; /* Evaluate misfit by annual averages? */
-ISEXTERN PetscInt costCount, costStartTimeStep, costNumTimeSteps;
+ISEXTERN StepTimer costTimer;
 ISEXTERN PetscScalar *localmbgc1, *localmbgc2, *localmbgc3; /* The pointers to the local model types */
 ISEXTERN Vec mbgc1,mbgc2,mbgc3,mbgc1avg,mbgc2avg,mbgc3avg; /* The individual model equivalents/misfits */
 ISEXTERN Vec obgc1,obgc2,obgc3; /* The observation arrays */
 ISEXTERN Vec cbgc1,cbgc2,cbgc3; /* The individual cost functions (e.g., RMS) */
 ISEXTERN Vec globVolFrac; /* volume of each box, as fraction of total volume */
+ISEXTERN Vec wbgc1,wbgc2,wbgc3; /* misfit weights for each individual box and tracer type*/
+ISEXTERN Vec w1,w2,w3; /* array to store overall weight in */
 ISEXTERN PetscScalar Gaveobgc1,Gaveobgc2,Gaveobgc3; /* global average observed PO4, O2, NO3, ... */
 ISEXTERN PetscScalar Gavembgc1,Gavembgc2,Gavembgc3; /* global average simulated PO4, O2, NO3, ... */
 ISEXTERN PetscScalar Gavecost1,Gavecost2,Gavecost3;  /* global cost function for PO4, O2, NO3 ... */

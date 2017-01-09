@@ -114,8 +114,8 @@ C BGC PARAMETERS FOR SURFACE OCEAN BIOLOGY
 ! Phytoplankton parameters
         TempB = 15.65d0 !ref. temperature for T-dependent growth
         ACmuphy = 0.6d0 !max. growth rate [1/day]
-        ACik = 24.0d0 !Light half-saturation constant [W/m2]
-        ACkpo4 = 0.5d0/rnp !half-saturation constant for PO4 uptake [mmol P/m3]
+        ACik = 9.653d0 !Light half-saturation constant [W/m2]
+        ACkpo4 = 0.4995d0 !half-saturation constant for PO4 uptake [mmol P/m3]
         ACkchl  = 0.03d0*rnp !att. of Phy [1/(m*mmol P/m3)]
         ACkw = 0.04d0 !attenuation of water [1/m]
         AClambda = 0.03d0      !exudation rate [1/day]
@@ -123,10 +123,10 @@ C BGC PARAMETERS FOR SURFACE OCEAN BIOLOGY
         plambda = 0.01d0 !phytoplankton mortality
 
 ! Zooplankton parameters
-        ACmuzoo=2.0d0 !max. grazing rate [1/d]
+        ACmuzoo=1.893d0 !max. grazing rate [1/d]
         ACkphy=SQRT(ACmuzoo/1.0d0)/rnp !zoo half-saturation constant [mmol P]
         AClambdaz=0.03d0 !zooplankton excretion [1/d]
-        AComniz=0.2d0*rnp !zooplankton mortality [m3/(mmol P * day)]
+        AComniz=4.548d0 !zooplankton mortality [m3/(mmol P * day)]
         ACeff=0.75d0 !assimilation efficiency
         zlambda=0.01d0 !zooplankton mortality
 

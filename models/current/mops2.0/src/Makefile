@@ -4,7 +4,12 @@ include ${PETSC_DIR}/lib/petsc/conf/petscvariables
 
 # Set compiler-dependent flags
 FPPFLAG=
-COMPILER=$(word 1,$(MPIFC_SHOW))
+ifeq ($(strip $(MPIFC_SHOW)),)
+	COMPILER=$(FC)
+else
+	COMPILER=$(word 1,$(MPIFC_SHOW))
+endif
+
 ifneq (,$(findstring ifort,$(COMPILER)))
 	FFLAGS+=-r8
 endif
@@ -30,8 +35,9 @@ SRC   = \
 	external_forcing_mops_biogeochem.c \
 	tmm_external_bc.c \
 	tmm_monitor.c \
-	tmm_misfit_mops.c \
-	tmm_profile_utils.c
+	misfit_mops_biogeochem.c \
+	tmm_profile_utils.c \
+	tmm_timer.c
 SRF   = \
 	BGC_MODEL.F \
 	BGC_INI.F \
