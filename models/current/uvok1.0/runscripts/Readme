@@ -1,0 +1,2 @@
+To use with a model with a different time step change dtts and dtnpzd in control.in 
+to match that time step.
