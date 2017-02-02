@@ -43,6 +43,7 @@ mpiexec -np 2 ./tmmmitgchemdic \
   -avg_files dicavg.petsc,alkavg.petsc,po4avg.petsc,dopavg.petsc,o2avg.petsc,feavg.petsc \
   -calc_diagnostics -diag_start_time_step 1 -diag_time_steps 60 \
   > log
+
 # driver options:
 #  I/O:
 #   -pickup_out pickup.petsc \

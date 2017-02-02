@@ -26,7 +26,6 @@ mpiexec -np 2 ./mops \
         -diag_files fbgc1.petsc,fbgc2.petsc,fbgc3.petsc,fbgc4.petsc,fbgc5.petsc,fbgc6.petsc,fbgc7.petsc \
         > log
 
-
 ## 360 days per year:
 mpiexec -np 2 ./mops \
         -numtracers 9 \

@@ -359,6 +359,8 @@ if useCoarseGrainedMatrix
 end
 
 if writeFiles
+  calc_periodic_times_for_tmm('monthly-365-day year','periodic_times_365d.bin');
+  calc_periodic_times_for_tmm('monthly-360-day year','periodic_times_360d.bin');  
 % Transport matrices
   if writeTMs
 %   Explicit transport matrix
