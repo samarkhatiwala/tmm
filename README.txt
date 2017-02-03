@@ -4,7 +4,7 @@ biogeochemical models (under models/) adapted to the TMM framework. The driver
 code and interface to models are written using the PETSc framework 
 (http://www.mcs.anl.gov/petsc/) but you don't need this code to use the TMM. 
 Simply skip to step (3) below. Otherwise keep reading and if you have any 
-questions feel free to email: Samar Khatiwala <samark@earth.ox.ac.uk>
+questions feel free to email: Samar Khatiwala <samar.khatiwala@earth.ox.ac.uk>
 
 For a quick overview of the TMM and the PETSc driver also have a look at this excellent 
 presentation by Iris Kriest: https://ftp.geomar.de/users/ikriest/TMM/MOPS-TMM-2016-June.pdf
@@ -21,12 +21,10 @@ http://kelvin.earth.ox.ac.uk/spk/Research/TMM/tmm_matlab_code.tar.gz
 choice: http://kelvin.earth.ox.ac.uk/spk/Research/TMM/TransportMatrixConfigs/
 Currently, there are 3 configurations of MITgcm available online (and several 
 others based on the UVic Earth System Model that I am happy to make available). 
-For each, download the TMs (e.g., MITgcm_ECCO.tar) and other associated data 
-(e.g., MITgcm_ECCO_model_data.tar). Unpack both. Then move the contents of the 
-second directory into that of the first. Make a note of the path to this directory 
-(e.g., /mydisk/somewhere/MITgcm_ECCO). We will need it later. For some experiments 
-you may also find it useful to download some miscellaneous data here (and adjust 
-paths accordingly in the provided Matlab scripts): 
+For each, download the TMs and other associated data (e.g., MITgcm_ECCO.tar). 
+Unpack. Make a note of the path to this directory (e.g., /mydisk/somewhere/MITgcm_ECCO). 
+We will need it later. For some experiments you may also find it useful to download 
+some miscellaneous data here (and adjust paths accordingly in the provided Matlab scripts): 
 http://kelvin.earth.ox.ac.uk/spk/Research/TMM/MiscData/
 
 4) Make a local directory and checkout the TMM driver and model codes:
