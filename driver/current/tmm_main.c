@@ -88,6 +88,7 @@ int main(int argc,char **args)
   char pickupoutFile[PETSC_MAX_PATH_LEN];  
   char outTimeFile[PETSC_MAX_PATH_LEN];  
   PetscBool appendOutput = PETSC_FALSE;
+  PetscFileMode OUTPUT_FILE_MODE;
   PetscBool doWriteBC = PETSC_FALSE;
   PetscBool doWriteUF = PETSC_FALSE;
   PetscBool doWriteUEF = PETSC_FALSE;
@@ -97,6 +98,10 @@ int main(int argc,char **args)
   char *avgOutFile[MAXNUMTRACERS];  
   Vec *vavg;
   PetscViewer fdavgout[MAXNUMTRACERS];
+  PetscBool avgAppendOutput = PETSC_FALSE;
+  PetscFileMode AVG_FILE_MODE;
+  FILE *avgfptime;
+  char avgOutTimeFile[PETSC_MAX_PATH_LEN];  
   char *bcavgOutFile[MAXNUMTRACERS];
   Vec *bcavg;
   PetscViewer fdbcavgout[MAXNUMTRACERS];
@@ -195,7 +200,31 @@ int main(int argc,char **args)
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Time averages will be written to:\n");CHKERRQ(ierr);
 	for (itr=0; itr<numTracers; itr++) {
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"   Tracer %d: %s\n", itr,avgOutFile[itr]);CHKERRQ(ierr);
-	}      
+	}
+
+	ierr = PetscOptionsHasName(PETSC_NULL,"-avg_append",&avgAppendOutput);CHKERRQ(ierr);
+	if (avgAppendOutput) {
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Time averages will be appended\n");CHKERRQ(ierr);
+	  AVG_FILE_MODE=FILE_MODE_APPEND;
+	} else {
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Time averages will overwrite existing file(s)\n");CHKERRQ(ierr);
+	  AVG_FILE_MODE=FILE_MODE_WRITE;
+	}
+
+/* Output times */
+	ierr = PetscOptionsGetString(PETSC_NULL,"-avg_time_file",avgOutTimeFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
+	if (!flg1) {
+	  strcpy(avgOutTimeFile,"");
+	  sprintf(avgOutTimeFile,"%s","time_average_output_time.txt");
+	}
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Time average output times will be written to %s\n",avgOutTimeFile);CHKERRQ(ierr);
+
+	if (!avgAppendOutput) {
+	  ierr = PetscFOpen(PETSC_COMM_WORLD,avgOutTimeFile,"w",&avgfptime);CHKERRQ(ierr);  
+	} else {
+	  ierr = PetscFOpen(PETSC_COMM_WORLD,avgOutTimeFile,"a",&avgfptime);CHKERRQ(ierr);  
+	}
+	
   }
   
 /* Initialize profile data and create template vector */
@@ -320,8 +349,10 @@ int main(int argc,char **args)
   ierr = PetscOptionsHasName(PETSC_NULL,"-append",&appendOutput);CHKERRQ(ierr);
   if (appendOutput) {
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Output will be appended\n");CHKERRQ(ierr);
+    OUTPUT_FILE_MODE=FILE_MODE_APPEND;
   } else {
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Output will overwrite existing file(s)\n");CHKERRQ(ierr);
+    OUTPUT_FILE_MODE=FILE_MODE_WRITE;
   }    
 
 /* Output times */
@@ -842,87 +873,69 @@ int main(int argc,char **args)
 
 /* Open files for output and optionally write initial conditions */
 #if !defined (FORSPINUP) && !defined (FORJACOBIAN)
+  for (itr=0; itr<numTracers; itr++) {       
+	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,outFile[itr],OUTPUT_FILE_MODE,&fdout[itr]);CHKERRQ(ierr);
+  }
+
+  if (doWriteUF) {
+/*  We only open files here since uf may not yet have been updated */
+	for (itr=0; itr<numTracers; itr++) {
+	  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,ufoutFile[itr],OUTPUT_FILE_MODE,&fdufout[itr]);CHKERRQ(ierr);
+	}
+  }
+
+  if (doWriteUEF) {
+/*  We only open files here since uef may not yet have been updated */
+	for (itr=0; itr<numTracers; itr++) {
+	  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,uefoutFile[itr],OUTPUT_FILE_MODE,&fduefout[itr]);CHKERRQ(ierr);
+	}
+  }
+    
+  if (doWriteBC) {
+/*  We only open files here since BCs may not yet have been computed */
+	for (itr=0; itr<numTracers; itr++) {
+	  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,bcoutFile[itr],OUTPUT_FILE_MODE,&fdbcout[itr]);CHKERRQ(ierr);
+	}
+  }
+
   if (!appendOutput) {
     ierr = PetscFOpen(PETSC_COMM_WORLD,outTimeFile,"w",&fptime);CHKERRQ(ierr);  
     ierr = PetscFPrintf(PETSC_COMM_WORLD,fptime,"%d   %10.5f\n",Iter0,time0);CHKERRQ(ierr);     
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing output at time %10.5f, step %d\n", time0,Iter0);CHKERRQ(ierr);  
     for (itr=0; itr<numTracers; itr++) {       
-      ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,outFile[itr],FILE_MODE_WRITE,&fdout[itr]);CHKERRQ(ierr);
       ierr = VecView(v[itr],fdout[itr]);CHKERRQ(ierr);
-    }
-
-    if (doWriteUF) {
-/*    We only open files here since uf may not yet have been updated */
-	  for (itr=0; itr<numTracers; itr++) {
-		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,ufoutFile[itr],FILE_MODE_WRITE,&fdufout[itr]);CHKERRQ(ierr);
-	  }
-    }
-
-    if (doWriteUEF) {
-/*    We only open files here since uef may not yet have been updated */
-	  for (itr=0; itr<numTracers; itr++) {
-		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,uefoutFile[itr],FILE_MODE_WRITE,&fduefout[itr]);CHKERRQ(ierr);
-	  }
-    }
-    
-    if (doWriteBC) {
-/*    We only open files here since BCs may not yet have been computed */
-	  for (itr=0; itr<numTracers; itr++) {
-		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,bcoutFile[itr],FILE_MODE_WRITE,&fdbcout[itr]);CHKERRQ(ierr);
-	  }
     }
   } else {
 	  ierr = PetscFOpen(PETSC_COMM_WORLD,outTimeFile,"a",&fptime);CHKERRQ(ierr);  
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Opening file(s) for output. Initial condition will NOT be written\n");CHKERRQ(ierr);  
-      for (itr=0; itr<numTracers; itr++) {       
-        ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,outFile[itr],FILE_MODE_APPEND,&fdout[itr]);CHKERRQ(ierr);
-      }
-
-      if (doWriteUF) {
-		for (itr=0; itr<numTracers; itr++) {
-		  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,ufoutFile[itr],FILE_MODE_APPEND,&fdufout[itr]);CHKERRQ(ierr);
-		}
-      }  
-
-      if (doWriteUEF) {
-		for (itr=0; itr<numTracers; itr++) {
-		  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,uefoutFile[itr],FILE_MODE_APPEND,&fduefout[itr]);CHKERRQ(ierr);
-		}
-      }  
-      
-      if (doWriteBC) {
-		for (itr=0; itr<numTracers; itr++) {
-		  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,bcoutFile[itr],FILE_MODE_APPEND,&fdbcout[itr]);CHKERRQ(ierr);
-		}
-      }  
   }
 #endif
 
   if (doTimeAverage) {  
-    ierr = VecDuplicateVecs(templateVec,numTracers,&vavg);CHKERRQ(ierr);  
+    ierr = VecDuplicateVecs(templateVec,numTracers,&vavg);CHKERRQ(ierr);
 	for (itr=0; itr<numTracers; itr++) {
 	  ierr = VecSet(vavg[itr],zero); CHKERRQ(ierr);
-      ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,avgOutFile[itr],FILE_MODE_WRITE,&fdavgout[itr]);CHKERRQ(ierr);
+      ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,avgOutFile[itr],AVG_FILE_MODE,&fdavgout[itr]);CHKERRQ(ierr);
     }
 	if (doWriteUF) {
       ierr = VecDuplicateVecs(templateVec,numTracers,&ufavg);CHKERRQ(ierr);  	
 	  for (itr=0; itr<numTracers; itr++) {
 		ierr = VecSet(ufavg[itr],zero); CHKERRQ(ierr);
-		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,ufavgOutFile[itr],FILE_MODE_WRITE,&fdufavgout[itr]);CHKERRQ(ierr);
+		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,ufavgOutFile[itr],AVG_FILE_MODE,&fdufavgout[itr]);CHKERRQ(ierr);
 	  }
 	}
 	if (doWriteUEF) {
       ierr = VecDuplicateVecs(templateVec,numTracers,&uefavg);CHKERRQ(ierr);  	
 	  for (itr=0; itr<numTracers; itr++) {
 		ierr = VecSet(uefavg[itr],zero); CHKERRQ(ierr);
-		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,uefavgOutFile[itr],FILE_MODE_WRITE,&fduefavgout[itr]);CHKERRQ(ierr);
+		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,uefavgOutFile[itr],AVG_FILE_MODE,&fduefavgout[itr]);CHKERRQ(ierr);
 	  }
 	}
 	if (doWriteBC) {
       ierr = VecDuplicateVecs(bcTemplateVec,numTracers,&bcavg);CHKERRQ(ierr);  	
 	  for (itr=0; itr<numTracers; itr++) {
 		ierr = VecSet(bcavg[itr],zero); CHKERRQ(ierr);
-		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,bcavgOutFile[itr],FILE_MODE_WRITE,&fdbcavgout[itr]);CHKERRQ(ierr);
+		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,bcavgOutFile[itr],AVG_FILE_MODE,&fdbcavgout[itr]);CHKERRQ(ierr);
 	  }
 	}    
 //     avgTimer.count=0;
@@ -1265,8 +1278,9 @@ int main(int argc,char **args)
 		  }	
 		  avgTimer.count++;
         }
-        if (avgTimer.count==avgTimer.numTimeSteps) { /* time to write averages to file */
-          ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing time average at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);                      
+        if (avgTimer.count==avgTimer.numTimeSteps) { /* time to write averages to file */        
+          ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing time average at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+		  ierr = PetscFPrintf(PETSC_COMM_WORLD,avgfptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);
 		  for (itr=0; itr<numTracers; itr++) {
 			ierr = VecScale(vavg[itr],1.0/avgTimer.count);CHKERRQ(ierr);
             ierr = VecView(vavg[itr],fdavgout[itr]);CHKERRQ(ierr);
@@ -1327,6 +1341,7 @@ int main(int argc,char **args)
 #endif
 
   if (doTimeAverage) {
+	ierr = PetscFClose(PETSC_COMM_WORLD,avgfptime);CHKERRQ(ierr);
 	for (itr=0; itr<numTracers; itr++) {
 	  ierr = PetscViewerDestroy(&fdavgout[itr]);CHKERRQ(ierr);
 	}
