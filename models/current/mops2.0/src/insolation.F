@@ -5,7 +5,7 @@ CBOP
 C !ROUTINE: INSOL
 
 C !INTERFACE: ==========================================================
-      SUBROUTINE insolation(N,Time,Yc,sfac,stau)
+      SUBROUTINE insolation(N,Time,Yc,daysperyear,sfac,stau)
 
 C !DESCRIPTION:
 C find shortwave radiation as function of date and latitude
@@ -20,6 +20,7 @@ C !INPUT PARAMETERS: ===================================================
 C time                 :: current time
        integer N
        real*8 time,Yc(N)
+       real*8 daysperyear
 
 C !OUPUT PARAMETERS: ===================================================
        real*8 sfac(N),stau(N)
@@ -39,8 +40,8 @@ C      par = 0.4       !photosynthetically reactive frac
 
 c
 c find day (****NOTE for year starting in winter*****)
-        dayfrac=mod(Time,360.d0 *86400.d0)
-     &                    /(360.d0 *86400.d 0)          !fraction of year
+        dayfrac=mod(Time,daysperyear*86400.d0)
+     &                    /(daysperyear*86400.d 0)          !fraction of year
         yday = 2.0*3.1416*dayfrac                         !convert to radians
         delta = (0.006918 - (0.399912*cos(yday))      !cosine zenith angle
      &          +(0.070257*sin(yday))                 !(paltridge+platt)

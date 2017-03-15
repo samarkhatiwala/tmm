@@ -4,7 +4,7 @@
 extern void mops_biogeochem_copy_data_(PetscInt *nzloc, PetscInt *itr, PetscScalar localTR[], PetscScalar localJTR[], 
                                 PetscScalar *DeltaT, PetscInt *direction);
 
-extern void insolation_(PetscInt *N, PetscScalar *myTime, PetscScalar locallatitude[], PetscScalar localswrad[], PetscScalar localstau[]);
+extern void insolation_(PetscInt *N, PetscScalar *myTime, PetscScalar locallatitude[], PetscScalar *daysperyear, PetscScalar localswrad[], PetscScalar localstau[]);
 
 extern void mops_biogeochem_ini_(PetscInt *Nrloc, PetscScalar *DeltaT, 
 #ifdef CARBON                      
