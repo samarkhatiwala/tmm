@@ -112,7 +112,10 @@ PetscInt itfC14 = -1;
 
 PetscBool calcDiagnostics = PETSC_FALSE;
 StepTimer diagTimer;
-PetscBool appendDiagnostics = PETSC_FALSE;
+PetscBool diagAppendOutput = PETSC_FALSE;
+PetscFileMode DIAG_FILE_MODE;
+FILE *diagfptime;
+char diagOutTimeFile[PETSC_MAX_PATH_LEN];
 PetscScalar *localpco2diag, *localpco2diagavg;
 PetscScalar *localgasexfluxdiag, *localgasexfluxdiagavg, *localtotfluxdiag, *localtotfluxdiagavg;
 PetscScalar *localc14gasexfluxdiag, *localc14gasexfluxdiagavg, *localc14totfluxdiag, *localc14totfluxdiagavg;
@@ -535,6 +538,29 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed starting at (and including) time step: %d\n", diagTimer.startTimeStep);CHKERRQ(ierr);	
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed over %d time steps\n", diagTimer.numTimeSteps);CHKERRQ(ierr);	
 
+	ierr = PetscOptionsHasName(PETSC_NULL,"-diag_append",&diagAppendOutput);CHKERRQ(ierr);
+	if (diagAppendOutput) {
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostic output will be appended\n");CHKERRQ(ierr);
+	  DIAG_FILE_MODE=FILE_MODE_APPEND;
+	} else {
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostic output will overwrite existing file(s)\n");CHKERRQ(ierr);
+	  DIAG_FILE_MODE=FILE_MODE_WRITE;
+	}
+
+/* Output times */
+	ierr = PetscOptionsGetString(PETSC_NULL,"-diag_time_file",diagOutTimeFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+	if (!flg) {
+	  strcpy(diagOutTimeFile,"");
+	  sprintf(diagOutTimeFile,"%s","diagnostic_output_time.txt");
+	}
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostic output times will be written to %s\n",diagOutTimeFile);CHKERRQ(ierr);
+
+	if (!diagAppendOutput) {
+	  ierr = PetscFOpen(PETSC_COMM_WORLD,diagOutTimeFile,"w",&diagfptime);CHKERRQ(ierr);  
+	} else {
+	  ierr = PetscFOpen(PETSC_COMM_WORLD,diagOutTimeFile,"a",&diagfptime);CHKERRQ(ierr);  
+	}
+
     ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localpco2diagavg);CHKERRQ(ierr);  
 
     ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localgasexfluxdiag);CHKERRQ(ierr);  
@@ -546,7 +572,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localc14gasexfluxdiag);CHKERRQ(ierr);  
     ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localc14gasexfluxdiagavg);CHKERRQ(ierr);  
     ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localc14totfluxdiag);CHKERRQ(ierr);  
-    ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localc14totfluxdiagavg);CHKERRQ(ierr);  
+    ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localc14totfluxdiagavg);CHKERRQ(ierr);
 #endif
 
     for (ip=0; ip<lNumProfiles; ip++) {
@@ -568,6 +594,8 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     ierr = VecDuplicate(DIC,&Rocn);CHKERRQ(ierr);
     ierr = VecDuplicate(DIC,&Rocnavg);CHKERRQ(ierr);
     ierr = VecSet(Rocnavg,zero); CHKERRQ(ierr);        
+    /* Open file here for subsequent output */
+	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Rocn.petsc",DIAG_FILE_MODE,&fdrocn);CHKERRQ(ierr);    
 #endif      
 
     if (useAtmModel) {
@@ -867,7 +895,8 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
 	  }
 
 	  if (diagTimer.count==diagTimer.numTimeSteps) { /* time to write averages to file */
-		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing diagnostics time average at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);                      
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing diagnostics time average at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+		ierr = PetscFPrintf(PETSC_COMM_WORLD,diagfptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
 
         for (ip=0; ip<lNumProfiles; ip++) {
           localpco2diagavg[ip]=localpco2diagavg[ip]/diagTimer.count;
@@ -883,34 +912,32 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
         ierr = VecScale(Rocnavg,1.0/diagTimer.count);CHKERRQ(ierr);
 #endif
 
-        ierr = writeProfileSurfaceScalarData("pCO2_surf.bin",localpco2diagavg,1,appendDiagnostics);  		
-        ierr = writeProfileSurfaceScalarData("gasexflux_surf.bin",localgasexfluxdiagavg,1,appendDiagnostics);  		
-        ierr = writeProfileSurfaceScalarData("totalflux_surf.bin",localtotfluxdiagavg,1,appendDiagnostics);  		
+        ierr = writeProfileSurfaceScalarData("pCO2_surf.bin",localpco2diagavg,1,diagAppendOutput);  		
+        ierr = writeProfileSurfaceScalarData("gasexflux_surf.bin",localgasexfluxdiagavg,1,diagAppendOutput);  		
+        ierr = writeProfileSurfaceScalarData("totalflux_surf.bin",localtotfluxdiagavg,1,diagAppendOutput);  		
 #ifdef ALLOW_C14
-        ierr = writeProfileSurfaceScalarData("c14gasexflux_surf.bin",localc14gasexfluxdiagavg,1,appendDiagnostics);  		
-        ierr = writeProfileSurfaceScalarData("c14totalflux_surf.bin",localc14totfluxdiagavg,1,appendDiagnostics);  		
-        if (!appendDiagnostics) {
-          ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Rocn.petsc",FILE_MODE_WRITE,&fdrocn);CHKERRQ(ierr);
-        }
+        ierr = writeProfileSurfaceScalarData("c14gasexflux_surf.bin",localc14gasexfluxdiagavg,1,diagAppendOutput);  		
+        ierr = writeProfileSurfaceScalarData("c14totalflux_surf.bin",localc14totfluxdiagavg,1,diagAppendOutput);  		
         ierr = VecView(Rocnavg,fdrocn);CHKERRQ(ierr);
 #endif		  
         if (useAtmModel) {
           pCO2atmavg=pCO2atmavg/diagTimer.count;
           Foceanavg=Foceanavg/diagTimer.count;   
-          ierr = writeBinaryScalarData("pCO2atm_avg.bin",&pCO2atmavg,1,appendDiagnostics);  		
-          ierr = writeBinaryScalarData("Focean_avg.bin",&Foceanavg,1,appendDiagnostics);  		
+          ierr = writeBinaryScalarData("pCO2atm_avg.bin",&pCO2atmavg,1,diagAppendOutput);  		
+          ierr = writeBinaryScalarData("Focean_avg.bin",&Foceanavg,1,diagAppendOutput);  		
 
 		  if (useLandModel) {
 			Flandavg=Flandavg/diagTimer.count;        
 			landStateavg[0]=landStateavg[0]/diagTimer.count;
 			landStateavg[1]=landStateavg[1]/diagTimer.count;
 			landStateavg[2]=landStateavg[2]/diagTimer.count;           
-			ierr = writeBinaryScalarData("Fland_avg.bin",&Flandavg,1,appendDiagnostics);  		
-			ierr = writeBinaryScalarData("land_state_avg.bin",landStateavg,3,appendDiagnostics);
+			ierr = writeBinaryScalarData("Fland_avg.bin",&Flandavg,1,diagAppendOutput);  		
+			ierr = writeBinaryScalarData("land_state_avg.bin",landStateavg,3,diagAppendOutput);
 		  }          
         }
 
-        appendDiagnostics=PETSC_TRUE;
+		diagAppendOutput=PETSC_TRUE;
+		DIAG_FILE_MODE=FILE_MODE_APPEND;
 
 /*      reset diagnostic arrays */
         for (ip=0; ip<lNumProfiles; ip++) {
@@ -995,6 +1022,7 @@ PetscErrorCode finalizeExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt n
   }
 
   if (calcDiagnostics) {      
+	ierr = PetscFClose(PETSC_COMM_WORLD,diagfptime);CHKERRQ(ierr);  	    
 #ifdef ALLOW_C14  
     ierr = VecDestroy(&Rocn);CHKERRQ(ierr);
     ierr = VecDestroy(&Rocnavg);CHKERRQ(ierr);    
