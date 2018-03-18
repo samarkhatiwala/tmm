@@ -19,7 +19,9 @@ useAtmModel=0
 useLandModel=0
 useEmissions=0
 %
+pCO2atm=278;
 useTimeVaryingPrescribedCO2=1
+spatiallyVariableCO2=0 % you must add code below for this
 doC14calc=1
 % iniConditionFile='preindustrial_steady_state_dic'
 useVirtualFlux=0
@@ -447,9 +449,20 @@ if writeFiles
   if ~useAtmModel 
     if useTimeVaryingPrescribedCO2
 	  write_binary('TpCO2.bin',length(Tco2),'int')  
-	  write_binary('TpCO2.bin',Tco2,'real*8',1)    
+	  write_binary('TpCO2.bin',Tco2,'real*8',1)
+	  if spatiallyVariableCO2
+%       This is placeholder code: change this to suit your problem
+		pCO2atm=repmat(pCO2atm,[1 nbb]);
+		pCO2atm=pCO2atm';
+	  end	
       write_binary('pCO2atm.bin',pCO2atm,'real*8')
-    end
+    else
+      if spatiallyVariableCO2
+%       This is placeholder code: change this to suit your problem      
+		pCO2atmb=repmat(pCO2atm,[nbb 1]);
+		write_binary('pCO2atm.bin',pCO2atm,'real*8')
+	  end	
+    end    
 	if doC14calc
 	  write_binary('DC14atm.bin',DC14atmb,'real*8')  
 	  if useTimeVaryingPrescribedCO2

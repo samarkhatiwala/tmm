@@ -49,7 +49,7 @@ PeriodicArray localuwindp, localvwindp;
 // PetscInt numWindsPeriods;
 // PetscScalar *tdpWinds; /* arrays for periodic forcing */
 // PetscScalar windsCyclePeriod, windsCycleStep;
-PetscScalar pistonVelocity=0.31; /* default piston velocity when using winds [cm/hr] */
+PetscScalar pistonVelocityCoeff=0.31; /* default piston velocity coefficient when using winds [cm/hr]*[s^2/m^2] */
 
 PetscBool useLinearChemistry = PETSC_FALSE;
 PetscScalar *linearChemistryFactor, *linearChemistryCO2, *linearChemistryDIC;
@@ -69,6 +69,9 @@ PetscInt numpCO2atm_hist = 0;
 PetscScalar *TpCO2atm_hist, *pCO2atm_hist;
 PetscBool fixedAtmosCO2 = PETSC_TRUE;
 char pCO2atmIniFile[PETSC_MAX_PATH_LEN];  
+PetscScalar *localpCO2atm, *localpCO2atm0, *localpCO2atm1;
+PetscBool spatiallyVariableCO2 = PETSC_FALSE;
+PetscInt itfCO2 = -1;
 
 /* Land/Atm model variables */
 PetscBool useAtmModel = PETSC_FALSE;
@@ -319,9 +322,16 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Using prescribed atmospheric pCO2\n");CHKERRQ(ierr);
 
     /* prescribed atmospheric CO2 */
-  	maxValsToRead = 2;
+	ierr = PetscOptionsHasName(PETSC_NULL,"-spatially_variable_atmospheric_co2",&spatiallyVariableCO2);CHKERRQ(ierr);
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Spatially-variable atmospheric pCO2 has been specified\n");CHKERRQ(ierr);      
+    
+    if (spatiallyVariableCO2) {
+	  ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localpCO2atm);CHKERRQ(ierr);    
+    }
+    
 	pCO2atmFiles[0] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* time file */
 	pCO2atmFiles[1] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* atmospheric pCO2 history file */
+  	maxValsToRead = 2;
     ierr = PetscOptionsGetStringArray(PETSC_NULL,"-pco2atm_history",pCO2atmFiles,&maxValsToRead,&flg);CHKERRQ(ierr);
     if (flg) { /* Read atmospheric pCO2 history */
       if (maxValsToRead != 2) {
@@ -338,26 +348,44 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
       ierr = PetscBinaryRead(fp,TpCO2atm_hist,numpCO2atm_hist,PETSC_SCALAR);CHKERRQ(ierr);
 	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
       /* read atmospheric pCO2 data */
-	  ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,pCO2atmFiles[1],FILE_MODE_READ,&fd);CHKERRQ(ierr);
-	  ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-      ierr = PetscMalloc(numpCO2atm_hist*sizeof(PetscScalar),&pCO2atm_hist);CHKERRQ(ierr); 
-      ierr = PetscBinaryRead(fp,pCO2atm_hist,numpCO2atm_hist,PETSC_SCALAR);CHKERRQ(ierr);
-	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
-      
-      pCO2atm = pCO2atm_hist[0];
-
-    }	else {
-      ierr = PetscOptionsGetReal(PETSC_NULL,"-pco2atm",&pCO2atm,&flg);CHKERRQ(ierr); /* overwrite default value */
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Using fixed atmospheric pCO2 of %g ppm\n",pCO2atm);CHKERRQ(ierr);
-      
+      if (spatiallyVariableCO2) {
+		ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localpCO2atm0);CHKERRQ(ierr);  
+		ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localpCO2atm1);CHKERRQ(ierr);  
+		ierr = readProfileSurfaceScalarData(pCO2atmFiles[1],localpCO2atm,1); /* read initial slice */ 
+		itfCO2=-1;      
+      } else {
+		ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,pCO2atmFiles[1],FILE_MODE_READ,&fd);CHKERRQ(ierr);
+		ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+		ierr = PetscMalloc(numpCO2atm_hist*sizeof(PetscScalar),&pCO2atm_hist);CHKERRQ(ierr); 
+		ierr = PetscBinaryRead(fp,pCO2atm_hist,numpCO2atm_hist,PETSC_SCALAR);CHKERRQ(ierr);
+		ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+	  
+		pCO2atm = pCO2atm_hist[0];
+      }
+    } else {
+      if (spatiallyVariableCO2) {
+		ierr = PetscOptionsGetString(PETSC_NULL,"-pco2atm",pCO2atmFiles[1],PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
+		if (flg1) {
+  		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading spatially-variable fixed atmospheric pCO2\n");CHKERRQ(ierr);		
+		  ierr = readProfileSurfaceScalarData(pCO2atmFiles[1],localpCO2atm,1);  
+		} else {
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Warning: no atmospheric pCO2 file given! Using a fixed, uniform value of %g ppm\n",pCO2atm);CHKERRQ(ierr);
+		  for (ip=0; ip<lNumProfiles; ip++) {
+			localpCO2atm[ip]=pCO2atm;
+		  }
+		}      
+      } else {
+		ierr = PetscOptionsGetReal(PETSC_NULL,"-pco2atm",&pCO2atm,&flg);CHKERRQ(ierr); /* overwrite default value */
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Using fixed atmospheric pCO2 of %g ppm\n",pCO2atm);CHKERRQ(ierr);
+      }    
     }    
 
 #ifdef ALLOW_C14
     /* prescribed atmospheric DeltaC14 */
 	ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localDC14atm);CHKERRQ(ierr);
-  	maxValsToRead = 2;
 	C14atmFiles[0] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* time file */
 	C14atmFiles[1] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* atmospheric DeltaC14 history file */
+  	maxValsToRead = 2;
     ierr = PetscOptionsGetStringArray(PETSC_NULL,"-c14atm_history",C14atmFiles,&maxValsToRead,&flg);CHKERRQ(ierr);
     if (flg) { /* Read atmospheric C14 history */
       if (maxValsToRead != 2) {
@@ -411,9 +439,9 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     ierr = PetscOptionsHasName(PETSC_NULL,"-use_winds",&useWinds);CHKERRQ(ierr);
     if (useWinds) {
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Periodic winds specified: gas transfer velocity will be computed using winds\n");CHKERRQ(ierr);      
-      ierr = PetscOptionsGetReal(PETSC_NULL,"-piston_velocity",&pistonVelocity,&flg);CHKERRQ(ierr); /* overwrite default value */
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Piston velocity of %10.5f cm/hr will be used\n", pistonVelocity);CHKERRQ(ierr);      
-      pistonVelocity = pistonVelocity*0.01/3600.0; /* convert cm/hr to m/s */
+      ierr = PetscOptionsGetReal(PETSC_NULL,"-piston_velocity_coeff",&pistonVelocityCoeff,&flg);CHKERRQ(ierr); /* overwrite default value */
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"Piston velocity coefficient of %10.5f [cm/hr]*[s^2/m^2] will be used\n", pistonVelocityCoeff);CHKERRQ(ierr);      
+      pistonVelocityCoeff = pistonVelocityCoeff*0.01/3600.0; /* convert [cm/hr]*[s^2/m^2] to [m/s]*[s^2/m^2] */
       ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localuwind);CHKERRQ(ierr);    
       localuwindp.firstTime = PETSC_TRUE;
       localuwindp.arrayLength = lNumProfiles;    
@@ -659,7 +687,7 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
       for (ip=0; ip<lNumProfiles; ip++) {
         kl=lStartIndices[ip];
         w2 = pow(localuwind[ip],2) + pow(localvwind[ip],2);
-        Vgas660 = (1.0-localfice[ip])*pistonVelocity*w2;
+        Vgas660 = (1.0-localfice[ip])*pistonVelocityCoeff*w2;
         Sc = 2073.1 - 125.62*localTs[kl] + 3.6276*pow(localTs[kl],2) - 0.043219*pow(localTs[kl],3);
         localVgas[ip]=Vgas660/sqrt(Sc/660.0);
       }                                                      
@@ -697,13 +725,32 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
   } else {  
 /* Interpolate atmospheric pCO2   */
     if (!fixedAtmosCO2) { 
-      if (tc>=TpCO2atm_hist[0]) {
-        ierr = calcInterpFactor(numpCO2atm_hist,tc,TpCO2atm_hist,&itf,&alpha); CHKERRQ(ierr);
-        pCO2atm = alpha*pCO2atm_hist[itf] + (1.0-alpha)*pCO2atm_hist[itf+1];	  
+      if (spatiallyVariableCO2) {
+		if (tc>=TpCO2atm_hist[0]) {
+		  ierr = calcInterpFactor(numpCO2atm_hist,tc,TpCO2atm_hist,&itf,&alpha); CHKERRQ(ierr);
+		  if (itf != itfCO2) { /* time to read new bracketing slices: itf uses 0-based, while readProfileSurfaceScalarDataRecord uses 1-based indexing*/
+			ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading new bracketing slices for pCO2atm at time = %g: %d and %d\n",tc,itf+1,itf+2);CHKERRQ(ierr);        
+			ierr = readProfileSurfaceScalarDataRecord(pCO2atmFiles[1],localpCO2atm0,1,itf+1);
+			ierr = readProfileSurfaceScalarDataRecord(pCO2atmFiles[1],localpCO2atm1,1,itf+2);
+			itfCO2=itf;
+		  }
+/*        interpolate in time */
+		  for (ip=0; ip<lNumProfiles; ip++) {
+			localpCO2atm[ip] = alpha*localpCO2atm0[ip] + (1.0-alpha)*localpCO2atm1[ip];	          
+		  }        
+		} else {
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Warning: time < %10.5f. Assuming pCO2atm fixed at initial value\n",TpCO2atm_hist[0]);CHKERRQ(ierr);
+		}      
       } else {
-        ierr = PetscPrintf(PETSC_COMM_WORLD,"Warning: time < %10.5f. Assuming pCO2atm=%g\n",TpCO2atm_hist[0],pCO2atm);CHKERRQ(ierr);
-      }
+		if (tc>=TpCO2atm_hist[0]) {
+		  ierr = calcInterpFactor(numpCO2atm_hist,tc,TpCO2atm_hist,&itf,&alpha); CHKERRQ(ierr);
+		  pCO2atm = alpha*pCO2atm_hist[itf] + (1.0-alpha)*pCO2atm_hist[itf+1];	  
+		} else {
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Warning: time < %10.5f. Assuming pCO2atm=%g\n",TpCO2atm_hist[0],pCO2atm);CHKERRQ(ierr);
+		}
+	  }	
     }  
+    
 #ifdef ALLOW_C14
     if (!fixedAtmosC14) { 
       if (tc>=TC14atm_hist[0]) {
@@ -744,6 +791,8 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
   for (ip=0; ip<lNumProfiles; ip++) {
     kl=lStartIndices[ip];
     nzloc=lProfileLength[ip];
+    
+    if (spatiallyVariableCO2) pCO2atm = localpCO2atm[ip];
     
 	if (!useVirtualFlux) { /* use the local surface value to calculate E-P contribution */
       DICemp=localDIC[kl];
