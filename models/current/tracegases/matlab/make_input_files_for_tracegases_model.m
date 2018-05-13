@@ -7,7 +7,11 @@ base_path='/data2/spk/TransportMatrixConfigs/MITgcm_2.8deg';
 gasID='CFC11';
 
 periodicForcing=1
+timeDependentForcing=0
+numForcingMats=4020
+Ttd0=1765
 periodicMatrix=1
+timeDependentMatrix=0
 
 dt=43200; % time step to use
 
@@ -222,42 +226,57 @@ if useVirtualFlux
   volFracSurf(Ib)=volb(Ib)/sum(volb(Ib));  
 end
 
-if gasExchangeType==1
-% Compute gas exchange velocity/exchange coefficient using OCMIP data/protocol
-  if periodicForcing
-	xkwb=load_ocmip_variable([],'XKW',Xboxnom(Ib),Yboxnom(Ib));
- 	ficeb=load_ocmip_variable([],'FICE',Xboxnom(Ib),Yboxnom(Ib));
-    ficeb(ficeb<0.2)=0; % OCMIP-2 howto 	
-  else 
-    Vgas660=calc_ocmip_piston_velocity([],Xboxnom(Ib),Yboxnom(Ib),Theta(Ib,:));
-  end
-  atmospb=load_ocmip_variable([],'P',Xboxnom(Ib),Yboxnom(Ib));  
-elseif gasExchangeType==2
-% Compute gas exchange velocity online from winds
-  [u10b,Tcore,lon,lat]=load_core_variable(fullfile(corePath,'u_10.15JUNE2009.nc'),'U_10_MOD',Xboxnom(Ib),Yboxnom(Ib));
-  [v10b,Tcore,lon,lat]=load_core_variable(fullfile(corePath,'v_10.15JUNE2009.nc'),'V_10_MOD',Xboxnom(Ib),Yboxnom(Ib));
-  ficeb=load_ocmip_variable([],'FICE',Xboxnom(Ib),Yboxnom(Ib));
-  ficeb(ficeb<0.2)=0; % OCMIP-2 howto  
-  atmospb=load_ocmip_variable([],'P',Xboxnom(Ib),Yboxnom(Ib));    
-elseif gasExchangeType==3
-% Compute gas exchange velocity online from model winds
-  load(iceFile,'Fice')
-  load(atmospFile,'atmospress')  
-  if ~isempty(uwindFile)
-	load(uwindFile,'uwind')
-	load(vwindFile,'vwind')
-  else  
-	load(windFile,'windspeed')
-%   fake it
-    uwind=windspeed;
-    vwind=zeros(size(windspeed));
-  end  
-  u10b=gridToMatrix(uwind,Ib,boxFile,gridFile,1);
-  v10b=gridToMatrix(vwind,Ib,boxFile,gridFile,1);  
-  ficeb=gridToMatrix(Fice,Ib,boxFile,gridFile,1);
-  atmospb=gridToMatrix(atmospress,Ib,boxFile,gridFile,1);
-else
-  error('ERROR: Unknown option for gas exchange')
+% surface T and S (note: we do this here as the full 3-d salinity is needed above)
+Thetas=Theta(Ib,:);
+Salts=Salt(Ib,:);
+
+clear Theta Salt % make some space
+
+switch gasExchangeType
+  case (1)
+%   Compute gas exchange velocity/exchange coefficient using OCMIP data/protocol
+	if periodicForcing
+	  xkwb=load_ocmip_variable([],'XKW',Xboxnom(Ib),Yboxnom(Ib));
+	  ficeb=load_ocmip_variable([],'FICE',Xboxnom(Ib),Yboxnom(Ib));
+	  ficeb(ficeb<0.2)=0; % OCMIP-2 howto 	
+	else 
+	  Vgas660=calc_ocmip_piston_velocity([],Xboxnom(Ib),Yboxnom(Ib),Thetas);
+	end
+	atmospb=load_ocmip_variable([],'P',Xboxnom(Ib),Yboxnom(Ib));  
+  case (2)
+%   Compute gas exchange velocity online from CORE winds and OCMIP fields
+	[u10b,Tcore,lon,lat]=load_core_variable(fullfile(corePath,'u_10.15JUNE2009.nc'),'U_10_MOD',Xboxnom(Ib),Yboxnom(Ib));
+	[v10b,Tcore,lon,lat]=load_core_variable(fullfile(corePath,'v_10.15JUNE2009.nc'),'V_10_MOD',Xboxnom(Ib),Yboxnom(Ib));
+	ficeb=load_ocmip_variable([],'FICE',Xboxnom(Ib),Yboxnom(Ib));
+	ficeb(ficeb<0.2)=0; % OCMIP-2 howto  
+	atmospb=load_ocmip_variable([],'P',Xboxnom(Ib),Yboxnom(Ib));    
+  case (3)
+%   Compute gas exchange velocity online from model winds and fields
+	load(iceFile,'Fice')
+	load(atmospFile,'atmospress')  
+	if ~isempty(uwindFile)
+	  load(uwindFile,'uwind')
+	  load(vwindFile,'vwind')
+	else  
+	  load(windFile,'windspeed')
+%     fake it
+	  uwind=windspeed;
+	  vwind=zeros(size(windspeed));
+	end  
+	u10b=gridToMatrix(uwind,Ib,boxFile,gridFile,1);
+	v10b=gridToMatrix(vwind,Ib,boxFile,gridFile,1);  
+	ficeb=gridToMatrix(Fice,Ib,boxFile,gridFile,1);
+	atmospb=gridToMatrix(atmospress,Ib,boxFile,gridFile,1);
+  case (4)
+%   Compute gas exchange velocity online from CORE winds and model fields
+	load(iceFile,'Fice')
+	[u10b,Tcore,lon,lat]=load_core_variable(fullfile(corePath,'u_10.15JUNE2009.nc'),'U_10_MOD',Xboxnom(Ib),Yboxnom(Ib));
+	[v10b,Tcore,lon,lat]=load_core_variable(fullfile(corePath,'v_10.15JUNE2009.nc'),'V_10_MOD',Xboxnom(Ib),Yboxnom(Ib));
+	ficeb=gridToMatrix(Fice,Ib,boxFile,gridFile,1);
+	ficeb(ficeb<0.2)=0; % OCMIP-2 howto 
+	atmospb=load_ocmip_variable([],'P',Xboxnom(Ib),Yboxnom(Ib));    
+  otherwise
+	error('ERROR: Unknown option for gas exchange')
 end
 
 if rescaleForcing
@@ -266,8 +285,8 @@ end
 
 % now take annual mean if necessary
 if ~periodicForcing
-  Theta=mean(Theta,2);
-  Salt=mean(Salt,2);
+  Thetas=mean(Thetas,2);
+  Salts=mean(Salts,2);
   EmP=mean(EmP,2);
   if gasExchangeType==1
 	Vgas660=mean(Vgas660,2);
@@ -293,8 +312,6 @@ if rearrangeProfiles
   Yboxnom=Yboxnom(Ir);
   Zboxnom=Zboxnom(Ir);
   izBox=izBox(Ir);
-  Theta=Theta(Ir,:);
-  Salt=Salt(Ir,:);
   volb=volb(Ir);
   if useVirtualFlux
     volFracSurf=volFracSurf(Ir);
@@ -316,6 +333,17 @@ if writeFiles
   calc_periodic_times_for_tmm('monthly-365-day year','periodic_times_365d.bin');
   calc_periodic_times_for_tmm('monthly-360-day year','periodic_times_360d.bin');  
   calc_periodic_times_for_tmm('6-hourly','periodic_times_6hourly.bin');
+  if timeDependentForcing==1 || timeDependentMatrix==1
+    bpp=[31 28 31 30 31 30 31 31 30 31 30 31]; % base year
+    N0=repmat(bpp,[1 (numForcingMats/nm)]);
+    T0=calc_periodic_times_for_tmm(N0)*(numForcingMats/nm);
+    T=zeros([length(T0)+2 1]); % extend times on either side
+    T(2:end-1)=T0;
+    T(1)=-bpp(1)/2/sum(bpp);
+    T(end)=T0(end)+bpp(end)/365;
+    T=T+Ttd0;
+    write_binary(['times_365d_' num2str(numForcingMats) 'months.bin'],T,'real*8')
+  end
 % Transport matrices
   if writeTMs
 %   Explicit transport matrix
@@ -335,8 +363,13 @@ if writeFiles
 	  writePetscBin('Ae.petsc',Aexpms,[],1)
 	else
       % load each month from separate file
-      disp('loading monthly mean explicit TMs')	      
-	  for im=1:12 
+      disp('loading monthly mean explicit TMs')
+      if timeDependentMatrix==1
+        ntmax=numForcingMats;
+      else
+        ntmax=nm;
+      end    
+	  for im=1:ntmax 
 		fn=[explicitMatrixFileBase '_' sprintf('%02d',im)];
 		load(fn,'Aexp')
 		if rearrangeProfiles
@@ -349,7 +382,20 @@ if writeFiles
 %         Not sure if this is really kosher!		  
 		  Aexp=Beta*Aexp*M; % coarse-grained explicit transport matrix
 		end
-		writePetscBin(['Ae_' sprintf('%02d',im-1)],Aexp,[],1)
+		if timeDependentMatrix==1
+		  it=im;
+		else
+		  it=im-1;
+		end
+		writePetscBin(['Ae_' sprintf('%02d',it)],Aexp,[],1)
+		if timeDependentMatrix==1
+		  if im==1
+		    it=im-1;
+		  elseif im==ntmax
+		    it=im+1;
+		  end
+		  writePetscBin(['Ae_' sprintf('%02d',it)],Aexp,[],1)		    
+		end
 		clear Aexp
 	  end
 	end
@@ -376,7 +422,12 @@ if writeFiles
 	else
 	  % load each month from separate file
       disp('loading monthly mean implicit TMs')	      	  
-	  for im=1:12
+      if timeDependentMatrix==1
+        ntmax=numForcingMats;
+      else
+        ntmax=nm;
+      end    
+	  for im=1:ntmax 
 		fn=[implicitMatrixFileBase '_' sprintf('%02d',im)];		
 		load(fn,'Aimp')
 		if dtMultiple~=1
@@ -394,7 +445,20 @@ if writeFiles
 		if useCoarseGrainedMatrix
 		  Aimp=Beta*Aimp*M; % coarse-grained implicit transport matrix		
 		end
-		writePetscBin(['Ai_' sprintf('%02d',im-1)],Aimp,[],1)
+		if timeDependentMatrix==1
+		  it=im;
+		else
+		  it=im-1;
+		end		
+		writePetscBin(['Ai_' sprintf('%02d',it)],Aimp,[],1)
+		if timeDependentMatrix==1
+		  if im==1
+		    it=im-1;
+		  elseif im==ntmax
+		    it=im+1;
+		  end
+		  writePetscBin(['Ai_' sprintf('%02d',it)],Aimp,[],1)		    
+		end		
 		clear Aimp
 	  end
 	end
@@ -421,52 +485,62 @@ if writeFiles
   
 % Surface forcing data
   if ~periodicForcing
+	write_binary('Ts.bin',Thetas,'real*8')
+	write_binary('Ss.bin',Salts,'real*8')  
     if gasExchangeType==1
       write_binary('Vgas660.bin',Vgas660,'real*8')
     end
 	write_binary('atmosp.bin',atmospb,'real*8')
+	write_binary('EmP.bin',EmP,'real*8')
+	if rescaleForcing
+	  writePetscBin('Rfs.petsc',Rfs)
+    end	
   else
+    if timeDependentForcing==1
+%     use the first numForcingMats time slices of each field
+      tmp=Thetas(:,[1 1:numForcingMats numForcingMats]);
+	  write_binary('Ts.bin',tmp,'real*8')
+      tmp=Salts(:,[1 1:numForcingMats numForcingMats]);
+	  write_binary('Ss.bin',tmp,'real*8')
+      if gasExchangeType==2 % OCMIP-2 fice; make copies here to fake time dependence
+        disp('Warming: OCMIP-2 fice is being used; making copies to fake time dependence!')
+        ficeb=repmat(ficeb,[1 numForcingMats/nm]);
+      end  
+      tmp=ficeb(:,[1 1:numForcingMats numForcingMats]);
+	  write_binary('fice.bin',tmp,'real*8')
+      tmp=EmP(:,[1 1:numForcingMats numForcingMats]);
+	  write_binary('EmP.bin',tmp,'real*8')
+	  if rescaleForcing
+		tmp=Rfs(:,[1 1:numForcingMats numForcingMats]);
+		writePetscBin('Rfs.petsc',tmp,1)
+	  end
+    else
+	  for im=1:nm
+		write_binary(['Ts_' sprintf('%02d',im-1)],Thetas(:,im),'real*8')
+		write_binary(['Ss_' sprintf('%02d',im-1)],Salts(:,im),'real*8')	  
+		write_binary(['fice_' sprintf('%02d',im-1)],ficeb(:,im),'real*8')
+		write_binary(['EmP_' sprintf('%02d',im-1)],EmP(:,im),'real*8')
+		if rescaleForcing
+		  writePetscBin(['Rfs_' sprintf('%02d',im-1)],Rfs(:,im))		
+        end				
+      end    
+    end    
+
     for im=1:nm
-	  write_binary(['fice_' sprintf('%02d',im-1)],ficeb(:,im),'real*8')
 	  if gasExchangeType==1
         write_binary(['xkw_' sprintf('%02d',im-1)],xkwb(:,im),'real*8')
       end
 	  write_binary(['atmosp_' sprintf('%02d',im-1)],atmospb(:,im),'real*8')
 	end
-	if gasExchangeType==2 || gasExchangeType==3
+	if gasExchangeType==2 || gasExchangeType==3 || gasExchangeType==4
 	  for im=1:size(u10b,2)
         write_binary(['uwind_' sprintf('%02d',im-1)],u10b(:,im),'real*8')
         write_binary(['vwind_' sprintf('%02d',im-1)],v10b(:,im),'real*8')
       end
     end	  
   end
-  if ~periodicForcing
-	writePetscBin('Ts.petsc',Theta)
-	writePetscBin('Ss.petsc',Salt)
-  else
-    for im=1:nm
-	  writePetscBin(['Ts_' sprintf('%02d',im-1)],Theta(:,im))
-	  writePetscBin(['Ss_' sprintf('%02d',im-1)],Salt(:,im))
-    end    
-  end    
-  if ~periodicForcing
-	write_binary('EmP.bin',EmP,'real*8')
-  else
-	for im=1:nm
-	  write_binary(['EmP_' sprintf('%02d',im-1)],EmP(:,im),'real*8')
-	end
-  end      
   if useVirtualFlux
     writePetscBin('surface_volume_fraction.petsc',volFracSurf)
-  end  
-  if rescaleForcing
-	if ~periodicMatrix
-	  writePetscBin('Rfs.petsc',Rfs)
-	else
-	  for im=1:nm
-		writePetscBin(['Rfs_' sprintf('%02d',im-1)],Rfs(:,im))
-	  end    
-	end    
   end  
   
 % Profile data  
