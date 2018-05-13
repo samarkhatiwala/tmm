@@ -100,15 +100,13 @@ PetscInt findindex(PetscScalar x[], PetscInt n, PetscScalar xf)
 #define __FUNCT__ "interpPeriodicMatrix"
 PetscErrorCode interpPeriodicMatrix(PetscScalar tc, Mat *A, PetscScalar cyclePeriod,
                                     PetscInt numPerPeriod, PetscScalar *tdp, 
-                                    PeriodicMat *user, char *filename)
+                                    PeriodicMat *user, const char *fileName)
 {
 /* Function to interpolate a matrix that is periodic in time with period cyclePeriod.  */
 /* tc is the current time and numPerPeriod is the number of instances per period   */
 /* at which data are available (to be read from files). */
 /* IMPORTANT: Matrix *A MUST have been created and preallocated before  */
 /* calling this routine. All other matrices will be created using *A as a template.  */
-
-#include <math.h>
 
   PetscScalar t,t1;
   PetscInt im,it0,it1;
@@ -121,12 +119,13 @@ PetscErrorCode interpPeriodicMatrix(PetscScalar tc, Mat *A, PetscScalar cyclePer
   if (user->firstTime) {
     if (numPerPeriod>MAX_MATRIX_NUM_PER_PERIOD) {
       SETERRQ(PETSC_COMM_WORLD,1,"Number of allowable matrices in PeriodicMat struct exceeded by requested number ! Increase MAX_MATRIX_NUM_PER_PERIOD.");
-    }    
+    }
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Initializing PeriodicMat object %s\n",fileName);CHKERRQ(ierr);        
     user->numPerPeriod = numPerPeriod;
     for (im=0; im<numPerPeriod; im++) {
       ierr = MatDuplicate(*A,MAT_DO_NOT_COPY_VALUES,&user->Ap[im]);CHKERRQ(ierr);        
 	  strcpy(tmpFile,"");
-	  sprintf(tmpFile,"%s%02d",filename,im);	  
+	  sprintf(tmpFile,"%s%02d",fileName,im);	  
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading matrix from file %s\n", tmpFile);CHKERRQ(ierr);        
 	  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,tmpFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	  ierr = MatLoad(user->Ap[im],fd);CHKERRQ(ierr);
@@ -151,15 +150,13 @@ PetscErrorCode interpPeriodicMatrix(PetscScalar tc, Mat *A, PetscScalar cyclePer
 #define __FUNCT__ "interpPeriodicVector"
 PetscErrorCode interpPeriodicVector(PetscScalar tc, Vec *u, PetscScalar cyclePeriod,
                                     PetscInt numPerPeriod, PetscScalar *tdp, 
-                                    PeriodicVec *user, char *filename)
+                                    PeriodicVec *user, const char *fileName)
 {
 /* Function to interpolate a vector that is periodic in time with period cyclePeriod.  */
 /* tc is the current time and numPerPeriod is the number of instances per period   */
 /* at which data are available (to be read from files). */
 /* IMPORTANT: Vectors u0 and u1 MUST have been created and preallocated before  */
 /* calling this routine. Use VecDuplicate to do this.  */
-
-#include <math.h>
 
   PetscScalar t,t1;
   PetscInt im,it0,it1;
@@ -170,11 +167,12 @@ PetscErrorCode interpPeriodicVector(PetscScalar tc, Vec *u, PetscScalar cyclePer
   PetscViewer fd;
 
   if (user->firstTime) {
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Initializing PeriodicVec object %s\n",fileName);CHKERRQ(ierr);
     user->numPerPeriod = numPerPeriod;  
     ierr = VecDuplicateVecs(*u,numPerPeriod,&user->up);CHKERRQ(ierr);    
     for (im=0; im<numPerPeriod; im++) {
 	  strcpy(tmpFile,"");
-	  sprintf(tmpFile,"%s%02d",filename,im);
+	  sprintf(tmpFile,"%s%02d",fileName,im);
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading vector from file %s\n", tmpFile);CHKERRQ(ierr);  
 	  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,tmpFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
       ierr = VecLoad(user->up[im],fd);CHKERRQ(ierr); /* IntoVector */
@@ -241,6 +239,88 @@ PetscErrorCode destroyPeriodicArray(PeriodicArray *user)
 }
 
 #undef __FUNCT__
+#define __FUNCT__ "interpTimeDependentMatrix"
+PetscErrorCode interpTimeDependentMatrix(PetscScalar tc, Mat *A, PetscInt numTimes, PetscScalar *tdt, 
+                                    TimeDependentMat *user, const char *fileName)
+{
+/* Function to interpolate a time-dependent matrix. */
+/* tc is the current time and numTimes are the number of time slices (in tdt) at */
+/* at which data are available. */
+/* IMPORTANT: Matrix *A MUST have been created and preallocated before  */
+/* calling this routine. All other matrices will be created using *A as a template.  */
+
+  PetscErrorCode ierr;
+  PetscInt itc;  
+  PetscScalar alpha;
+  char tmpFile[PETSC_MAX_PATH_LEN];
+  PetscViewer fd;
+
+  if (user->firstTime) {
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Initializing TimeDependentMat object %s\n",fileName);CHKERRQ(ierr);
+	ierr = MatDuplicate(*A,MAT_DO_NOT_COPY_VALUES,&user->Atd[0]);CHKERRQ(ierr);
+	ierr = MatDuplicate(*A,MAT_DO_NOT_COPY_VALUES,&user->Atd[1]);CHKERRQ(ierr);
+	user->itcurr=-1;
+    user->firstTime = PETSC_FALSE;
+  }
+
+  if ((tc<tdt[0]) || (tc>tdt[numTimes-1])) {
+    SETERRQ(PETSC_COMM_WORLD,1,"Error in interpTimeDependentMatrix: time out of bound");
+  }
+
+  ierr = calcInterpFactor(numTimes,tc,tdt,&itc,&alpha); CHKERRQ(ierr);
+  if (itc != user->itcurr) { /* time to read new bracketing slices */
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading new bracketing slices for matrix %s at time = %g: %d and %d\n",fileName,tc,itc,itc+1);CHKERRQ(ierr);
+	strcpy(tmpFile,"");
+	sprintf(tmpFile,"%s%02d",fileName,itc);	  
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading matrix from file %s\n", tmpFile);CHKERRQ(ierr);        
+	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,tmpFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	ierr = MatLoad(user->Atd[0],fd);CHKERRQ(ierr);
+	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+
+	strcpy(tmpFile,"");
+	sprintf(tmpFile,"%s%02d",fileName,itc+1);	  
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading matrix from file %s\n", tmpFile);CHKERRQ(ierr);        
+	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,tmpFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	ierr = MatLoad(user->Atd[1],fd);CHKERRQ(ierr);
+	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+
+	user->itcurr=itc;
+  }
+/* interpolate to current time   */
+  ierr = MatAXPBYmy(alpha,1.0-alpha,user->Atd[0],user->Atd[1],A);CHKERRQ(ierr);
+
+  return 0;
+}
+
+#undef __FUNCT__
+#define __FUNCT__ "destroyTimeDependentMat"
+/* Function to destroy Mats's in a TimeDependentMat struct */
+
+PetscErrorCode destroyTimeDependentMat(TimeDependentMat *user)
+{
+  PetscErrorCode ierr;
+  
+  ierr = MatDestroy(&(user->Atd[0]));CHKERRQ(ierr);
+  ierr = MatDestroy(&(user->Atd[1]));CHKERRQ(ierr);
+  
+  return 0;
+}
+
+#undef __FUNCT__
+#define __FUNCT__ "destroyTimeDependentArray"
+/* Function to destroy arrays in a TimeDependentArray struct */
+
+PetscErrorCode destroyTimeDependentArray(TimeDependentArray *user)
+{
+  PetscErrorCode ierr;
+
+  ierr = PetscFree(user->utd[0]);CHKERRQ(ierr);    
+  ierr = PetscFree(user->utd[1]);CHKERRQ(ierr);    
+  
+  return 0;
+}
+
+#undef __FUNCT__
 #define __FUNCT__ "interpTimeDependentVector"
 PetscErrorCode interpTimeDependentVector(PetscScalar tc, Vec *u, PetscInt numTracers, 
                                       PetscInt nt, PetscScalar *t, Vec **ut)
@@ -269,7 +349,7 @@ PetscErrorCode interpTimeDependentVector(PetscScalar tc, Vec *u, PetscInt numTra
 
 #undef __FUNCT__
 #define __FUNCT__ "writeBinaryScalarData"
-PetscErrorCode writeBinaryScalarData(char *fileName, PetscScalar *arr, PetscInt N, PetscBool appendToFile)
+PetscErrorCode writeBinaryScalarData(const char *fileName, PetscScalar *arr, PetscInt N, PetscBool appendToFile)
 {
   PetscErrorCode ierr;
   PetscViewer fd;

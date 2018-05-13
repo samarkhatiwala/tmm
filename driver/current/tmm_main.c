@@ -46,9 +46,12 @@ int main(int argc,char **args)
 /* TM's */
   Mat Ae, Ai;
   PeriodicMat Aep, Aip;
+  TimeDependentMat Aetd, Aitd;
   char mateFile[PETSC_MAX_PATH_LEN], matiFile[PETSC_MAX_PATH_LEN], rfsFile[PETSC_MAX_PATH_LEN];
   PetscBool periodicMatrix = PETSC_FALSE;
-  PeriodicTimer matrixTimer;
+  PetscBool timeDependentMatrix = PETSC_FALSE;
+  PeriodicTimer matrixPeriodicTimer;
+  TimeDependentTimer matrixTimeDependentTimer;
   
 /* Forcing */
   Vec *uf, *uef;
@@ -182,10 +185,6 @@ int main(int argc,char **args)
   ierr = PetscOptionsHasName(PETSC_NULL,"-time_avg",&doTimeAverage);CHKERRQ(ierr);
   if (doTimeAverage) {
     ierr = iniStepTimer("avg_", Iter0, &avgTimer);CHKERRQ(ierr);
-//     avgStartTimeStep = Iter0 + 1; /* by default we start accumulating at first time step */
-//     ierr = PetscOptionsGetInt(PETSC_NULL,"-avg_start_time_step",&avgStartTimeStep,&flg1);CHKERRQ(ierr);
-//     ierr = PetscOptionsGetInt(PETSC_NULL,"-avg_time_steps",&avgNumTimeSteps,&flg1);CHKERRQ(ierr);
-//     if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate number of time averaging time steps with the -avg_time_step flag");
 	for (itr=0; itr<numTracers; itr++) {
 	  avgOutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
 	}
@@ -260,7 +259,12 @@ int main(int argc,char **args)
   ierr = MatSetType(Ai,MATMPIAIJ);CHKERRQ(ierr);        
   ierr = MatSetFromOptions(Ai);CHKERRQ(ierr);
   
-  ierr = PetscOptionsHasName(PETSC_NULL,"-periodic_matrix",&periodicMatrix);CHKERRQ(ierr);  
+  ierr = PetscOptionsHasName(PETSC_NULL,"-periodic_matrix",&periodicMatrix);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(PETSC_NULL,"-time_dependent_matrix",&timeDependentMatrix);CHKERRQ(ierr);
+  if (periodicMatrix & timeDependentMatrix) {
+    SETERRQ(PETSC_COMM_WORLD,1,"Cannot use both -periodic_matrix and -time_dependent_matrix together!");
+  }
+  
   if (periodicMatrix) {    
     ierr=PetscPrintf(PETSC_COMM_WORLD,"Periodic matrices specified\n");CHKERRQ(ierr);
     ierr=PetscStrcat(mateFile,"_");CHKERRQ(ierr);
@@ -269,19 +273,7 @@ int main(int argc,char **args)
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Ai basename is %s\n", matiFile);CHKERRQ(ierr);     
     
 /*  read time data */
-    ierr = iniPeriodicTimer("matrix_", &matrixTimer);CHKERRQ(ierr);
-//     ierr = PetscOptionsGetReal(PETSC_NULL,"-matrix_cycle_period",&matrixCyclePeriod,&flg2);CHKERRQ(ierr);
-//     if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate matrix cycling time with the -matrix_cycle_period option");
-//     ierr = PetscOptionsGetReal(PETSC_NULL,"-matrix_cycle_step",&matrixCycleStep,&flg2);CHKERRQ(ierr);
-//     if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate cycling step with the -matrix_cycle_step option");
-//     numMatrixPeriods=matrixCyclePeriod/matrixCycleStep;
-/*  array for holding extended time array */
-//     PetscMalloc((numMatrixPeriods+2)*sizeof(PetscScalar), &tdpMatrix); 
-//     ierr = PetscPrintf(PETSC_COMM_WORLD,"Periodic matrix specified at times:\n");CHKERRQ(ierr);            
-//     for (it=0; it<=numMatrixPeriods+1; it++) {
-//       tdpMatrix[it]=(-matrixCycleStep/2.0) + it*matrixCycleStep;
-//       ierr = PetscPrintf(PETSC_COMM_WORLD,"tdpMatrix=%10.5f\n", tdpMatrix[it]);CHKERRQ(ierr);        
-//     }    
+    ierr = iniPeriodicTimer("matrix_", &matrixPeriodicTimer);CHKERRQ(ierr);
     
 /*  Read here to set sparsity pattern */
 	strcpy(tmpFile,"");
@@ -298,6 +290,32 @@ int main(int argc,char **args)
 
     Aep.firstTime = PETSC_TRUE;
     Aip.firstTime = PETSC_TRUE;
+
+  } else if (timeDependentMatrix) {
+    ierr=PetscPrintf(PETSC_COMM_WORLD,"Time-dependent matrices specified\n");CHKERRQ(ierr);
+    ierr=PetscStrcat(mateFile,"_");CHKERRQ(ierr);
+    ierr=PetscStrcat(matiFile,"_");CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"Ae basename is %s\n", mateFile);CHKERRQ(ierr); 
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"Ai basename is %s\n", matiFile);CHKERRQ(ierr);     
+    
+/*  read time data */
+    ierr = iniTimeDependentTimer("matrix_", &matrixTimeDependentTimer);CHKERRQ(ierr);
+    
+/*  Read here to set sparsity pattern */
+	strcpy(tmpFile,"");
+	sprintf(tmpFile,"%s%02d",mateFile,0);
+	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,tmpFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	ierr = MatLoad(Ae,fd);CHKERRQ(ierr);
+	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+
+	strcpy(tmpFile,"");
+	sprintf(tmpFile,"%s%02d",matiFile,0);
+	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,tmpFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	ierr = MatLoad(Ai,fd);CHKERRQ(ierr);
+	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
+
+    Aetd.firstTime = PETSC_TRUE;
+    Aitd.firstTime = PETSC_TRUE;  
     
   } else { /*  not periodic. read matrices here */
 
@@ -454,18 +472,6 @@ int main(int argc,char **args)
 
 /*    read time data */
       ierr = iniPeriodicTimer("forcing_", &forcingTimer);CHKERRQ(ierr);
-//       ierr = PetscOptionsGetReal(PETSC_NULL,"-forcing_cycle_period",&forcingCyclePeriod,&flg2);CHKERRQ(ierr);
-//       if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate forcing cycling time with the -forcing_cycle_period option");
-//       ierr = PetscOptionsGetReal(PETSC_NULL,"-forcing_cycle_step",&forcingCycleStep,&flg2);CHKERRQ(ierr);
-//       if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate cycling step with the -forcing_cycle_step option");
-//       numForcingPeriods=forcingCyclePeriod/forcingCycleStep;
-/*    array for holding extended time array */
-//       PetscMalloc((numForcingPeriods+2)*sizeof(PetscScalar), &tdpForcing); 
-//       ierr = PetscPrintf(PETSC_COMM_WORLD,"Periodic forcing specified at times:\n");CHKERRQ(ierr);            
-//       for (it=0; it<=numForcingPeriods+1; it++) {
-//         tdpForcing[it]=(-forcingCycleStep/2.0) + it*forcingCycleStep;
-//         ierr = PetscPrintf(PETSC_COMM_WORLD,"tdpForcing=%10.5f\n", tdpForcing[it]);CHKERRQ(ierr);        
-//       }
     } else { /* constant or (nonperiodic) time dependent forcing */
 /*    Read info AND forcing here */    
       ierr = PetscOptionsHasName(PETSC_NULL,"-time_dependent_forcing",&timeDependentForcing);CHKERRQ(ierr);
@@ -662,18 +668,6 @@ int main(int argc,char **args)
 
 /*      read time data */
         ierr = iniPeriodicTimer("bc_", &bcTimer);CHKERRQ(ierr);
-//         ierr = PetscOptionsGetReal(PETSC_NULL,"-bc_cycle_period",&bcCyclePeriod,&flg2);CHKERRQ(ierr);
-//         if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate BC cycling time with the -bc_cycle_period option");
-//         ierr = PetscOptionsGetReal(PETSC_NULL,"-bc_cycle_step",&bcCycleStep,&flg2);CHKERRQ(ierr);
-//         if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate cycling step with the -bc_cycle_step option");
-//         numBCPeriods=bcCyclePeriod/bcCycleStep;
-/*      array for holding extended time array */
-//         PetscMalloc((numBCPeriods+2)*sizeof(PetscScalar), &tdpBC); 
-//         ierr = PetscPrintf(PETSC_COMM_WORLD,"Periodic BC specified at times:\n");CHKERRQ(ierr);            
-//         for (it=0; it<=numBCPeriods+1; it++) {
-//           tdpBC[it]=(-bcCycleStep/2.0) + it*bcCycleStep;
-//           ierr = PetscPrintf(PETSC_COMM_WORLD,"tdpBC=%10.5f\n", tdpBC[it]);CHKERRQ(ierr);        
-//         }
       } else { /* constant or (nonperiodic) time dependent BC */
 /*      Read info AND BC here */    
         ierr = PetscOptionsHasName(PETSC_NULL,"-time_dependent_bc",&timeDependentBC);CHKERRQ(ierr);
@@ -938,7 +932,6 @@ int main(int argc,char **args)
 		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,bcavgOutFile[itr],AVG_FILE_MODE,&fdbcavgout[itr]);CHKERRQ(ierr);
 	  }
 	}    
-//     avgTimer.count=0;
   }
 
 /* reinitialize forcing if required */
@@ -1005,14 +998,17 @@ int main(int argc,char **args)
 #ifndef FORJACOBIAN
 /*  interpolate Ae,Ai,uf,uef,bcc to current time (tc) and bcf to future time (tf) */
     if (periodicMatrix) {
-      ierr = interpPeriodicMatrix(tc,&Ae,matrixTimer.cyclePeriod,matrixTimer.numPerPeriod,
-                                  matrixTimer.tdp,&Aep,mateFile);
-      ierr = interpPeriodicMatrix(tc,&Ai,matrixTimer.cyclePeriod,matrixTimer.numPerPeriod,
-                                  matrixTimer.tdp,&Aip,matiFile);
+      ierr = interpPeriodicMatrix(tc,&Ae,matrixPeriodicTimer.cyclePeriod,matrixPeriodicTimer.numPerPeriod,
+                                  matrixPeriodicTimer.tdp,&Aep,mateFile);
+      ierr = interpPeriodicMatrix(tc,&Ai,matrixPeriodicTimer.cyclePeriod,matrixPeriodicTimer.numPerPeriod,
+                                  matrixPeriodicTimer.tdp,&Aip,matiFile);
       if (rescaleForcing) {
-		ierr = interpPeriodicVector(tc,&Rfs,matrixTimer.cyclePeriod,matrixTimer.numPerPeriod,
-                                  matrixTimer.tdp,&Rfsp,rfsFile);
+		ierr = interpPeriodicVector(tc,&Rfs,matrixPeriodicTimer.cyclePeriod,matrixPeriodicTimer.numPerPeriod,
+                                  matrixPeriodicTimer.tdp,&Rfsp,rfsFile);
       }
+    } else if (timeDependentMatrix) {
+      ierr = interpTimeDependentMatrix(tc,&Ae,matrixTimeDependentTimer.numTimes,matrixTimeDependentTimer.tdt,&Aetd,mateFile);
+      ierr = interpTimeDependentMatrix(tc,&Ai,matrixTimeDependentTimer.numTimes,matrixTimeDependentTimer.tdt,&Aitd,matiFile);
     }
 
 /*  Forcing     */
@@ -1052,10 +1048,10 @@ int main(int argc,char **args)
 		}        
       } else {    
         if (periodicMatrix) {
-          ierr = interpPeriodicMatrix(tc,&Be,matrixTimer.cyclePeriod,matrixTimer.numPerPeriod,
-                                      matrixTimer.tdp,&Bep,matbeFile);
-          ierr = interpPeriodicMatrix(tc,&Bi,matrixTimer.cyclePeriod,matrixTimer.numPerPeriod,
-                                      matrixTimer.tdp,&Bip,matbiFile);
+          ierr = interpPeriodicMatrix(tc,&Be,matrixPeriodicTimer.cyclePeriod,matrixPeriodicTimer.numPerPeriod,
+                                      matrixPeriodicTimer.tdp,&Bep,matbeFile);
+          ierr = interpPeriodicMatrix(tc,&Bi,matrixPeriodicTimer.cyclePeriod,matrixPeriodicTimer.numPerPeriod,
+                                      matrixPeriodicTimer.tdp,&Bip,matbiFile);
         }    
         if (periodicBC) {
           for (itr=0; itr<numTracers; itr++) {    
@@ -1186,7 +1182,6 @@ int main(int argc,char **args)
               ierr = VecSet(vavg[itr],zero); CHKERRQ(ierr);
             }        
 		    ierr = updateStepTimer("avg_", Iter0+iLoop, &avgTimer);CHKERRQ(ierr);              
-//             avgTimer.count = 0;     
 
             ierr = PetscPrintf(PETSC_COMM_WORLD,"Waiting for new initial condition ...\n");CHKERRQ(ierr);
             ierr = waitForSignal(10);CHKERRQ(ierr);
@@ -1308,7 +1303,6 @@ int main(int argc,char **args)
 			}
 		  }
 		  ierr = updateStepTimer("avg_", Iter0+iLoop, &avgTimer);CHKERRQ(ierr);
-//           avgTimer.count = 0;
         }
       }
     }
@@ -1385,6 +1379,9 @@ int main(int argc,char **args)
   if (periodicMatrix) {
     ierr = destroyPeriodicMat(&Aep);CHKERRQ(ierr);
     ierr = destroyPeriodicMat(&Aip);CHKERRQ(ierr);    
+  } else if (timeDependentMatrix) {
+	ierr = destroyTimeDependentMat(&Aetd);
+	ierr = destroyTimeDependentMat(&Aitd);
   }
 
   if (rescaleForcing) {

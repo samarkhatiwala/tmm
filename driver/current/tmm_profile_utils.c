@@ -101,7 +101,7 @@ PetscErrorCode iniProfileData(PetscInt myId)
 
 #undef __FUNCT__
 #define __FUNCT__ "readProfileSurfaceIntData"
-PetscErrorCode readProfileSurfaceIntData(char *fileName, PetscInt *arr, PetscInt numValsPerProfile)
+PetscErrorCode readProfileSurfaceIntData(const char *fileName, PetscInt *arr, PetscInt numValsPerProfile)
 {
   PetscErrorCode ierr;
 /*   PetscInt *tmpArr; */
@@ -146,7 +146,7 @@ PetscErrorCode readProfileSurfaceIntData(char *fileName, PetscInt *arr, PetscInt
 
 #undef __FUNCT__
 #define __FUNCT__ "readProfileSurfaceScalarData"
-PetscErrorCode readProfileSurfaceScalarData(char *fileName, PetscScalar *arr, PetscInt numValsPerProfile)
+PetscErrorCode readProfileSurfaceScalarData(const char *fileName, PetscScalar *arr, PetscInt numValsPerProfile)
 {
   PetscErrorCode ierr;
 /*   PetscScalar *tmpArr; */
@@ -193,7 +193,7 @@ PetscErrorCode readProfileSurfaceScalarData(char *fileName, PetscScalar *arr, Pe
 
 #undef __FUNCT__
 #define __FUNCT__ "readProfileSurfaceScalarDataRecord"
-PetscErrorCode readProfileSurfaceScalarDataRecord(char *fileName, PetscScalar *arr, PetscInt numValsPerProfile, PetscInt iRec)
+PetscErrorCode readProfileSurfaceScalarDataRecord(const char *fileName, PetscScalar *arr, PetscInt numValsPerProfile, PetscInt iRec)
 {
 /* Random access version of readProfileSurfaceScalarData */
 /* This version takes 1 additional argument:  */
@@ -222,56 +222,14 @@ PetscErrorCode readProfileSurfaceScalarDataRecord(char *fileName, PetscScalar *a
 }
 
 #undef __FUNCT__
-#define __FUNCT__ "readProfileSurfaceData"
-/* PetscErrorCode readProfileSurfaceData(char *fileName, void *arr, PetscDataType type) */
-/* { */
-/*   PetscErrorCode ierr; */
-/*   void *tmpArr; */
-/*   PetscInt ip; */
-/*   size_t m1, m2; */
-/*   PetscViewer fd; */
-/*   PetscInt fp; */
-/*  */
-/*   if (type == PETSC_INT) { */
-/*     m1 = totalNumProfiles*sizeof(PetscInt); */
-/*     m2 = lNumProfiles*sizeof(PetscInt); */
-/*   } else if (type == PETSC_SCALAR) { */
-/*     m1 = totalNumProfiles*sizeof(PetscScalar); */
-/*     m2 = lNumProfiles*sizeof(PetscScalar);     */
-/*   } else { */
-/*     SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"Unknown type"); */
-/*   } */
-/*  */
-/*   ierr = PetscMalloc(m1,&tmpArr);CHKERRQ(ierr); */
-/*   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,fileName,FILE_MODE_READ,&fd);CHKERRQ(ierr); */
-/*   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr); */
-/*   ierr = PetscBinaryRead(fp,tmpArr,totalNumProfiles,type);CHKERRQ(ierr); */
-/*   ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr); */
-/*    */
-/*   ierr = PetscMalloc(m2,&arr);CHKERRQ(ierr); */
-/*   for (ip=1; ip<=lNumProfiles; ip++) {   */
-/*     arr[ip-1]=tmpArr[numPrevProfiles+ip-1]; */
-/*   } */
-
-/*   ierr = PetscFree(tmpArr);CHKERRQ(ierr); */
-/*      */
-/*   return 0; */
-/* } */
-
-#undef __FUNCT__
 #define __FUNCT__ "interpPeriodicProfileSurfaceScalarData"
 PetscErrorCode interpPeriodicProfileSurfaceScalarData(PetscScalar tc, PetscScalar *uarr, PetscScalar cyclePeriod,
                                     PetscInt numPerPeriod, PetscScalar *tdp, 
-                                    PeriodicArray *user, char *fileName)
+                                    PeriodicArray *user, const char *fileName)
 {
 /* Function to interpolate an array that is periodic in time with period cyclePeriod.  */
 /* tc is the current time and numPerPeriod is the number of instances per period   */
 /* at which data are available (to be read from files). */
-/* IMPORTANT: Arrays u0 and u1 MUST have been created and preallocated before  */
-/* calling this routine.  */
-
-#include <math.h>
-#include "petsc_matvec_utils.h"
 
   PetscScalar t,t1;
   PetscInt im,it0,it1;
@@ -284,14 +242,16 @@ PetscErrorCode interpPeriodicProfileSurfaceScalarData(PetscScalar tc, PetscScala
   if (user->firstTime) {
     if (numPerPeriod>MAX_FORCING_NUM_PER_PERIOD) {
       SETERRQ(PETSC_COMM_WORLD,1,"Number of allowable arrays in PeriodicArray struct exceeded by requested number ! Increase MAX_FORCING_NUM_PER_PERIOD.");
-    }      
+    }    
+    user->numValsPerProfile = (user->arrayLength)/lNumProfiles;
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Initializing PeriodicArray object %s with %d value(s) per profile\n",fileName,user->numValsPerProfile);CHKERRQ(ierr);    
     user->numPerPeriod = numPerPeriod;  
     for (im=0; im<numPerPeriod; im++) {
       ierr = PetscMalloc((user->arrayLength)*sizeof(PetscScalar),&user->up[im]);CHKERRQ(ierr);    
       strcpy(tmpFile,"");
       sprintf(tmpFile,"%s%02d",fileName,im);
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading data from file %s\n", tmpFile);CHKERRQ(ierr);  
-	  ierr = readProfileSurfaceScalarData(tmpFile,user->up[im],1);    
+	  ierr = readProfileSurfaceScalarData(tmpFile,user->up[im],user->numValsPerProfile);    
     }
     user->firstTime = PETSC_FALSE;  
   }
@@ -303,7 +263,7 @@ PetscErrorCode interpPeriodicProfileSurfaceScalarData(PetscScalar tc, PetscScala
 /*   ierr = PetscPrintf(PETSC_COMM_WORLD,"tc=%lf,t1=%lf,it0=%d,it1=%d,a1=%17.16lf,a2=%17.16lf\n",tc,t1,it0,it1,alpha[0],alpha[1]);CHKERRQ(ierr);   */
   
 /* interpolate to current time   */
-  for (ip=0;ip<lNumProfiles;ip++) {
+  for (ip=0;ip<(user->arrayLength);ip++) {
     uarr[ip]=alpha[0]*user->up[it0][ip]+alpha[1]*user->up[it1][ip];
   }
 
@@ -311,8 +271,50 @@ PetscErrorCode interpPeriodicProfileSurfaceScalarData(PetscScalar tc, PetscScala
 }
 
 #undef __FUNCT__
+#define __FUNCT__ "interpTimeDependentProfileSurfaceScalarData"
+PetscErrorCode interpTimeDependentProfileSurfaceScalarData(PetscScalar tc, PetscScalar *uarr, PetscInt numTimes, PetscScalar *tdt,
+                                    TimeDependentArray *user, const char *fileName)
+{
+/* Function to interpolate a time-dependent array.  */
+/* tc is the current time and numTimes are the number of time slices (in tdt) at */
+/* at which data are available. */
+
+  PetscErrorCode ierr;
+  PetscInt itc;  
+  PetscScalar alpha;
+  PetscInt ip;
+  
+  if (user->firstTime) {
+    user->numValsPerProfile = (user->arrayLength)/lNumProfiles;
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Initializing TimeDependentArray object %s with %d value(s) per profile\n",fileName,user->numValsPerProfile);CHKERRQ(ierr);    
+	ierr = PetscMalloc((user->arrayLength)*sizeof(PetscScalar),&user->utd[0]);CHKERRQ(ierr);
+	ierr = PetscMalloc((user->arrayLength)*sizeof(PetscScalar),&user->utd[1]);CHKERRQ(ierr);
+	user->itcurr=-1;
+    user->firstTime = PETSC_FALSE;
+  }
+
+  if ((tc<tdt[0]) || (tc>tdt[numTimes-1])) {
+    SETERRQ(PETSC_COMM_WORLD,1,"Error in interpTimeDependentProfileSurfaceScalarData: time out of bound");
+  }
+
+  ierr = calcInterpFactor(numTimes,tc,tdt,&itc,&alpha); CHKERRQ(ierr);
+  if (itc != user->itcurr) { /* time to read new bracketing slices: itc uses 0-based, while readProfileSurfaceScalarDataRecord uses 1-based indexing*/
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading new bracketing slices for array %s at time = %g: %d and %d\n",fileName,tc,itc+1,itc+2);CHKERRQ(ierr);
+	ierr = readProfileSurfaceScalarDataRecord(fileName,user->utd[0],user->numValsPerProfile,itc+1);
+	ierr = readProfileSurfaceScalarDataRecord(fileName,user->utd[1],user->numValsPerProfile,itc+2);	
+	user->itcurr=itc;
+  }
+/* interpolate to current time   */
+  for (ip=0;ip<(user->arrayLength);ip++) {
+	uarr[ip] = alpha*user->utd[0][ip] + (1.0-alpha)*user->utd[1][ip];
+  }
+
+  return 0;
+}
+
+#undef __FUNCT__
 #define __FUNCT__ "writeProfileSurfaceScalarData"
-PetscErrorCode writeProfileSurfaceScalarData(char *fileName, PetscScalar *arr, PetscInt numValsPerProfile, PetscBool appendToFile)
+PetscErrorCode writeProfileSurfaceScalarData(const char *fileName, PetscScalar *arr, PetscInt numValsPerProfile, PetscBool appendToFile)
 {
   PetscErrorCode ierr;
   PetscScalar *tmpArr;

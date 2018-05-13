@@ -19,7 +19,7 @@ PetscErrorCode iniPeriodicTimer( const char pre[], PeriodicTimer *thetimer )
 
 /*  read time data */
     ierr = PetscOptionsGetReal(pre,"-cycle_period",&thetimer->cyclePeriod,&flg);CHKERRQ(ierr);
-    if (!flg) SETERRQ1(PETSC_COMM_WORLD,1,"Must indicate matrix cycling time with the -%scycle_period option",pre);
+    if (!flg) SETERRQ1(PETSC_COMM_WORLD,1,"Must indicate cycling time with the -%scycle_period option",pre);
 
     ierr = PetscOptionsGetReal(pre,"-cycle_step",&thetimer->cycleStep,&flg);CHKERRQ(ierr);
     if (flg) {
@@ -118,6 +118,38 @@ PetscErrorCode updateStepTimer( const char pre[], PetscInt Iter, StepTimer *thet
       ierr = PetscPrintf(PETSC_COMM_WORLD,"New interval for StepTimer object %s at iter %d is %d\n", pre,Iter,thetimer->numTimeSteps);CHKERRQ(ierr);
     }
 	    
+    return 0;
+    
+}
+
+PetscErrorCode iniTimeDependentTimer( const char pre[], TimeDependentTimer *thetimer )
+{
+
+    PetscErrorCode ierr;
+    PetscBool flg;
+    PetscInt it;    
+	PetscViewer fd;
+	PetscInt fp;
+    char timeFile[PETSC_MAX_PATH_LEN];
+
+/*  read time data */
+    ierr = PetscOptionsGetInt(pre,"-num_times",&thetimer->numTimes,&flg);CHKERRQ(ierr);
+    if (!flg) SETERRQ1(PETSC_COMM_WORLD,1,"Must indicate number of time slices with the -%snum_times option",pre);
+
+	ierr = PetscMalloc((thetimer->numTimes)*sizeof(PetscScalar), &thetimer->tdt);CHKERRQ(ierr);
+	ierr = PetscOptionsGetString(pre,"-times_file",timeFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+    if (!flg) SETERRQ1(PETSC_COMM_WORLD,1,"Must indicate name of time file with the -%stimes_file option",pre);
+	
+	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,timeFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,&thetimer->tdt[0],thetimer->numTimes,PETSC_SCALAR);CHKERRQ(ierr);
+	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Time-dependent object %s specified at times:\n",pre);CHKERRQ(ierr);            
+	for (it=0; it<thetimer->numTimes; it++) {
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"tdt=%10.5f\n", thetimer->tdt[it]);CHKERRQ(ierr);        
+	}    
+
     return 0;
     
 }
