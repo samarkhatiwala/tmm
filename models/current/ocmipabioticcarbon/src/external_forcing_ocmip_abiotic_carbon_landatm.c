@@ -315,9 +315,9 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
     /* prescribed atmospheric CO2 */
 	ierr = PetscOptionsHasName(PETSC_NULL,"-spatially_variable_atmospheric_co2",&spatiallyVariableCO2);CHKERRQ(ierr);
-	ierr = PetscPrintf(PETSC_COMM_WORLD,"Spatially-variable atmospheric pCO2 has been specified\n");CHKERRQ(ierr);      
     
     if (spatiallyVariableCO2) {
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Spatially-variable atmospheric pCO2 has been specified\n");CHKERRQ(ierr);          
 	  ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localpCO2atm);CHKERRQ(ierr);    
     }
     
