@@ -1,0 +1,227 @@
+The TMM driver code is implemented in PETSc, which provides a flexible set of 
+routines for setting run-time options via command line arguments. (These options 
+can also be read from a file but the preferred way is to simply specify them on 
+the command line.) The easiest way to see what arguments are supported by the 
+driver code grep for "PetscOptions" in tmm_main.c (see below for the full list 
+in the current version). In addition to these options, each model may require 
+its own set of model-specific options and these can be found in the appropriate 
+external_forcing*.c or similar file.
+
+Here I list some key options for performing any simulation with the TMM. Some are 
+required and some are optional and will take on default values.
+
+1) To specify number of tracers: -numtracers NN, where NN is an integer. By default this is 1.
+
+2) To specify the maximum number of time steps to run the model: -max_steps NN, where NN is an 
+integer.
+
+3) To specify output frequency (in time steps): -write_steps NN, where NN is an integer.
+
+4) You can specify initial conditions (tracer concentrations) in two ways:
+  a) With the -i option: -i XX,YY,... where XX, YY etc are the file names (strings). 
+     You must provide as many file names as the number of tracers.
+  b) With the -pickup option: -pickup XX, where XX is the name of the pickup (restart) 
+     file. This file should contain as many vectors as the number of tracers.
+
+5) To specify the names of output files: -o XX,YY,... where XX, YY etc are the file names 
+(strings). You must provide as many file names as the number of tracers.
+
+At the end of every run, the driver writes out a restart or pickup file that contains 
+the tracer fields at the end of the integration. By default it is called 'pickup.petsc'. 
+But you can specify the name of this file with the -pickup_out XX option, where XX is 
+the desired filename (string). Next time you want to start from this initial condition just 
+specify the file name: -pickup XX.
+
+Note: input and output files are in PETSc binary format.
+
+6) A couple of other useful output options are -append (which will append output to the 
+files specified by the -o option rather than the default behavior of overwriting them) 
+and -time_file XX (which will write the output times to a text file called XX rather 
+than the default 'output_time.txt').
+
+7) The driver uses an internal 'clock' to keep track of time (e.g., for interpolating 
+forcing or transport matrices to the current time). The unit of this 'clock' is arbitrary 
+but any other time information you specify to the TMM driver must be in that unit. (The 
+exception is the physical time step required to convert the source/sink tendency term into 
+a discrete-in-time term. This is usually done via an option such as: -biogeochem_deltat XX.)
+Output times (see above) are written in the same units. 
+
+You control the clock by specifying the length of a time step (in your chosen unit) via: 
+-deltat_clock XX, where XX is a floating point number. Thus, if the unit of time is a year 
+then XX is the time step in years. For example, if your model takes 2 timesteps per day 
+and your year has 360 days, then you would specify: -deltat_clock 0.0013888888888889, 
+where 0.0013888888888889 is simply 1/(360*2). Note that you must use specify the value in full 
+double precision (16 decimal places). In Matlab this would be: sprintf('%17.16f',1/(360*2)). 
+Similarly, for a 365-day year: -deltat_clock 0.0013698630136986.
+
+By default the clock start at time=0.0. You can change this via the -t0 XX option, where XX is 
+your desired time origin. You can also optionally specify the corresponding starting iteration 
+number with -iter0 NN, where NN is an integer (by default 0). These options are useful if, for 
+example, you're restarting a run and want to record the correct output times.
+
+8) As mentioned above, the internal clock is used for interpolating transport matrices and 
+forcing fields to the current time step. The times at which these TMs and fields are given 
+must also be in the units of the internal clock and for periodic data this requires providing 
+additional information to the TMM driver via a set of extra options. For example, if the unit 
+of time is year and your circulation has a periodicity of 1 year you would specify that with: 
+-matrix_cycle_period 1.0. But you also need to tell the driver how many TMs it should read 
+and how these are spaced apart over the year. The former is given via the -periodic_matrix_num_per_period NN 
+option, where NN is an integer giving the number of TMs per period. Thus, for monthly-mean TMs, 
+you would have: -periodic_matrix_num_per_period 12. If only this option is given, the driver will 
+assume the TMs are spaced apart equally over the course of a period and assign times to them 
+accordingly. However, if the TMs are not equally spaced then you need to provide the corresponding 
+times via: -matrix_periodic_times_file XX, where XX is the name (string) of a binary file containing 
+the times at which the TMs are given (in units of the internal clock). This is useful, for instance, 
+if your year has 365 days with different days per month and you want to tell the driver that the TMs 
+are given at the middle of each month. (See below for how to create such a file.)
+
+Note: If your TMs are equally spaced there is an alternative option with which you can simply specify 
+the spacing: -matrix_cycle_step XX, where XX is a floating point number giving the spacing in units 
+of the internal clock. Thus, if your chosen unit of time is year and you're specifying monthly-mean TMs 
+then the spacing is simply 1/12, i.e.: -matrix_cycle_step 0.0833333333333333. This option is useful if, 
+for example, your year has 360 days and each month is 30 days. Note that you must use specify the value 
+in full double precision (16 decimal places). In Matlab this would be: sprintf('%17.16f',1/12). 
+Be aware though that this is only provided for backward compatibility with legacy run script and it will 
+be deprecated in future releases. You should instead use: -periodic_matrix_num_per_period NN as described 
+above.
+
+The binary files with the time specification of periodic fields can be created in Matlab as follows:
+
+% For monthly-mean fields with a 365-day year:
+dpm=[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+cdpm=cumsum(dpm);
+dpy=sum(dpm);
+N=length(dpm);
+t=zeros(N,1);
+
+t(1)=dpm(1)/2;
+for it=1:N-1
+  t(it+1)=cdpm(it)+dpm(it+1)/2;
+end
+
+write_binary('periodic_times_365d.bin',t/dpy,'real*8’)
+
+% For 6-hourly fields with a 365-day year:
+dpm=repmat(1,[365*4 1]);
+cdpm=cumsum(dpm);
+dpy=sum(dpm);
+N=length(dpm);
+t=zeros(N,1);
+
+t(1)=dpm(1)/2;
+for it=1:N-1
+  t(it+1)=cdpm(it)+dpm(it+1)/2;
+end
+
+write_binary('periodic_times_6hourly.bin',t/dpy,'real*8')
+
+9) Transport matrices:
+ a) To specify the name or prefix of the explicit transport matrix: -me XX, where XX is a string.
+ b) To specify the name or prefix of the implicit transport matrix: -mi XX, where XX is a string.
+
+If your TMs are periodic in time you must additionally give: -periodic_matrix. The strings specified 
+with -me XX and -mi YY will then be interpreted as prefixes for file names of the form XX_NN and YY_NN, 
+where NN an integer. For monthly-mean TMs, NN = 00, 01, 02, ..., 11 and the driver will try to read 
+PETSc formatted files XX_00, XX_01, ..., XX_11 and YY_00, YY_01, ..., YY_11.
+
+10) Time averaging: The driver can optionally accumulate and write out time averages of tracer fields 
+if you specify: -time_avg. You must then also give the names of files to which time-averaged output 
+is to be written for each tracer via: -avg_files XX,YY ... where XX, YY etc are the file names (strings). 
+You must provide as many file names as the number of tracers. 
+
+If you're restarting your run from a previous integration you can optionally append the time averages 
+to existing files (of the same name as given by arguments to -avg_files) with the -avg_append flag.
+
+The times at which time averages are written are written by default to 'time_average_output_time.txt'. 
+You can write this to a different file with: -avg_time_file XX, where XX is the name of a text file. 
+
+In addition, you must also specify the averaging interval via the option -avg_time_steps. This option 
+takes two forms:
+
+ a) If the averaging interval is fixed: -avg_time_steps NN, where NN is an integer giving the 
+ number of time steps over which to average.
+
+ b) If the averaging interval varies: -avg_time_steps NN,MM,...,PP where NN,MM,...,PP is a comma-separated 
+ list of integers giving the number of time steps over which to average. The driver will first average 
+ over NN time steps, then MM time steps, and so on. When it gets to the end of the list (PP), the 
+ list starts over again with NN. This option is useful if, for example, your year is 365 days and you're 
+ interested in calendar month averages. In this case the number of days per month and hence the number 
+ of time steps per month (and over which you wish to average) varies over the course of each year. 
+ Thus, if your simulation take 2 time steps per day (and assuming that the number of days per month for a 
+ nominal, no-leap, 365-day year is: 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31): 
+ -avg_time_steps 62,56,62,60,62,60,62,62,60,62,60,62
+
+Lastly, if, for example, you're doing a long spin-up run, you may only want to write out averages in, say, 
+the last year of the integration. In that case use: -avg_start_time_step NN, where NN is an integer specifying 
+the absolute (i.e., including iter0) time step at which (and including) to start accumulating time averages. 
+By default this is iter0 + 1. Thus, if your simulation starts at iter0=0, takes 720 time steps per year and 
+you want to start time averaging in the 2nd year: -avg_start_time_step 721.
+
+11) Forcings: In addition to transporting tracers you can include source/sink terms ("forcings"). The TMM 
+driver allows this to be specified in three ways, any combination of which can be turned on: 
+ a) Forcing term read from file (can be periodic, constant, or time-dependent) with: -forcing_from_file
+ b) External forcing computed in S/R calcExternalForcing: -external_forcing
+ c) Prescribed boundary condition (can be periodic, constant, or time-dependent): -prescribed_bc
+
+Forcing vectors are assumed discrete in time i.e., already multiplied by any physical time step before 
+being read from file or in calcExternalForcing. We consider each in turn below.
+
+a) Forcing term read from file: If the option -forcing_from_file is given you must then also 
+provide a list of file names via: -forcing_files XX,YY,..., where XX, YY etc are the file names 
+(strings). You must provide as many file names as the number of tracers. Forcing is assumed 
+discrete in time i.e., already multiplied by any physical time step.
+
+There are now 3 possibilities: 
+i) Periodic forcing: -periodic_forcing
+In this case the file names specified with -forcing_files are interpreted as prefixes as described 
+above (#9) for TMs. Also, as described above (#8) for TMs, you must specify the times at which 
+the periodic forcing is given via the options: -forcing_cycle_period, -periodic_forcing_num_per_period 
+and -forcing_periodic_times_file. (These work identically to the corresponding matrix options.)
+
+ii) Time-dependent forcing: -time_dependent_forcing
+In this case you must specify the number of forcing vectors being provided: -number_forcing_vecs NN 
+and the starting time:
+        ierr = PetscOptionsGetReal(PETSC_NULL,"-tfini",&tf0,&flg2);CHKERRQ(ierr);
+        if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate first forcing time with the -tfini option");
+        ierr = PetscOptionsGetReal(PETSC_NULL,"-tfend",&tf1,&flg2);CHKERRQ(ierr);
+        if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate last forcing time with the -tfend option");        
+
+Given forcing data are assumed to be spaced equally between the starting and ending times.
+Optional:
+ ierr = PetscOptionsGetStringArray(PETSC_NULL,"-ouf",ufoutFile,&maxValsToRead,&doWriteUF);CHKERRQ(ierr);
+ If -time_avg is specified then must also specify:
+	ierr = PetscOptionsGetStringArray(PETSC_NULL,"-ufavg_files",ufavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+  
+iii) Constant forcing: if neither -periodic_forcing or -time_dependent_forcing are given, the forcing 
+is assumed constant in time.
+
+b)  External forcing: If the option -external_forcing is given then the (time discrete) forcing is 
+computed by a user-provided function called calcExternalForcing.
+
+Optional:
+ ierr = PetscOptionsGetStringArray(PETSC_NULL,"-ouef",uefoutFile,&maxValsToRead,&doWriteUEF);CHKERRQ(ierr);
+ If -time_avg is specified then must also specify:
+	ierr = PetscOptionsGetStringArray(PETSC_NULL,"-uefavg_files",uefavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+
+c) Prescribed boundary condition: -prescribed_bc
+read from file (can be periodic, constant, or time-dependent) or computed 'on-the-fly'.
+    ierr = PetscOptionsHasName(PETSC_NULL,"-calc_bc",&doCalcBC);CHKERRQ(ierr);
+        ierr = PetscOptionsGetInt(PETSC_NULL,"-bc_vec_size",&gBCSize,&flg1);CHKERRQ(ierr);
+OR
+    ierr = PetscOptionsGetStringArray(PETSC_NULL,"-bc_files",bcFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+      ierr = PetscOptionsHasName(PETSC_NULL,"-periodic_bc",&periodicBC);CHKERRQ(ierr);
+      ierr = PetscOptionsHasName(PETSC_NULL,"-time_dependent_bc",&timeDependentBC);CHKERRQ(ierr);
+          ierr = PetscOptionsGetInt(PETSC_NULL,"-number_bc_vecs",&numBC,&flg2);CHKERRQ(ierr);
+          ierr = PetscOptionsGetReal(PETSC_NULL,"-tbcini",&tbc0,&flg2);CHKERRQ(ierr);
+          ierr = PetscOptionsGetReal(PETSC_NULL,"-tbcend",&tbc1,&flg2);CHKERRQ(ierr);
+      constant      
+
+    ierr = PetscOptionsGetInt(PETSC_NULL,"-bc_cutoff_step",&bcCutOffStep,&flg1);CHKERRQ(ierr);
+	ierr = PetscOptionsGetStringArray(PETSC_NULL,"-obc",bcoutFile,&maxValsToRead,&doWriteBC);CHKERRQ(ierr);
+		ierr = PetscOptionsGetStringArray(PETSC_NULL,"-bcavg_files",bcavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+
+	ierr = PetscOptionsGetString(PETSC_NULL,"-mbe",matbeFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
+	ierr = PetscOptionsGetString(PETSC_NULL,"-mbi",matbiFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
+
+    Time info is inherited from main TMs info.
+
