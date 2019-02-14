@@ -65,9 +65,9 @@ must also be in the units of the internal clock and for periodic data this requi
 additional information to the TMM driver via a set of extra options. For example, if the unit 
 of time is year and your circulation has a periodicity of 1 year you would specify that with: 
 -matrix_cycle_period 1.0. But you also need to tell the driver how many TMs it should read 
-and how these are spaced apart over the year. The former is given via the -periodic_matrix_num_per_period NN 
+and how these are spaced apart over the year. The former is given via the -matrix_num_per_period NN 
 option, where NN is an integer giving the number of TMs per period. Thus, for monthly-mean TMs, 
-you would have: -periodic_matrix_num_per_period 12. If only this option is given, the driver will 
+you would have: -matrix_num_per_period 12. If only this option is given, the driver will 
 assume the TMs are spaced apart equally over the course of a period and assign times to them 
 accordingly. However, if the TMs are not equally spaced then you need to provide the corresponding 
 times via: -matrix_periodic_times_file XX, where XX is the name (string) of a binary file containing 
@@ -82,8 +82,7 @@ then the spacing is simply 1/12, i.e.: -matrix_cycle_step 0.0833333333333333. Th
 for example, your year has 360 days and each month is 30 days. Note that you must use specify the value 
 in full double precision (16 decimal places). In Matlab this would be: sprintf('%17.16f',1/12). 
 Be aware though that this is only provided for backward compatibility with legacy run script and it will 
-be deprecated in future releases. You should instead use: -periodic_matrix_num_per_period NN as described 
-above.
+be deprecated in future releases. You should instead use: -matrix_num_per_period NN as described above.
 
 The binary files with the time specification of periodic fields can be created in Matlab as follows:
 
@@ -175,7 +174,7 @@ There are now 3 possibilities:
 i) Periodic forcing: -periodic_forcing
 In this case the file names specified with -forcing_files are interpreted as prefixes as described 
 above (#9) for TMs. Also, as described above (#8) for TMs, you must specify the times at which 
-the periodic forcing is given via the options: -forcing_cycle_period, -periodic_forcing_num_per_period 
+the periodic forcing is given via the options: -forcing_cycle_period, -forcing_num_per_period 
 and -forcing_periodic_times_file. (These work identically to the corresponding matrix options.)
 
 ii) Time-dependent forcing: -time_dependent_forcing
