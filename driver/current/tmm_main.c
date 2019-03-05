@@ -79,6 +79,7 @@ int main(int argc,char **args)
   PetscInt bcCutOffStep = -1;
   Mat Be, Bi;
   PeriodicMat Bep, Bip;
+  TimeDependentMat Betd, Bitd;  
   char matbeFile[PETSC_MAX_PATH_LEN], matbiFile[PETSC_MAX_PATH_LEN];
   Vec bcTemplateVec;
   
@@ -819,7 +820,30 @@ int main(int argc,char **args)
     
 	  Bep.firstTime = PETSC_TRUE;
 	  Bip.firstTime = PETSC_TRUE;
-    
+
+    } else if (timeDependentMatrix) {
+	  ierr=PetscPrintf(PETSC_COMM_WORLD,"Time-dependent matrices specified\n");CHKERRQ(ierr);
+	  ierr=PetscStrcat(matbeFile,"_");CHKERRQ(ierr);
+	  ierr=PetscStrcat(matbiFile,"_");CHKERRQ(ierr);
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Be basename is %s\n", matbeFile);CHKERRQ(ierr); 
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Bi basename is %s\n", matbiFile);CHKERRQ(ierr);     
+
+/*    Read here to set sparsity pattern */  
+	  strcpy(tmpFile,"");
+	  sprintf(tmpFile,"%s%02d",matbeFile,0);
+	  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,tmpFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	  ierr = MatLoad(Be,fd);CHKERRQ(ierr);
+	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+        
+	  strcpy(tmpFile,"");
+	  sprintf(tmpFile,"%s%02d",matbiFile,0);
+	  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,tmpFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
+	  ierr = MatLoad(Bi,fd);CHKERRQ(ierr);
+	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
+
+	  Betd.firstTime = PETSC_TRUE;
+	  Bitd.firstTime = PETSC_TRUE;  
+        
     } else { /*  not periodic. read matrices here */
 
 	  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,matbeFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
@@ -1052,7 +1076,10 @@ int main(int argc,char **args)
                                       matrixPeriodicTimer.tdp,&Bep,matbeFile);
           ierr = interpPeriodicMatrix(tc,&Bi,matrixPeriodicTimer.cyclePeriod,matrixPeriodicTimer.numPerPeriod,
                                       matrixPeriodicTimer.tdp,&Bip,matbiFile);
-        }    
+		} else if (timeDependentMatrix) {
+		  ierr = interpTimeDependentMatrix(tc,&Be,matrixTimeDependentTimer.numTimes,matrixTimeDependentTimer.tdt,&Betd,matbeFile);
+		  ierr = interpTimeDependentMatrix(tc,&Bi,matrixTimeDependentTimer.numTimes,matrixTimeDependentTimer.tdt,&Bitd,matbiFile);
+		}
         if (periodicBC) {
           for (itr=0; itr<numTracers; itr++) {    
             ierr = interpPeriodicVector(tc,&bcc[itr],bcTimer.cyclePeriod,bcTimer.numPerPeriod,bcTimer.tdp,&bcp[itr],bcFile[itr]);
@@ -1423,6 +1450,9 @@ int main(int argc,char **args)
 	if (periodicMatrix) {
 	  ierr = destroyPeriodicMat(&Bep);CHKERRQ(ierr);
 	  ierr = destroyPeriodicMat(&Bip);CHKERRQ(ierr);    
+	} else if (timeDependentMatrix) {
+	  ierr = destroyTimeDependentMat(&Betd);
+	  ierr = destroyTimeDependentMat(&Bitd);
 	}
     ierr = VecDestroyVecs(numTracers,&bcc);CHKERRQ(ierr);
     ierr = VecDestroyVecs(numTracers,&bcf);CHKERRQ(ierr);  
