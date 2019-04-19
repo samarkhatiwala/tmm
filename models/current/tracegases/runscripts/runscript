@@ -18,7 +18,7 @@ mpiexec -np 2 ./tmmtracegases \
    -matrix_cycle_period 1.0 -matrix_num_per_period 12 -matrix_periodic_times_file periodic_times_365d.bin \
    -periodic_biogeochem_forcing \
    -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_num_per_period 12 -periodic_biogeochem_periodic_times_file periodic_times_365d.bin \
-   -use_winds -piston_velocity 0.24 \
+   -use_winds -piston_velocity_coeff 0.24 \
    -periodic_winds_cycle_period 1.0 -periodic_winds_num_per_period 1460 -periodic_winds_periodic_times_file periodic_times_6hourly.bin \
    -gas_id 2 -mixing_ratio_scale_factor 1.e-12 \
    -xTRatm_history TxTR.bin,xTRatm.bin -spatially_variable_mixing_ratio \
@@ -45,7 +45,7 @@ mpiexec -np 2 ./tmmtracegases \
    -periodic_matrix -matrix_cycle_period 1.0 -matrix_num_per_period 12 \
    -periodic_biogeochem_forcing \
    -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_num_per_period 12 \
-   -use_winds -piston_velocity 0.24 \
+   -use_winds -piston_velocity_coeff 0.24 \
    -periodic_winds_cycle_period 1.0 -periodic_winds_num_per_period 1460 \
    -gas_id 2 -mixing_ratio_scale_factor 1.e-12 \
    -xTRatm_history TxTR.bin,xTRatm.bin -spatially_variable_mixing_ratio \
