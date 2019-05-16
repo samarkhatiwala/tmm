@@ -6,9 +6,9 @@ code and interface to models are written using the PETSc framework
 Simply skip to step (3) below. Otherwise keep reading and if you have any 
 questions feel free to email: Samar Khatiwala <samar.khatiwala@earth.ox.ac.uk>
 
-If you use the TMM, please cite Khatiwala et al. (2005; DOI: 10.1016/j.ocemod.2004.04.002) 
-and Khatiwala (2007; DOI: 10.1029/2007GB002923). Furthermore, if you use this code 
-please also cite Khatiwala (2018; DOI: 10.5281/zenodo.1246300). Thank you!
+If you use the TMM, please cite Khatiwala et al. (2005; https://doi.org/10.1016/j.ocemod.2004.04.002) 
+and Khatiwala (2007; https://doi.org/10.1029/2007GB002923). Furthermore, if you use this code 
+please also cite Khatiwala (2018; https://doi.org/10.5281/zenodo.1246300). Thank you!
 
 For a quick overview of the TMM and the PETSc driver also have a look at this excellent 
 presentation by Iris Kriest: https://ftp.geomar.de/users/ikriest/TMM/MOPS-TMM-2016-June.pdf
