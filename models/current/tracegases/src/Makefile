@@ -11,14 +11,14 @@ else
 endif
 
 ifneq (,$(findstring ifort,$(COMPILER)))
-	FFLAGS+=-r8
+	FC_FLAGS+=
 endif
 ifneq (,$(findstring gfortran,$(COMPILER)))
-	FFLAGS+=-fdefault-real-8
+	FC_FLAGS+=
 endif
 ifneq (,$(findstring xlf,$(COMPILER)))
 	FPPFLAG+=-WF,
-	FFLAGS+=-qrealsize=8 -qzerosize
+	FC_FLAGS+=-qzerosize
 endif
 
 SRCTMM = tmm_main.c tmm_forward_step.c tmm_forcing_utils.c \

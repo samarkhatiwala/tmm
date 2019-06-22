@@ -16,14 +16,14 @@ else
 endif
 
 ifneq (,$(findstring ifort,$(COMPILER)))
-	FFLAGS+=-r8
+	FC_FLAGS+=-r8
 endif
 ifneq (,$(findstring gfortran,$(COMPILER)))
-	FFLAGS+=-fdefault-real-8
+	FC_FLAGS+=-fdefault-real-8
 endif
 ifneq (,$(findstring xlf,$(COMPILER)))
 	FPPFLAG+=-WF,
-	FFLAGS+=-qrealsize=8 -qzerosize
+	FC_FLAGS+=-qrealsize=8 -qzerosize
 endif
 
 MYPATHS = $(BASE1)/common:$(BASE1)/mom:$(BASE1)/embm:$(BASE2)/common:$(BASE2)/mom:$(BASE2)/embm:$(BASE3)/common:$(BASE3)/mom:$(BASE3)/embm

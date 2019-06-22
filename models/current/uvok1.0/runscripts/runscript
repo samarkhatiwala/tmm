@@ -1,3 +1,4 @@
+## 365 days per year with a time step of 3 steps per day:
 mpiexec -np 4 ./tmmuvok \
   -numtracers 10 \
   -i dicini.petsc,c14ini.petsc,alkini.petsc,o2ini.petsc,po4ini.petsc,phytini.petsc,zoopini.petsc,detrini.petsc,no3ini.petsc,diazini.petsc \

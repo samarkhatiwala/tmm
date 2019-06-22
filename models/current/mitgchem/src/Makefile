@@ -9,14 +9,14 @@ include ${PETSC_DIR}/lib/petsc/conf/petscvariables
 FPPFLAG=
 COMPILER=$(word 1,$(MPIFC_SHOW))
 ifneq (,$(findstring ifort,$(COMPILER)))
-	FFLAGS+=-r8
+	FC_FLAGS+=-r8
 endif
 ifneq (,$(findstring gfortran,$(COMPILER)))
-	FFLAGS+=-fdefault-real-8
+	FC_FLAGS+=-fdefault-real-8
 endif
 ifneq (,$(findstring xlf,$(COMPILER)))
 	FPPFLAG+=-WF,
-	FFLAGS+=-qrealsize=8 -qzerosize
+	FC_FLAGS+=-qrealsize=8 -qzerosize
 endif
 
 MYPATHS = $(MITGCMBASE)/model/src:$(MITGCMBASE)/model/inc:$(MITGCMBASE)/eesupp/src:$(MITGCMBASE)/eesupp/inc:$(MITGCMBASE)/pkg/ptracers:$(MITGCMBASE)/pkg/gchem:$(MITGCMBASE)/pkg/dic

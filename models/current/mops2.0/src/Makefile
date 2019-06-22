@@ -11,14 +11,14 @@ else
 endif
 
 ifneq (,$(findstring ifort,$(COMPILER)))
-	FFLAGS+=-r8
+	FC_FLAGS+=-r8
 endif
 ifneq (,$(findstring gfortran,$(COMPILER)))
-	FFLAGS+=-fdefault-real-8
+	FC_FLAGS+=-fdefault-real-8
 endif
 ifneq (,$(findstring xlf,$(COMPILER)))
 	FPPFLAG+=-WF,
-	FFLAGS+=-qrealsize=8 -qzerosize
+	FC_FLAGS+=-qrealsize=8 -qzerosize
 endif
 
 PROGRAM = mops
@@ -57,20 +57,20 @@ OBJECTS = $(SRC:.c=.o) $(SRF:.F=.o)
 # option -DASCIIPARAMS to use ASCII parameter file as default
 
 # use surface supply of buried P
-$(PROGRAM): FPPFLAGS+=$(FPPFLAG)-DASCIIPARAMS
-$(PROGRAM): CPPFLAGS+=-DASCIIPARAMS
+$(PROGRAM): FPPFLAGS+=$(FPPFLAG)-DASCIIPARAMS -DCARBON
+$(PROGRAM): CPPFLAGS+=-DASCIIPARAMS -DCARBON
 
 # use mops with surface supply of buried P and implicit profiles
-$(IPROGRAM): FPPFLAGS+=$(FPPFLAG)-DIMPRO -DASCIIPARAMS
-$(IPROGRAM): CPPFLAGS+=-DIMPRO -DASCIIPARAMS
+$(IPROGRAM): FPPFLAGS+=$(FPPFLAG)-DIMPRO -DASCIIPARAMS -DCARBON
+$(IPROGRAM): CPPFLAGS+=-DIMPRO -DASCIIPARAMS -DCARBON
 
 # use the original mops with river runoff of buried P
-$(RPROGRAM): FPPFLAGS+=$(FPPFLAG)-DRUNOFF -DASCIIPARAMS
-$(RPROGRAM): CPPFLAGS+=-DRUNOFF -DASCIIPARAMS
+$(RPROGRAM): FPPFLAGS+=$(FPPFLAG)-DRUNOFF -DASCIIPARAMS -DCARBON
+$(RPROGRAM): CPPFLAGS+=-DRUNOFF -DASCIIPARAMS -DCARBON
 
 # use the original mops with river runoff of buried P and implicit profiles
-$(IRPROGRAM): FPPFLAGS+=$(FPPFLAG)-DRUNOFF -DIMPRO -DASCIIPARAMS
-$(IRPROGRAM): CPPFLAGS+=-DRUNOFF -DIMPRO -DASCIIPARAMS
+$(IRPROGRAM): FPPFLAGS+=$(FPPFLAG)-DRUNOFF -DIMPRO -DASCIIPARAMS -DCARBON
+$(IRPROGRAM): CPPFLAGS+=-DRUNOFF -DIMPRO -DASCIIPARAMS -DCARBON
 
 $(PROGRAM): $(OBJECTS) chkopts
 	-${CLINKER} -o $@ $(OBJECTS) ${PETSC_MAT_LIB}
