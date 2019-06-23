@@ -7,19 +7,21 @@ distributed from here: https://github.com/OSU-CEOAS-Schmittner/UVic2.9/wiki
 (2) Next, make a directory in which you want to compile and run TMM-MOBI. We will call this 
 TEST below.
 
-(3) Copy the contents (including subdirectories) of matlab/ and runscripts/ to TEST/. 
+(3) Copy the contents (including subdirectories) of mobi2.0/matlab/ and mobi2.0/runscripts/ 
+to TEST/. 
 
-(4) Copy src/Makefile to TEST and follow the instructions at the top of Makefile for setting 
-paths.
+(4) Copy mobi2.0/src/Makefile and mobi2.0/src/MOBI_TMM_OPTIONS.h to TEST/ and follow the 
+instructions at the top of Makefile for setting paths.
 
 (5) If you wish to make changes to the MOBI or interface code copy the relevant source files 
 to TEST/ and make your changes.
 
 (6) Edit namelist parameters in control.in as necessary.
 
-(7) Edit the CPP options in MOBI_TMM_OPTIONS.h as necessary.
+(7) Edit the C preprocessor options in MOBI_TMM_OPTIONS.h as necessary. 
 
 (7) Build with:
+make cleanall
 make smallf
 make tmmmobiwrite
 make tmmmobi
@@ -58,7 +60,8 @@ final comma.)
 NOTE-3: tmmmobiwrite uses UVic routines where initial condition profiles are set. The code 
 for this is hardwired for the standard UVic grid with 19 levels. If you're using TMs from 
 a different ocean model you will need to modify make_input_files_for_mobi_model.m accordingly 
-to specify initial conditions corresponding to your grid.
+to specify initial conditions corresponding to your grid. You will also need to change the 
+number of levels (km) in size.h.
 
 (9) Set the path at the top of make_input_files_for_mobi_model.m and execute in Matlab. 
 (See NOTE-3 in #8.)

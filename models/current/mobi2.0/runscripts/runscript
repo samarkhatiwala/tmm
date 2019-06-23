@@ -8,8 +8,8 @@ mpiexec -np 4 ./tmmmobi \
    -max_steps 2190 \
    -write_steps 1095 \
    -o dic.petsc,dic13.petsc,c14.petsc,alk.petsc,o2.petsc,po4.petsc,phyt.petsc,zoop.petsc,detr.petsc,cocc.petsc,caco3.petsc,dop.petsc,no3.petsc,don.petsc,diaz.petsc,din15.petsc,don15.petsc,phytn15.petsc,coccn15.petsc,zoopn15.petsc,detrn15.petsc,diazn15.petsc,dfe.petsc,detrfe.petsc,phytc13.petsc,coccc13.petsc,caco3c13.petsc,zoopc13.petsc,detrc13.petsc,doc13.petsc,diazc13.petsc \
-   -pickup_out pickup_fixed_CO2.petsc \
-   -time_file output_time_fixed_CO2.txt \
+   -pickup_out pickup.petsc \
+   -time_file output_time.txt \
    -external_forcing \
    -use_profiles \
    -biogeochem_deltat 28800.0 \
