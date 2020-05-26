@@ -7,7 +7,12 @@
 
 #include "petscmat.h"
 #include "petsc_matvec_utils.h"
+#include "tmm_timer.h"
 #include "tmm_forcing_utils.h"
+#include "tmm_profile_utils.h"
+#include "tmm_profile_data.h"
+#include "tmm_misfit.h"
+#include "tmm_main.h"
 
 #undef __FUNCT__
 #define __FUNCT__ "iniCalcBC"

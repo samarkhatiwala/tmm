@@ -74,10 +74,11 @@ PetscErrorCode iniStepTimer( const char pre[], PetscInt Iter0, StepTimer *thetim
 /*  read time step data */
     thetimer->startTimeStep = Iter0 + 1; /* by default we start at first time step */
     ierr = PetscOptionsGetInt(pre,"-start_time_step",&thetimer->startTimeStep,&flg);CHKERRQ(ierr);
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Start time step for StepTimer object %s is %d\n", pre, thetimer->startTimeStep);CHKERRQ(ierr);	  
 
     thetimer->maxNumIntervals=MAX_NUM_INTERVALS;
     ierr = PetscOptionsGetIntArray(pre,"-time_steps",tmparr,&thetimer->maxNumIntervals,&flg);CHKERRQ(ierr);
-    if (!flg) SETERRQ1(PETSC_COMM_WORLD,1,"Must indicate number of step timer time steps with the -%stime_step flag",pre);
+    if (!flg) SETERRQ1(PETSC_COMM_WORLD,1,"Must indicate number of step timer time steps with the -%stime_steps flag",pre);
 
     if (thetimer->maxNumIntervals==1) {
       thetimer->fixedStep=PETSC_TRUE;
@@ -95,7 +96,25 @@ PetscErrorCode iniStepTimer( const char pre[], PetscInt Iter0, StepTimer *thetim
 	  thetimer->currInterval=0;
 	  thetimer->numTimeSteps=thetimer->timeIntervals[thetimer->currInterval];
     }
+
+    thetimer->startTimeStepResetFreq=-1;
+    ierr = PetscOptionsGetInt(pre,"-start_time_step_reset_freq",&thetimer->startTimeStepResetFreq,&flg);CHKERRQ(ierr);
+    if (flg) {
+	  PetscInt tmp=0;
+	  if (!thetimer->fixedStep) {
+		for (it=0; it<thetimer->maxNumIntervals; it++) {
+		  tmp=tmp+(thetimer->timeIntervals[it]);
+        } 
+	  } else {
+        tmp=thetimer->numTimeSteps;
+      }
+      if (tmp > thetimer->startTimeStepResetFreq) {
+        SETERRQ1(PETSC_COMM_WORLD,1,"Start time reset frequency less than total number of timer steps for StepTimer object %s",pre);
+      } 
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"Start time will be reset every %d steps for StepTimer object %s\n", thetimer->startTimeStepResetFreq, pre);CHKERRQ(ierr);	  
+    }    
     
+    thetimer->haveResetStartTimeStep=PETSC_FALSE;
 	thetimer->count=0;
 	    
     return 0;
@@ -105,19 +124,33 @@ PetscErrorCode iniStepTimer( const char pre[], PetscInt Iter0, StepTimer *thetim
 PetscErrorCode updateStepTimer( const char pre[], PetscInt Iter, StepTimer *thetimer )
 {
 
+    PetscBool endOfSequence = PETSC_TRUE;
     PetscErrorCode ierr;
-
+    
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Updating StepTimer object %s at iter %d\n", pre,Iter);CHKERRQ(ierr);        
 
 	thetimer->count=0; /* reset counter */
-
+    thetimer->haveResetStartTimeStep=PETSC_FALSE;
+    
     if (!thetimer->fixedStep) {
       thetimer->currInterval++;
-      if (thetimer->currInterval==thetimer->maxNumIntervals) thetimer->currInterval=0;
+      if (thetimer->currInterval==thetimer->maxNumIntervals) {
+//      We're now at the end of the sequence      
+        thetimer->currInterval=0;
+      } else {
+//      Still within sequence      
+        endOfSequence = PETSC_FALSE;
+      }       
       thetimer->numTimeSteps=thetimer->timeIntervals[thetimer->currInterval];
       ierr = PetscPrintf(PETSC_COMM_WORLD,"New interval for StepTimer object %s at iter %d is %d\n", pre,Iter,thetimer->numTimeSteps);CHKERRQ(ierr);
     }
-	    
+
+    if ((thetimer->startTimeStepResetFreq > 0) && (endOfSequence)) {
+      thetimer->startTimeStep = thetimer->startTimeStep + thetimer->startTimeStepResetFreq;
+      thetimer->haveResetStartTimeStep=PETSC_TRUE;
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"New start time step for StepTimer object %s is %d\n", pre, thetimer->startTimeStep);CHKERRQ(ierr);
+    }
+
     return 0;
     
 }

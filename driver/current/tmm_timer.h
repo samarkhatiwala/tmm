@@ -2,8 +2,8 @@
 struct timerstruct {
 	char	*name;
 
-    PetscBool fixedStep;
-    PetscInt count, startTimeStep, numTimeSteps, maxNumIntervals, currInterval;
+    PetscBool fixedStep, haveResetStartTimeStep;
+    PetscInt count, startTimeStep, startTimeStepResetFreq, numTimeSteps, maxNumIntervals, currInterval;
     PetscInt *timeIntervals;
 };
 

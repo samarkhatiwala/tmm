@@ -7,11 +7,11 @@
 
 #include "petscmat.h"
 #include "petsc_matvec_utils.h"
-#include "tmm_main.h"
+#include "tmm_timer.h"
 #include "tmm_forcing_utils.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
-#include "tmm_timer.h"
+#include "tmm_main.h"
 
 StepTimer misfitTimer;
 

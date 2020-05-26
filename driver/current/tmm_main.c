@@ -25,14 +25,20 @@ static char help[] = "\n";
 #include "tmm_main.h"
 
 PetscScalar deltaTClock, time0;
-PetscInt maxSteps, Iter0, writeSteps;
+PetscInt maxSteps, Iter0;
+StepTimer writeTimer;
 PetscInt *gIndices, gLow, gHigh;
 PetscInt *gBCIndices, lBCSize, gBCSize, gbcLow, gbcHigh;
 PetscBool doMisfit = PETSC_FALSE;
+PetscBool rescaleForcing = PETSC_FALSE;
 
 extern PetscErrorCode forwardStep(PetscScalar tc, PetscInt iLoop, PetscScalar dt, PetscInt numTracers, 
                                   PetscBool useForcingFromFile, PetscBool useExternalForcing, PetscBool usePrescribedBC, 
                                   Vec *v, Mat Ae, Mat Ai, Mat Be, Mat Bi, Vec *uf, Vec *uef, Vec *bcc, Vec *bcf, Vec *vtmp);
+
+extern PetscErrorCode iniTMMWrite(PetscScalar tc, PetscInt it, PetscInt ntr, Vec *v, PetscBool append);
+extern PetscErrorCode doTMMWrite(PetscScalar tc, PetscInt it, PetscInt ntr, Vec *v);
+extern PetscErrorCode finalizeTMMWrite(PetscScalar tc, PetscInt it, PetscInt ntr);
 
 extern PetscErrorCode waitForSignal(PetscInt waitTime);
 
@@ -62,6 +68,8 @@ int main(int argc,char **args)
   Vec **utdf;
   PetscScalar *tdfT; /* array for time dependent (nonperiodic) forcing */
   PetscScalar tf0, tf1;
+  PetscInt forcingFromFileCutOffStep = -1;
+  PetscInt externalForcingCutOffStep = -1;
 
 /* Rescale forcing */
   Vec Rfs;
@@ -90,6 +98,8 @@ int main(int argc,char **args)
   char *ufoutFile[MAXNUMTRACERS], *uefoutFile[MAXNUMTRACERS];
   char pickupFile[PETSC_MAX_PATH_LEN];
   char pickupoutFile[PETSC_MAX_PATH_LEN];  
+  PetscBool writePickup = PETSC_FALSE;
+  StepTimer pickupTimer;
   char outTimeFile[PETSC_MAX_PATH_LEN];  
   PetscBool appendOutput = PETSC_FALSE;
   PetscFileMode OUTPUT_FILE_MODE;
@@ -126,7 +136,9 @@ int main(int argc,char **args)
   PetscBool useExternalForcing = PETSC_FALSE;
   PetscBool useForcingFromFile = PETSC_FALSE;
   PetscBool usePrescribedBC = PETSC_FALSE;
-  PetscBool applyBC = PETSC_FALSE;  
+  PetscBool applyExternalForcing = PETSC_FALSE;
+  PetscBool applyForcingFromFile = PETSC_FALSE;
+  PetscBool applyBC = PETSC_FALSE;
   PetscBool periodicForcing = PETSC_FALSE;
   PetscBool timeDependentForcing = PETSC_FALSE;
   PetscBool constantForcing = PETSC_FALSE;
@@ -134,7 +146,6 @@ int main(int argc,char **args)
   PetscBool timeDependentBC = PETSC_FALSE;
   PetscBool constantBC = PETSC_FALSE;
   PetscBool doCalcBC = PETSC_FALSE;
-  PetscBool rescaleForcing = PETSC_FALSE;
   PetscBool useMonitor = PETSC_FALSE;
 
   PetscMPIInt numProcessors, myId;  
@@ -179,8 +190,13 @@ int main(int argc,char **args)
   if ((!flg1) && (flg2)) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate both or neither time0 and Iter0 with the -t0 and -iter0 flags");        
   ierr = PetscOptionsGetInt(PETSC_NULL,"-max_steps",&maxSteps,&flg1);CHKERRQ(ierr);
   if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate maximum number of steps with the -max_steps option");
-  ierr = PetscOptionsGetInt(PETSC_NULL,"-write_steps",&writeSteps,&flg1);CHKERRQ(ierr);
-  if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate output step with the -write_steps option");
+
+// Catch deprecated option
+  PetscInt dum;
+  ierr = PetscOptionsGetInt(PETSC_NULL,"-write_steps",&dum,&flg1);CHKERRQ(ierr);
+  if (flg1) SETERRQ(PETSC_COMM_WORLD,1,"ERROR!: The -write_steps option has been deprecated. Use the StepTimer object with prefix 'write'");
+
+  ierr = iniStepTimer("write_", Iter0, &writeTimer);CHKERRQ(ierr);
 
 /*Data for time averaging */
   ierr = PetscOptionsHasName(PETSC_NULL,"-time_avg",&doTimeAverage);CHKERRQ(ierr);
@@ -390,6 +406,12 @@ int main(int argc,char **args)
   }
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Final pickup will be written to %s\n",pickupoutFile);CHKERRQ(ierr);
 
+  ierr = PetscOptionsHasName(PETSC_NULL,"-pickup_time_steps",&writePickup);CHKERRQ(ierr);
+  if (writePickup) {
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"Intermediate pickups will be written to pickup_ITERATIONNUMBER.petsc\n");CHKERRQ(ierr);
+    ierr = iniStepTimer("pickup_", Iter0, &pickupTimer);CHKERRQ(ierr);
+  }
+
 /* tracer vectors */
   ierr = VecDuplicateVecs(templateVec,numTracers,&v);CHKERRQ(ierr);
   ierr = VecDuplicateVecs(templateVec,numTracers,&vtmp);CHKERRQ(ierr); /* temporary work space needed by forwardStep */
@@ -440,12 +462,6 @@ int main(int argc,char **args)
   ierr = PetscOptionsHasName(PETSC_NULL,"-forcing_from_file",&useForcingFromFile);CHKERRQ(ierr);
   ierr = PetscOptionsHasName(PETSC_NULL,"-prescribed_bc",&usePrescribedBC);CHKERRQ(ierr);
   ierr = PetscOptionsHasName(PETSC_NULL,"-external_forcing",&useExternalForcing);CHKERRQ(ierr);
-
-/*   if (useExternalForcing) { */
-/*     if ((useForcingFromFile) | (usePrescribedBC)) { */
-/*       SETERRQ(PETSC_COMM_WORLD,1,"Cannot use the -external_forcing option with the -forcing_from_file or -prescribed_bc options");   */
-/*     }   */
-/*   } */
 
   if (useForcingFromFile) {  
   	ierr=PetscPrintf(PETSC_COMM_WORLD,"Forcing from file(s) specified\n");CHKERRQ(ierr);  
@@ -554,6 +570,14 @@ int main(int argc,char **args)
 		}
 	  }
     }
+
+    applyForcingFromFile = PETSC_TRUE;
+    
+    ierr = PetscOptionsGetInt(PETSC_NULL,"-forcing_from_file_cutoff_step",&forcingFromFileCutOffStep,&flg1);CHKERRQ(ierr);
+    if (forcingFromFileCutOffStep>0) {
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"Forcing from file will be turned off after time step %d\n",forcingFromFileCutOffStep);CHKERRQ(ierr);    
+    }
+    
   } else {  /* no forcing */
     numForcing=0;
     ierr = PetscPrintf(PETSC_COMM_WORLD,"No forcing from file(s) specified\n");CHKERRQ(ierr);    
@@ -595,6 +619,13 @@ int main(int argc,char **args)
 		  ierr = PetscPrintf(PETSC_COMM_WORLD,"   Tracer %d: %s\n", itr,uefavgOutFile[itr]);CHKERRQ(ierr);
 		}      
 	  }
+    }
+
+    applyExternalForcing = PETSC_TRUE;
+
+    ierr = PetscOptionsGetInt(PETSC_NULL,"-external_forcing_cutoff_step",&externalForcingCutOffStep,&flg1);CHKERRQ(ierr);
+    if (externalForcingCutOffStep>0) {
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"External forcing will be turned off after time step %d\n",externalForcingCutOffStep);CHKERRQ(ierr);    
     }
     
   } else {
@@ -877,6 +908,8 @@ int main(int argc,char **args)
 	}  
   }
 
+  ierr = iniTMMWrite(time0,Iter0,numTracers,v,appendOutput);CHKERRQ(ierr);
+
 /* initialize monitor */
   ierr = PetscOptionsHasName(PETSC_NULL,"-monitor",&useMonitor);CHKERRQ(ierr);
   if (useMonitor) {  
@@ -1036,30 +1069,44 @@ int main(int argc,char **args)
     }
 
 /*  Forcing     */
-    if (useForcingFromFile) {
-	  if (periodicForcing) {
-		for (itr=0; itr<numTracers; itr++) {    
-		  ierr = interpPeriodicVector(tc,&uf[itr],forcingTimer.cyclePeriod,forcingTimer.numPerPeriod,forcingTimer.tdp,&up[itr],forcingFile[itr]);
-		}    
-	  } else if (timeDependentForcing) {
-		ierr = interpTimeDependentVector(tc,uf,numTracers,numForcing,tdfT,utdf);CHKERRQ(ierr);
-	  }
-	  if (rescaleForcing) {
-		for (itr=0; itr<numTracers; itr++) {    
-          ierr = VecPointwiseMult(uf[itr],Rfs,uf[itr]);CHKERRQ(ierr);
-        }  
-	  }
+    if (applyForcingFromFile) {
+      if ((forcingFromFileCutOffStep>0) && (iLoop==(forcingFromFileCutOffStep+1))) {
+        applyForcingFromFile = PETSC_FALSE;
+		for (itr=0; itr<numTracers; itr++) {
+		  VecSet(uf[itr],zero);
+		}
+      } else {
+		if (periodicForcing) {
+		  for (itr=0; itr<numTracers; itr++) {    
+			ierr = interpPeriodicVector(tc,&uf[itr],forcingTimer.cyclePeriod,forcingTimer.numPerPeriod,forcingTimer.tdp,&up[itr],forcingFile[itr]);
+		  }    
+		} else if (timeDependentForcing) {
+		  ierr = interpTimeDependentVector(tc,uf,numTracers,numForcing,tdfT,utdf);CHKERRQ(ierr);
+		}
+		if (rescaleForcing) {
+		  for (itr=0; itr<numTracers; itr++) {    
+			ierr = VecPointwiseMult(uf[itr],Rfs,uf[itr]);CHKERRQ(ierr);
+		  }  
+		}
+	  }	
 	}
 #endif
 
-    if (useExternalForcing) {
-      ierr = calcExternalForcing(tc,Iterc,iLoop,numTracers,v,uef);CHKERRQ(ierr); /* Compute external forcing in uef */
-	  if (rescaleForcing) {
-		for (itr=0; itr<numTracers; itr++) {    
-          ierr = VecPointwiseMult(uef[itr],Rfs,uef[itr]);CHKERRQ(ierr);
-        }  
-	  }      
-    }    
+    if (applyExternalForcing) {
+      if ((externalForcingCutOffStep>0) && (iLoop==(externalForcingCutOffStep+1))) {
+        applyExternalForcing = PETSC_FALSE;
+		for (itr=0; itr<numTracers; itr++) {
+		  VecSet(uef[itr],zero);
+		}
+      } else {    
+		ierr = calcExternalForcing(tc,Iterc,iLoop,numTracers,v,uef);CHKERRQ(ierr); /* Compute external forcing in uef */
+		if (rescaleForcing) {
+		  for (itr=0; itr<numTracers; itr++) {    
+			ierr = VecPointwiseMult(uef[itr],Rfs,uef[itr]);CHKERRQ(ierr);
+		  }  
+		}
+	  }	
+    } 
 
 #ifndef FORJACOBIAN
     if (applyBC) {
@@ -1104,7 +1151,7 @@ int main(int argc,char **args)
 	  }	
     }
         
-    ierr = forwardStep(tc,Iterc,deltaTClock,numTracers,useForcingFromFile,useExternalForcing,applyBC,
+    ierr = forwardStep(tc,Iterc,deltaTClock,numTracers,applyForcingFromFile,applyExternalForcing,applyBC,
                        v,Ae,Ai,Be,Bi,uf,uef,bcc,bcf,vtmp);CHKERRQ(ierr);
 #endif    
     tc=time0 + deltaTClock*iLoop;  /*  time at end of step */    
@@ -1121,163 +1168,200 @@ int main(int argc,char **args)
 
 /* write output */
 #if !defined (FORSPINUP) && !defined (FORJACOBIAN)
-    if (useExternalForcing) {
+    if (applyExternalForcing) {
       ierr = writeExternalForcing(tc,iLoop,numTracers,v,uef);CHKERRQ(ierr);
     }
     if (doCalcBC) {
       ierr = writeBC(tc,iLoop,numTracers,v,bcc,bcf);CHKERRQ(ierr); 
     }
-    if ((iLoop % writeSteps)==0) {  /*  time to write out */  /* ??? should this be Iter0+iLoop */
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
-      ierr = PetscFPrintf(PETSC_COMM_WORLD,fptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
-/*       ierr = PetscViewerASCIIPrintf(fdtime,"\n%d   %10.5f",Iter0+iLoop,tc);CHKERRQ(ierr);        */
-      for (itr=0; itr<numTracers; itr++) {
-        ierr = VecView(v[itr],fdout[itr]);CHKERRQ(ierr);
-      }
-
-	  if (doWriteUF) {
-		for (itr=0; itr<numTracers; itr++) {
-		  ierr = VecView(uf[itr],fdufout[itr]);CHKERRQ(ierr);
-		}
+	if (Iter0+iLoop>=writeTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+	  if (writeTimer.count<=writeTimer.numTimeSteps) {
+	    writeTimer.count++;
 	  }
-
-	  if (doWriteUEF) {
+	  if (writeTimer.count==writeTimer.numTimeSteps) { /* time to write out */
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+		ierr = PetscFPrintf(PETSC_COMM_WORLD,fptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
 		for (itr=0; itr<numTracers; itr++) {
-		  ierr = VecView(uef[itr],fduefout[itr]);CHKERRQ(ierr);
+		  ierr = VecView(v[itr],fdout[itr]);CHKERRQ(ierr);
 		}
+
+		if (doWriteUF) {
+		  for (itr=0; itr<numTracers; itr++) {
+			ierr = VecView(uf[itr],fdufout[itr]);CHKERRQ(ierr);
+		  }
+		}
+
+		if (doWriteUEF) {
+		  for (itr=0; itr<numTracers; itr++) {
+			ierr = VecView(uef[itr],fduefout[itr]);CHKERRQ(ierr);
+		  }
+		}
+	  
+		if (doWriteBC) {
+		  for (itr=0; itr<numTracers; itr++) {
+			ierr = VecView(bcf[itr],fdbcout[itr]);CHKERRQ(ierr);
+		  }
+		}
+
+		ierr = updateStepTimer("write_", Iter0+iLoop, &writeTimer);CHKERRQ(ierr);
 	  }
-      
-	  if (doWriteBC) {
-		for (itr=0; itr<numTracers; itr++) {
-		  ierr = VecView(bcf[itr],fdbcout[itr]);CHKERRQ(ierr);
+    }
+    
+    ierr = doTMMWrite(tc,iLoop,numTracers,v);CHKERRQ(ierr);
+
+    if (writePickup) {
+	  if (Iter0+iLoop>=pickupTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+		if (pickupTimer.count<=pickupTimer.numTimeSteps) {
+		  pickupTimer.count++;
+		}
+		if (pickupTimer.count==pickupTimer.numTimeSteps) { /* time to write out */
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing pickup at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+		  strcpy(tmpFile,"");
+		  sprintf(tmpFile,"pickup_%d.petsc",Iter0+iLoop);
+		  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,tmpFile,FILE_MODE_WRITE,&fdp);CHKERRQ(ierr);
+		  for (itr=0; itr<numTracers; itr++) {
+			ierr = VecView(v[itr],fdp);CHKERRQ(ierr);
+		  }
+		  ierr = PetscViewerDestroy(&fdp);CHKERRQ(ierr);      
+
+		  ierr = updateStepTimer("pickup_", Iter0+iLoop, &pickupTimer);CHKERRQ(ierr);
 		}
 	  }
     }
+
 #else
 #ifdef FORSPINUP
-    if ((iLoop % writeSteps)==0) {  /*  time to write out */  /* ??? should this be Iter0+iLoop */
-	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
-	  for (itr=0; itr<numTracers; itr++) {       
-		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,outFile[itr],FILE_MODE_WRITE,&fdout[itr]);CHKERRQ(ierr);
-		ierr = VecView(v[itr],fdout[itr]);CHKERRQ(ierr);
-        ierr = PetscViewerDestroy(&fdout[itr]);CHKERRQ(ierr);		
+	if (Iter0+iLoop>=writeTimer.startTimeStep) { /* start time averaging (note: startTimeStep is ABSOLUTE time step) */
+	  if (writeTimer.count<=writeTimer.numTimeSteps) {
+	    writeTimer.count++;	  
 	  }
+	  if (writeTimer.count==writeTimer.numTimeSteps) { /* time to write out */
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+		for (itr=0; itr<numTracers; itr++) {       
+		  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,outFile[itr],FILE_MODE_WRITE,&fdout[itr]);CHKERRQ(ierr);
+		  ierr = VecView(v[itr],fdout[itr]);CHKERRQ(ierr);
+		  ierr = PetscViewerDestroy(&fdout[itr]);CHKERRQ(ierr);		
+		}
 
-	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Waiting for new initial condition ...\n");CHKERRQ(ierr);
-      ierr = waitForSignal(10);CHKERRQ(ierr);
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Waiting for new initial condition ...\n");CHKERRQ(ierr);
+		ierr = waitForSignal(10);CHKERRQ(ierr);
 
-      for (itr=0; itr<numTracers; itr++) {
-        ierr = PetscPrintf(PETSC_COMM_WORLD,"Tracer %d: reading new initial condition from file %s\n", itr,iniFile[itr]);CHKERRQ(ierr);
-        ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,iniFile[itr],FILE_MODE_READ,&fd);CHKERRQ(ierr);
-        ierr = VecLoad(v[itr],fd);CHKERRQ(ierr); /* IntoVector */
-        ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);          
-      }        
+		for (itr=0; itr<numTracers; itr++) {
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Tracer %d: reading new initial condition from file %s\n", itr,iniFile[itr]);CHKERRQ(ierr);
+		  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,iniFile[itr],FILE_MODE_READ,&fd);CHKERRQ(ierr);
+		  ierr = VecLoad(v[itr],fd);CHKERRQ(ierr); /* IntoVector */
+		  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);          
+		}        
 
-      ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"itjac.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-      ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-      ierr = PetscBinaryRead(fp,&itjac,1,PETSC_INT);CHKERRQ(ierr);  
-      ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+		ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"itjac.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
+		ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+		ierr = PetscBinaryRead(fp,&itjac,1,PETSC_INT);CHKERRQ(ierr);  
+		ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Setting iteration number to: %d\n", itjac);CHKERRQ(ierr);
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Setting iteration number to: %d\n", itjac);CHKERRQ(ierr);
 
-      tc=time0 + deltaTClock*(itjac-1);  /*  current time (time at beginning of step) */
-      tf=time0 + deltaTClock*itjac;  /*  future time (time at end of step) */
-      Iterc=Iter0+itjac-1;
+		tc=time0 + deltaTClock*(itjac-1);  /*  current time (time at beginning of step) */
+		tf=time0 + deltaTClock*itjac;  /*  future time (time at end of step) */
+		Iterc=Iter0+itjac-1;
 
-      if (useExternalForcing) ierr = reInitializeExternalForcing(tc,Iterc,numTracers,v,uef);CHKERRQ(ierr);      
-      if (doCalcBC) ierr = reInitializeCalcBC(tc,Iterc,tc+deltaTClock,Iterc+1,numTracers,v,bcc,bcf);CHKERRQ(ierr);              
+		if (applyExternalForcing) ierr = reInitializeExternalForcing(tc,Iterc,numTracers,v,uef);CHKERRQ(ierr);
+		if (doCalcBC) ierr = reInitializeCalcBC(tc,Iterc,tc+deltaTClock,Iterc+1,numTracers,v,bcc,bcf);CHKERRQ(ierr);
+	  }	
     }
 #endif
 #ifdef FORJACOBIAN
     if (doTimeAverage) {
-      if ((iLoop % writeSteps)==0) {  /*  time to write out */  /* ??? should this be Iter0+iLoop */      
-        if (Iter0+iLoop>=avgTimer.startTimeStep) { /* start time averaging (note: avgStartTimeStep is ABSOLUTE time step) */
-          if (avgTimer.count<=avgTimer.numTimeSteps) { /* still within same averaging block so accumulate */
-            for (itr=0; itr<numTracers; itr++) {
-              ierr = VecAXPY(vavg[itr],one,uef[itr]);CHKERRQ(ierr);
-            }          
-            avgTimer.count++;
+	  if (Iter0+iLoop>=avgTimer.startTimeStep) { /* start time averaging (note: startTimeStep is ABSOLUTE time step) */
+		if (avgTimer.count<=avgTimer.numTimeSteps) { /* still within same averaging block so accumulate */
+		  for (itr=0; itr<numTracers; itr++) {
+			ierr = VecAXPY(vavg[itr],one,uef[itr]);CHKERRQ(ierr);
+		  }          
+		  avgTimer.count++;
 /*           ierr = PetscPrintf(PETSC_COMM_WORLD,"Accumulating: %d\n", iLoop);CHKERRQ(ierr);                       */
-          }
-          if (avgTimer.count==avgTimer.numTimeSteps) { /* time to write averages to file */
-            ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing time average q at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);                      
-            for (itr=0; itr<numTracers; itr++) {
-              ierr = VecScale(vavg[itr],1.0/avgTimer.count);CHKERRQ(ierr);
-              ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,outFile[itr],FILE_MODE_WRITE,&fdout[itr]);CHKERRQ(ierr);            
-              ierr = VecView(vavg[itr],fdout[itr]);CHKERRQ(ierr);              
-              ierr = PetscViewerDestroy(&fdout[itr]);CHKERRQ(ierr);		              
-              ierr = VecSet(vavg[itr],zero); CHKERRQ(ierr);
-            }        
-		    ierr = updateStepTimer("avg_", Iter0+iLoop, &avgTimer);CHKERRQ(ierr);              
+		}
+		if (avgTimer.count==avgTimer.numTimeSteps) { /* time to write averages to file */
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing time average q at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);                      
+		  for (itr=0; itr<numTracers; itr++) {
+			ierr = VecScale(vavg[itr],1.0/avgTimer.count);CHKERRQ(ierr);
+			ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,outFile[itr],FILE_MODE_WRITE,&fdout[itr]);CHKERRQ(ierr);            
+			ierr = VecView(vavg[itr],fdout[itr]);CHKERRQ(ierr);              
+			ierr = PetscViewerDestroy(&fdout[itr]);CHKERRQ(ierr);		              
+			ierr = VecSet(vavg[itr],zero); CHKERRQ(ierr);
+		  }        
+		  ierr = updateStepTimer("avg_", Iter0+iLoop, &avgTimer);CHKERRQ(ierr);              
 
-            ierr = PetscPrintf(PETSC_COMM_WORLD,"Waiting for new initial condition ...\n");CHKERRQ(ierr);
-            ierr = waitForSignal(10);CHKERRQ(ierr);
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Waiting for new initial condition ...\n");CHKERRQ(ierr);
+		  ierr = waitForSignal(10);CHKERRQ(ierr);
 
-            for (itr=0; itr<numTracers; itr++) {
-              ierr = PetscPrintf(PETSC_COMM_WORLD,"Tracer %d: reading new initial condition from file %s\n", itr,iniFile[itr]);CHKERRQ(ierr);
-              ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,iniFile[itr],FILE_MODE_READ,&fd);CHKERRQ(ierr);
-              ierr = VecLoad(v[itr],fd);CHKERRQ(ierr); /* IntoVector */
-              ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);          
-            }        
-    
-            ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"itjac.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-            ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-            ierr = PetscBinaryRead(fp,&itjac,1,PETSC_INT);CHKERRQ(ierr);  
-            ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
-      
-            ierr = PetscPrintf(PETSC_COMM_WORLD,"Setting iteration number to: %d\n", itjac);CHKERRQ(ierr);
-      
-            tc=time0 + deltaTClock*(itjac-1);  /*  current time (time at beginning of step) */
-            tf=time0 + deltaTClock*itjac;  /*  future time (time at end of step) */
-            Iterc=Iter0+itjac-1;
-      
-            if (useExternalForcing) ierr = reInitializeExternalForcing(tc,Iterc,numTracers,v,uef);CHKERRQ(ierr);      
-          
-          } else {
-          
-            for (itr=0; itr<numTracers; itr++) {
-              ierr = PetscPrintf(PETSC_COMM_WORLD,"Tracer %d: reading new initial condition from file %s\n", itr,iniFile[itr]);CHKERRQ(ierr);
-              ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,iniFile[itr],FILE_MODE_READ,&fd);CHKERRQ(ierr);
-              ierr = VecLoad(v[itr],fd);CHKERRQ(ierr); /* IntoVector */
-              ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);          
-            }        
+		  for (itr=0; itr<numTracers; itr++) {
+			ierr = PetscPrintf(PETSC_COMM_WORLD,"Tracer %d: reading new initial condition from file %s\n", itr,iniFile[itr]);CHKERRQ(ierr);
+			ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,iniFile[itr],FILE_MODE_READ,&fd);CHKERRQ(ierr);
+			ierr = VecLoad(v[itr],fd);CHKERRQ(ierr); /* IntoVector */
+			ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);          
+		  }        
+  
+		  ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"itjac.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
+		  ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+		  ierr = PetscBinaryRead(fp,&itjac,1,PETSC_INT);CHKERRQ(ierr);  
+		  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+	
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Setting iteration number to: %d\n", itjac);CHKERRQ(ierr);
+	
+		  tc=time0 + deltaTClock*(itjac-1);  /*  current time (time at beginning of step) */
+		  tf=time0 + deltaTClock*itjac;  /*  future time (time at end of step) */
+		  Iterc=Iter0+itjac-1;
+	
+		  if (applyExternalForcing) ierr = reInitializeExternalForcing(tc,Iterc,numTracers,v,uef);CHKERRQ(ierr);      
+		
+		} else {
+		
+		  for (itr=0; itr<numTracers; itr++) {
+			ierr = PetscPrintf(PETSC_COMM_WORLD,"Tracer %d: reading new initial condition from file %s\n", itr,iniFile[itr]);CHKERRQ(ierr);
+			ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,iniFile[itr],FILE_MODE_READ,&fd);CHKERRQ(ierr);
+			ierr = VecLoad(v[itr],fd);CHKERRQ(ierr); /* IntoVector */
+			ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);          
+		  }        
 
-            tc=time0 + deltaTClock*(itjac-1);  /* this is now the time at end of time step */
-            Iterc=Iter0+itjac-1;    
-            if (useExternalForcing) ierr = reInitializeExternalForcing(tc,Iterc,numTracers,v,uef);CHKERRQ(ierr);                  
-          }
-        }
-      }
+		  tc=time0 + deltaTClock*(itjac-1);  /* this is now the time at end of time step */
+		  Iterc=Iter0+itjac-1;    
+		  if (applyExternalForcing) ierr = reInitializeExternalForcing(tc,Iterc,numTracers,v,uef);CHKERRQ(ierr);                  
+		}
+	  }
     } else { /* no time averaging */
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing q at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
-      for (itr=0; itr<numTracers; itr++) {       
-        ierr = VecView(uef[itr],fdout[itr]);CHKERRQ(ierr);
-      }
-      if ((iLoop % writeSteps)==0) {  /*  time to read new set of initial condition(s) */      
-        for (itr=0; itr<numTracers; itr++) {       
-          ierr = PetscViewerDestroy(&fdout[itr]);CHKERRQ(ierr);		
-          ierr = PetscViewerDestroy(&fdin[itr]);CHKERRQ(ierr);          
-        }
-        ierr = PetscPrintf(PETSC_COMM_WORLD,"Waiting for new initial condition ...\n");CHKERRQ(ierr);
-        ierr = waitForSignal(10);CHKERRQ(ierr);
-/*      open files here for I/O */
-        for (itr=0; itr<numTracers; itr++) {       
-          ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,outFile[itr],FILE_MODE_WRITE,&fdout[itr]);CHKERRQ(ierr);
-          ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,iniFile[itr],FILE_MODE_READ,&fdin[itr]);CHKERRQ(ierr);
-        }
-      }
-      ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"itjac.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-      ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-      ierr = PetscBinaryRead(fp,&itjac,1,PETSC_INT);CHKERRQ(ierr);  
-      ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);          
+	  if (Iter0+iLoop>=writeTimer.startTimeStep) { /* start time averaging (note: startTimeStep is ABSOLUTE time step) */
+		if (writeTimer.count<=writeTimer.numTimeSteps) {
+		  writeTimer.count++;	  
+		}
+		if (writeTimer.count==writeTimer.numTimeSteps) { /* time to write out */
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing q at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+		  for (itr=0; itr<numTracers; itr++) {       
+			ierr = VecView(uef[itr],fdout[itr]);CHKERRQ(ierr);
+		  }
+		  for (itr=0; itr<numTracers; itr++) {       
+			ierr = PetscViewerDestroy(&fdout[itr]);CHKERRQ(ierr);		
+			ierr = PetscViewerDestroy(&fdin[itr]);CHKERRQ(ierr);          
+		  }
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Waiting for new initial condition ...\n");CHKERRQ(ierr);
+		  ierr = waitForSignal(10);CHKERRQ(ierr);
+  /*      open files here for I/O */
+		  for (itr=0; itr<numTracers; itr++) {       
+			ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,outFile[itr],FILE_MODE_WRITE,&fdout[itr]);CHKERRQ(ierr);
+			ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,iniFile[itr],FILE_MODE_READ,&fdin[itr]);CHKERRQ(ierr);
+		  }
 
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Setting iteration number to: %d\n", itjac);CHKERRQ(ierr);              
+		  ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"itjac.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
+		  ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
+		  ierr = PetscBinaryRead(fp,&itjac,1,PETSC_INT);CHKERRQ(ierr);  
+		  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);          
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Setting iteration number to: %d\n", itjac);CHKERRQ(ierr);
+		}		
+	  }	
     }	  
 #endif
 #endif
 #ifndef FORJACOBIAN    
     if (doTimeAverage) {
-      if (Iter0+iLoop>=avgTimer.startTimeStep) { /* start time averaging (note: avgStartTimeStep is ABSOLUTE time step) */
+      if (Iter0+iLoop>=avgTimer.startTimeStep) { /* start time averaging (note: startTimeStep is ABSOLUTE time step) */
         if (avgTimer.count<=avgTimer.numTimeSteps) { /* still within same averaging block so accumulate */
 /*           ierr = PetscPrintf(PETSC_COMM_WORLD,"Accumulating for time average\n");CHKERRQ(ierr);               */
 		  for (itr=0; itr<numTracers; itr++) {
@@ -1341,6 +1425,8 @@ int main(int argc,char **args)
     ierr = PetscViewerDestroy(&fdout[itr]);CHKERRQ(ierr);
   }
   ierr = PetscFClose(PETSC_COMM_WORLD,fptime);CHKERRQ(ierr);
+
+  ierr = finalizeTMMWrite(tc,maxSteps,numTracers);CHKERRQ(ierr);
 
   if (doWriteUF) {
 	for (itr=0; itr<numTracers; itr++) {

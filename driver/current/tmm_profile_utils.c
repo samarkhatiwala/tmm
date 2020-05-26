@@ -22,6 +22,7 @@ PetscErrorCode iniProfileData(PetscInt myId)
   PetscViewer fd;
   PetscInt fp;
   PetscInt dum;
+  PetscBool useProfileNumberPartitioning = PETSC_FALSE;
 
   useProfiles = PETSC_FALSE;
   ierr = PetscOptionsHasName(PETSC_NULL,"-use_profiles",&useProfiles);CHKERRQ(ierr);
@@ -66,58 +67,65 @@ PetscErrorCode iniProfileData(PetscInt myId)
 	  gSizes[ipro] = 0; /* initialize all with 0 */
 	}
 
-/*  Code from Iris Kriest */
-	PetscInt totalNumBoxes;
-	PetscScalar avgNumBoxesPerProcessor;
-	totalNumBoxes = gEndIndices[totalNumProfiles-1];
-	avgNumBoxesPerProcessor = totalNumBoxes/(PetscScalar)numProcessors; /* also the ideal number of boxes per processor, if all profiles were of equal length */
+    ierr = PetscOptionsHasName(PETSC_NULL,"-partition_by_number_of_profiles",&useProfileNumberPartitioning);CHKERRQ(ierr);
+    if (useProfileNumberPartitioning) {
+  /* Let PETSc do this for us but this allocates the same number of profiles (rather than boxes) per process */
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Partitioning by number of profiles\n");CHKERRQ(ierr);
+	  Vec templateVec;
+	  ierr = VecCreate(PETSC_COMM_WORLD,&templateVec);CHKERRQ(ierr);
+	  ierr = VecSetSizes(templateVec,PETSC_DECIDE,totalNumProfiles);CHKERRQ(ierr);
+	  ierr = VecSetFromOptions(templateVec);CHKERRQ(ierr);
+	  ierr = VecGetLocalSize(templateVec,&lNumProfiles);CHKERRQ(ierr);
+	  ierr = VecDestroy(&templateVec);CHKERRQ(ierr);
 
-	for (ip=0; ip<totalNumProfiles; ip++) {
-	  ipro = (PetscInt)floor((gStartIndices[ip]-1+0.5*gProfileLengths[ip])/avgNumBoxesPerProcessor); /* determine process Id */
-	  gNumProfiles[ipro] =  gNumProfiles[ipro] + 1; /* add one profile to this processor */
-	  gSizes[ipro] = gSizes[ipro] + gProfileLengths[ip];
-	}
+  /* NOTE: myId starts at 1 */  
+	  gNumProfiles[myId-1]=lNumProfiles;
+	  MPI_Allgather(&lNumProfiles, 1, MPI_INT, gNumProfiles, 1, MPI_INT, PETSC_COMM_WORLD);
 
-/*  Check */
-	PetscInt tot=0;
-	PetscInt totp=0;
-	tot=0;
-	totp=0; 
-	for (ipro=1; ipro<=numProcessors; ipro++) {
-	  tot=tot+gSizes[ipro-1];
-	  totp=totp+gNumProfiles[ipro-1];
-	}
- 
-	if (tot != totalNumBoxes) {
-	  ierr=PetscPrintf(PETSC_COMM_WORLD,"Number of boxes calculated during load balancing (%d) not equal to actual number of boxes (%d) \n",tot,totalNumBoxes);CHKERRQ(ierr);   
-	  SETERRQ(PETSC_COMM_WORLD,1,"Problem distributing profiles across processors!");
-	}
+    } else {
+  /* Alternatively, try to allocate the same number of boxes per process */
+  /*  Code from Iris Kriest */
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Partitioning by number of boxes\n");CHKERRQ(ierr);  
+	  PetscInt totalNumBoxes;
+	  PetscScalar avgNumBoxesPerProcessor;
+	  totalNumBoxes = gEndIndices[totalNumProfiles-1];
+	  avgNumBoxesPerProcessor = totalNumBoxes/(PetscScalar)numProcessors; /* also the ideal number of boxes per processor, if all profiles were of equal length */
 
-	if (totp != totalNumProfiles) {
-	  ierr=PetscPrintf(PETSC_COMM_WORLD,"Number of profiles calculated during load balancing (%d) not equal to actual number of profiles (%d) \n",totp,totalNumProfiles);CHKERRQ(ierr);   
-	  SETERRQ(PETSC_COMM_WORLD,1,"Problem distributing profiles across processors!");
-	}
+	  for (ip=0; ip<totalNumProfiles; ip++) {
+		ipro = (PetscInt)floor((gStartIndices[ip]-1+0.5*gProfileLengths[ip])/avgNumBoxesPerProcessor); /* determine process Id */
+		gNumProfiles[ipro] =  gNumProfiles[ipro] + 1; /* add one profile to this processor */
+		gSizes[ipro] = gSizes[ipro] + gProfileLengths[ip];
+	  }
+
+  /*  Check */
+	  PetscInt tot=0;
+	  PetscInt totp=0;
+	  tot=0;
+	  totp=0; 
+	  for (ipro=1; ipro<=numProcessors; ipro++) {
+		tot=tot+gSizes[ipro-1];
+		totp=totp+gNumProfiles[ipro-1];
+	  }
  
-	lNumProfiles=gNumProfiles[myId-1];
+	  if (tot != totalNumBoxes) {
+		ierr=PetscPrintf(PETSC_COMM_WORLD,"Number of boxes calculated during load balancing (%d) not equal to actual number of boxes (%d) \n",tot,totalNumBoxes);CHKERRQ(ierr);   
+		SETERRQ(PETSC_COMM_WORLD,1,"Problem distributing profiles across processors!");
+	  }
+
+	  if (totp != totalNumProfiles) {
+		ierr=PetscPrintf(PETSC_COMM_WORLD,"Number of profiles calculated during load balancing (%d) not equal to actual number of profiles (%d) \n",totp,totalNumProfiles);CHKERRQ(ierr);   
+		SETERRQ(PETSC_COMM_WORLD,1,"Problem distributing profiles across processors!");
+	  }
  
-/* Alternatively, let PETSc do this for us but this allocates the same number of profiles (rather than boxes) per process */
-//   Vec templateVec;
-//   ierr = VecCreate(PETSC_COMM_WORLD,&templateVec);CHKERRQ(ierr);
-//   ierr = VecSetSizes(templateVec,PETSC_DECIDE,totalNumProfiles);CHKERRQ(ierr);
-//   ierr = VecSetFromOptions(templateVec);CHKERRQ(ierr);
-//   ierr = VecGetLocalSize(templateVec,&lNumProfiles);CHKERRQ(ierr);
-//   ierr = VecDestroy(&templateVec);CHKERRQ(ierr);
-// 
-// /* NOTE: myId starts at 1 */  
-//   gNumProfiles[myId-1]=lNumProfiles;
-//   MPI_Allgather(&lNumProfiles, 1, MPI_INT, gNumProfiles, 1, MPI_INT, PETSC_COMM_WORLD);
+	  lNumProfiles=gNumProfiles[myId-1];
+    } 
 
 /* Compute total number of profiles upto (but not including) current processor */
 /* NOTE: myId starts at 1 */
-  numPrevProfiles=0;
-  for (ipro=1; ipro<=myId-1; ipro++) {
-    numPrevProfiles = numPrevProfiles + gNumProfiles[ipro-1];
-  }
+	numPrevProfiles=0;
+	for (ipro=1; ipro<=myId-1; ipro++) {
+	  numPrevProfiles = numPrevProfiles + gNumProfiles[ipro-1];
+	}
   
 /*  Compute starting and ending LOCAL indices of profiles on current processor. NOTE: These have a base 0 index. */
 /*  ierr=PetscPrintf(PETSC_COMM_WORLD,"lNumProfiles = %d\n",lNumProfiles);CHKERRQ(ierr);   */
@@ -132,6 +140,10 @@ PetscErrorCode iniProfileData(PetscInt myId)
 	  lSize=lSize+lProfileLength[ip-1];
 	}
 
+    if (useProfileNumberPartitioning) {
+	  MPI_Allgather(&lSize, 1, MPI_INT, gSizes, 1, MPI_INT, PETSC_COMM_WORLD);
+    }
+    
 /*  Check */
 /*  NOTE: myId starts at 1 */  
 	if (lSize != gSizes[myId-1]) SETERRQ(PETSC_COMM_WORLD,1,"Problem distributing profiles across processors!");
