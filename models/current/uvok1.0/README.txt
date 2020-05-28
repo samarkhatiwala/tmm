@@ -10,10 +10,8 @@ code implementing transport matrix extraction and interfacing of the biogeochemi
 model to the TMM: http://kelvin.earth.ox.ac.uk/spk/Research/TMM/Kiel_Jan_2017_updates_to_UVIC2.9.tar.gz 
 or https://thredds.geomar.de/thredds/catalog/open_access/Kiel_Jan_2017_updates_to_UVIC2.9/catalog.html.
 
-Once you have all the above components, edit Makefile in src/ to set the variables BASE1 
-to point to the toplevel of Kiel_Jan_2017_updates_to_UVIC2.9; BASE2 to the version 2.9 
-updates directory; and BASE3 to the main 2.9 source tree.
+Once you have all the above components, set environment and other variables as described 
+at the top of the Makefile.
 
 Then compile with:
-make smallf
 make tmmuvok

@@ -1,9 +1,18 @@
 extern void mobi_copy_data_(PetscInt *lSize, PetscInt *numLocProfiles, PetscInt *itr, PetscScalar localTR[], PetscInt *direction);
 
+extern void mobi_sed_copy_data_(PetscInt *numLocProfiles, PetscScalar localSedMixTR[], PetscScalar localSedBurTR[], PetscInt *direction);
+
 extern void mobi_ini_(PetscInt *numTracers, PetscInt *lSize, PetscInt *numLocProfiles, PetscInt *nzmax, PetscInt nzarr[],
-               PetscScalar zt[], PetscScalar drF[], PetscScalar *DeltaT, PetscScalar locallatitude[],
+               PetscScalar zt[], PetscScalar drF[], PetscScalar *DeltaT, PetscScalar locallatitude[], PetscScalar localarea[],
                PetscScalar localsgbathy[],
-               PetscScalar *Sglobavg,PetscScalar TRglobavg[], 
+               PetscScalar *Sglobavg,PetscScalar TRglobavg[],
+               PetscScalar *pCO2atm, PetscScalar *dc13atm, PetscScalar *DC14atm,                 
+#ifdef O_sed  
+               PetscInt *numOceanStepsPerSedStep,
+               PetscInt *nzmaxSed, PetscInt *ibmaxSed, PetscInt *numSedMixedTracers,                
+               PetscInt *numSedBuriedTracers, PetscScalar *globalweathflx,
+               PetscScalar *sedsa, PetscScalar sedmaskloc[],
+#endif               
                PetscInt *debugFlag);
 
 extern void mobi_calc_(PetscInt *lSize, PetscInt *numLocProfiles, 
@@ -18,13 +27,13 @@ extern void mobi_calc_(PetscInt *lSize, PetscInt *numLocProfiles,
                PetscScalar *pCO2atm,
 #   endif               
 #endif               
-               PetscScalar localwind[],
+#if defined O_c14ccn_data
+               PetscScalar *dc14ccnnhatm, PetscScalar *dc14ccneqatm, PetscScalar *dc14ccnshatm,
 #endif
-# if defined O_c14ccn_data
-               PetscScalar *dc14ccnnatm, PetscScalar *dc14ccnsatm, PetscScalar *dc14ccneatm,
-#endif
-#if defined O_carbon && defined O_carbon_13_coupled && defined O_TMM_interactive_atmosphere
+#if defined O_c13ccn_data || defined O_carbon_13_coupled
                PetscScalar *c13o2atm,
+#endif
+               PetscScalar localwind[],
 #endif
 #  if defined O_npzd_fe_limitation
                PetscScalar localFe_dissolved[],
@@ -43,9 +52,16 @@ extern void mobi_calc_(PetscInt *lSize, PetscInt *numLocProfiles,
                PetscScalar localEmP[], PetscScalar *empglobavg, 
 # if defined O_carbon
                PetscScalar gasexfluxloc[], PetscScalar totfluxloc[], 
-# endif                    
-#if defined O_carbon && defined O_carbon_13_coupled && defined O_TMM_interactive_atmosphere
+#if defined O_carbon_13_coupled
                PetscScalar c13gasexfluxloc[],
+#endif
+# endif
+#if defined O_sed
+# if defined O_embm
+               PetscScalar *globdisch, PetscScalar localdisch[],
+# endif
+               PetscInt *timeToRunSedModel,
+               PetscScalar *globwflx, PetscScalar localwflx[],
 #endif
                PetscInt *debugFlag);
 
@@ -66,6 +82,7 @@ extern void mobi_diags_finalize_(PetscInt *debugFlag);
 
 #if !defined(PETSC_HAVE_FORTRAN_UNDERSCORE) 
 #define mobi_copy_data_ mobi_copy_data
+#define mobi_sed_copy_data_ mobi_sed_copy_data
 #define mobi_ini_ mobi_ini
 #define mobi_start_ mobi_start
 #define mobi_stop_ mobi_stop

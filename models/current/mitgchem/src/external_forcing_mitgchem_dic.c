@@ -7,13 +7,13 @@
 
 #include "petscmat.h"
 #include "petsc_matvec_utils.h"
-#include "tmm_main.h"
+#include "tmm_timer.h"
 #include "tmm_forcing_utils.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
-#include "tmm_timer.h"
-#include "DIC_OPTIONS_TMM.h"
-#include "mitgchem_dic.h"
+#include "tmm_misfit.h"
+#include "tmm_main.h"
+#include "mitgchem_dic_tmm.h"
 
 /* Macros to map tracer names to vectors */
 /* v[0]=DIC,v[1]=Alk,v[2]=PO4,v[3]=DOP,v[4]=O2,v[5]=Fe */
@@ -67,8 +67,6 @@ PeriodicArray localinputfep;
 #ifdef LIGHT_CHL
 PeriodicArray localchlp;
 #endif
-// PetscInt numBiogeochemPeriods;
-// PetscScalar *tdpBiogeochem; /* arrays for periodic forcing */
 PetscBool periodicBiogeochemForcing = PETSC_FALSE;
 PeriodicTimer biogeochemTimer;
 
@@ -100,7 +98,7 @@ PetscScalar atmModelDeltaT;
 PetscScalar daysPerYear, secondsPerYear;
 PetscScalar Fland = 0.0, Focean=0.0;
 
-PetscInt atmWriteSteps;
+StepTimer atmWriteTimer;
 PetscBool atmAppendOutput;
 FILE *atmfptime;
 PetscViewer atmfd;
@@ -257,8 +255,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
       
     atmModelDeltaT = DeltaT/secondsPerYear; /* time step in years */
 
-    ierr = PetscOptionsGetInt(PETSC_NULL,"-atm_write_steps",&atmWriteSteps,&flg);CHKERRQ(ierr);
-    if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate atmospheric model output step with the -atm_write_steps option");
+	ierr = iniStepTimer("atm_write_", Iter0, &atmWriteTimer);CHKERRQ(ierr);
 
     ierr = PetscOptionsHasName(PETSC_NULL,"-atm_append",&atmAppendOutput);CHKERRQ(ierr);
     if (atmAppendOutput) {
@@ -576,8 +573,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	  }      
     }
     
-// 	diagCount=0;
-	
   }
 
   return 0;
@@ -786,23 +781,30 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
 
   if (useAtmModel) {
 /* write instantaneous atmos model state */
-    if ((iLoop % atmWriteSteps)==0) {  /*  time to write out */
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing atmospheric model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
-      ierr = PetscFPrintf(PETSC_COMM_WORLD,atmfptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
-      ierr = writeBinaryScalarData("pCO2atm_output.bin",&pCO2atm,1,PETSC_TRUE);
-
-	  if (useEmissions) {
-		ierr = PetscPrintf(PETSC_COMM_WORLD,"Cumulative emissions at time %10.5f, step %d = %10.6f PgC\n", tc, Iter0+iLoop, cumulativeEmissions);CHKERRQ(ierr);
-      }  
-    }
-
-	if (useLandModel) {
-/*   write instantaneous land model state */
-	  if ((iLoop % atmWriteSteps)==0) {  /*  time to write out */
-		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing land model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
-		ierr = writeBinaryScalarData("land_state_output.bin",landState,3,PETSC_TRUE);
+	if (Iter0+iLoop>=atmWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+	  if (atmWriteTimer.count<=atmWriteTimer.numTimeSteps) {
+		atmWriteTimer.count++;
 	  }
-	}    
+	  if (atmWriteTimer.count==atmWriteTimer.numTimeSteps) { /* time to write out */
+    
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing atmospheric model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+		ierr = PetscFPrintf(PETSC_COMM_WORLD,atmfptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
+		ierr = writeBinaryScalarData("pCO2atm_output.bin",&pCO2atm,1,PETSC_TRUE);
+
+		if (useEmissions) {
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Cumulative emissions at time %10.5f, step %d = %10.6f PgC\n", tc, Iter0+iLoop, cumulativeEmissions);CHKERRQ(ierr);
+		}  
+
+		if (useLandModel) {
+/*        write instantaneous land model state */
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing land model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+		  ierr = writeBinaryScalarData("land_state_output.bin",landState,3,PETSC_TRUE);
+		}
+
+		ierr = updateStepTimer("atm_write_", Iter0+iLoop, &atmWriteTimer);CHKERRQ(ierr);
+
+      }
+    }
   }
 
   if (calcDiagnostics) {  
@@ -829,7 +831,7 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
 		  }                  
         }        
         
-		diagTimer.count++; // = diagCount+1;
+		diagTimer.count++;
 	  }
 
 	  if (diagTimer.count==diagTimer.numTimeSteps) { /* time to write averages to file */
@@ -888,7 +890,7 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
 		  }          
         }
         ierr = updateStepTimer("diag_", Iter0+iLoop, &diagTimer);CHKERRQ(ierr);
-// 		diagCount = 0;        
+
 	  }
 	}  
   }

@@ -37,13 +37,13 @@
  &ice    /
  &veg    /
  &mtlm   BF=0.0 /
- &npzd   k1n=0.7, capr=0.045, abio_P=0.6, alpha=0.16, nup=0.03, nupt0=0.001, 
+ &npzd   k1n=0.7, capr=0.055, abio_P=0.6, alpha=0.16, nup=0.03, nupt0=0.001, 
          redctn=7, geZ=0.54, redotn=11.0, kfemin=0.04e-3, kfemax=0.4e-3,
-	 kfemin_C=0.03e-3, kfemax_C=0.3e-3, kfe_D=0.1e-3, 
+	 kfemin_C=0.04e-3, kfemax_C=0.4e-3, kfe_D=0.1e-3, 
 	 zprefC=0.21, zprefP=0.24, dissk0=0.013
- 	 gbio=0.38, wd0=10, nuz=0.06, jdiar=0.2, nud0=0.07, sgbdfac=2., 
+ 	 gbio=0.38, wd0=15, nuz=0.06, jdiar=0.2, nud0=0.07, sgbdfac=2., 
 	 diazntp=40., nup_D=0.0001, abio_C=0.3, k1n_C = 0.35, alpha_C=0.1,
-         nuct0=0.013,nupt0_D=0.001, dfr=0.1, dfrt=0.08, dtnpzd=5760.,
+         nuct0=0.013,nupt0_D=0.001, dfr=0.1, dfrt=0.08, dtnpzd=14400.,
 	 hdop=0.4, nudop0=2.e-5, nudon0=1.e-5, eps_assim=6.,
 	 eps_excr=4., eps_recy=1.3, eps_wcdeni=25., eps_bdeni0=4.,
          eps_nfix=1., mwz=100000., mw=0.055 /    

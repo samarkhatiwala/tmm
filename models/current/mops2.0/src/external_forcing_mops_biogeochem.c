@@ -13,13 +13,13 @@
 #undef READ_SWRAD
 #include "petscmat.h"
 #include "petsc_matvec_utils.h"
-#include "tmm_main.h"
+#include "tmm_timer.h"
 #include "tmm_forcing_utils.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
-#include "tmm_timer.h"
-#include "mops_biogeochem.h"
 #include "tmm_misfit.h"
+#include "tmm_main.h"
+#include "mops_biogeochem_tmm.h"
 #include "mops_biogeochem_misfit_data.h"
 
 /* Macros to map tracer names to vectors */
@@ -101,9 +101,8 @@ PetscScalar atmModelDeltaT;
 PetscScalar Focean=0.0;
 PetscScalar localFocean=0.0;
 PetscScalar Foceanint = 0.0;
-PetscInt atmModelUpdateTimeSteps=1;
 
-PetscInt atmWriteSteps;
+StepTimer atmWriteTimer;
 PetscBool atmAppendOutput;
 FILE *atmfptime;
 PetscViewer atmfd;
@@ -297,8 +296,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     pCO2atm = pCO2atm_ini;
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Using initial atmospheric pCO2 of %g ppm\n",pCO2atm);CHKERRQ(ierr);
       
-    ierr = PetscOptionsGetInt(PETSC_NULL,"-atm_write_steps",&atmWriteSteps,&flg);CHKERRQ(ierr);
-    if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate atmospheric model output step with the -atm_write_steps option");
+	ierr = iniStepTimer("atm_write_", Iter0, &atmWriteTimer);CHKERRQ(ierr);
 
     ierr = PetscOptionsHasName(PETSC_NULL,"-atm_append",&atmAppendOutput);CHKERRQ(ierr);
     if (atmAppendOutput) {
@@ -326,19 +324,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Atmospheric model output will be appended. Initial condition will NOT be written\n");CHKERRQ(ierr);      
     }
 
-    ierr = PetscOptionsGetInt(PETSC_NULL,"-atm_update_steps",&atmModelUpdateTimeSteps,&flg);CHKERRQ(ierr);
-    if ((maxSteps % atmModelUpdateTimeSteps)!=0) {
-      SETERRQ(PETSC_COMM_WORLD,1,"maxSteps not divisible by atmModelUpdateTimeSteps!");
-    }
-    if ((atmWriteSteps % atmModelUpdateTimeSteps)!=0) {
-      SETERRQ(PETSC_COMM_WORLD,1,"atmWriteSteps not divisible by atmModelUpdateTimeSteps!");
-    }    
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"Atmospheric model will be updated every %d time steps\n",atmModelUpdateTimeSteps);CHKERRQ(ierr);
-    if (atmModelUpdateTimeSteps>1) {
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"WARNING: Focean and pCO2atm diagnostics may not be correct!\n");CHKERRQ(ierr);
-    }
-
-    atmModelDeltaT = atmModelUpdateTimeSteps*DeltaT/secondsPerYear; /* time step in years */
+    atmModelDeltaT = DeltaT/secondsPerYear; /* time step in years */
 
   } else {  /* not using atm model */
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Using prescribed atmospheric pCO2\n");CHKERRQ(ierr);
@@ -682,7 +668,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     }    
 #endif
 
-// 	diagCount=0;
   }
   
   return 0;
@@ -821,23 +806,17 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
 #ifdef CARBON
 
   if (useAtmModel) {
-    if ((iLoop % atmModelUpdateTimeSteps)==0) {  /*  time to update atmosphere */
-  
-      Focean = 0.0;
-       
-      MPI_Allreduce(&localFocean, &Focean, 1, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD);    
+	Focean = 0.0;
+	 
+	MPI_Allreduce(&localFocean, &Focean, 1, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD);    
     
-/*    time step atmosphere */
-      Focean = Focean/atmModelUpdateTimeSteps; /* average flux over accumulation period Pg C/yr*/
-      pCO2atm = pCO2atm + atmModelDeltaT*(-Focean)/ppmToPgC;
+/*  time step atmosphere */
+	pCO2atm = pCO2atm + atmModelDeltaT*(-Focean)/ppmToPgC;
 
-/*    reset values */
-      localFocean = 0.0; 
-      Foceanint = Foceanint + atmModelDeltaT*Focean; /* calculate the time integrated flux */
+/*  reset values */
+	localFocean = 0.0; 
+	Foceanint = Foceanint + atmModelDeltaT*Focean; /* calculate the time integrated flux */
         
-/*      Focean = 0.0; */     
-     
-    }
   }  
 
 #endif  
@@ -975,12 +954,20 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
 #ifdef CARBON
   if (useAtmModel) {
 /* write instantaneous atmos model state */
-    if ((iLoop % atmWriteSteps)==0) {  /*  time to write out */
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing atmospheric model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
-      ierr = PetscFPrintf(PETSC_COMM_WORLD,atmfptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
-      ierr = writeBinaryScalarData("pCO2atm_output.bin",&pCO2atm,1,PETSC_TRUE);
-      ierr = writeBinaryScalarData("Foceanint_output.bin",&Foceanint,1,PETSC_TRUE);
-      Foceanint = 0.0;
+	if (Iter0+iLoop>=atmWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+	  if (atmWriteTimer.count<=atmWriteTimer.numTimeSteps) {
+		atmWriteTimer.count++;
+	  }
+	  if (atmWriteTimer.count==atmWriteTimer.numTimeSteps) { /* time to write out */
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing atmospheric model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+		ierr = PetscFPrintf(PETSC_COMM_WORLD,atmfptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
+		ierr = writeBinaryScalarData("pCO2atm_output.bin",&pCO2atm,1,PETSC_TRUE);
+		ierr = writeBinaryScalarData("Foceanint_output.bin",&Foceanint,1,PETSC_TRUE);
+		Foceanint = 0.0;
+
+		ierr = updateStepTimer("atm_write_", Iter0+iLoop, &atmWriteTimer);CHKERRQ(ierr);
+
+      }
     }
   }
 #endif
@@ -1012,7 +999,7 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
         }	  
 #endif
 
-		diagTimer.count++; // = diagCount+1;
+		diagTimer.count++;
 	  }
 	  if (diagTimer.count==diagTimer.numTimeSteps) { /* time to write averages to file */
 		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing diagnostics time average at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);                      
@@ -1060,7 +1047,6 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
 
         appendDiagnostics=PETSC_TRUE;
         ierr = updateStepTimer("diag_", Iter0+iLoop, &diagTimer);CHKERRQ(ierr);
-// 		diagCount = 0;        
 
 	  }
 	}  

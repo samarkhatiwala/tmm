@@ -11,11 +11,13 @@
 #undef READ_SWRAD
 #include "petscmat.h"
 #include "petsc_matvec_utils.h"
-#include "tmm_main.h"
+#include "tmm_timer.h"
 #include "tmm_forcing_utils.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
-#include "mops_biogeochem.h"
+#include "tmm_misfit.h"
+#include "tmm_main.h"
+#include "mops_biogeochem_tmm.h"
 
 /* Macros to map tracer names to vectors */
 /* Note: for MOPS, we have the following tracer assignement:*/

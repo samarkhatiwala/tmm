@@ -1,11 +1,18 @@
-# Set this to the top level path of the Kiel and UVic code base
-BASE1 = /data2/spk/UVic_Kiel_Matrix/Kiel_Jan_2017_updates_to_UVIC2.9/source
-BASE2 = /data2/spk/UVic_ESCM/2.9/updates/02/source
-BASE3 = /data2/spk/UVic_ESCM/2.9/source
+# (1) Set the environment variables TMMROOT and UVICESCMROOT to point to the top level 
+#     of the TMM and UVic ECSM 2.9 code, respectively.
+# (2) Set UVICESCMKIELMODS below to the top level of the Kiel modifications
+# (3) Set UVICUPDATESLEVEL below to the updates 'level' of the UVic ESCM compatible with UVOK.
+#
+UVICESCMKIELMODS = /data2/spk/UVic_Kiel_Matrix/Kiel_Jan_2017_updates_to_UVIC2.9/source
+UVICUPDATESLEVEL = 02
+#
+TMMBASE = ${TMMROOT}/driver/current
+MODELBASE = ${TMMROOT}/models/current/uvok1.0/src
+UVICBASE1 = ${UVICESCMROOT}/updates/${UVICUPDATESLEVEL}/source
+UVICBASE2 = ${UVICESCMROOT}/source
 
 include ${PETSC_DIR}/lib/petsc/conf/variables
 include ${PETSC_DIR}/lib/petsc/conf/rules
-include ${PETSC_DIR}/lib/petsc/conf/petscvariables
 
 # Set compiler-dependent flags
 FPPFLAG=
@@ -25,58 +32,67 @@ ifneq (,$(findstring xlf,$(COMPILER)))
 	FPPFLAG+=-WF,
 	FC_FLAGS+=-qrealsize=8 -qzerosize
 endif
+ifneq (,$(findstring ftn,$(COMPILER)))
+	FC_FLAGS+=-s real64
+endif
 
-MYPATHS = $(BASE1)/common:$(BASE1)/mom:$(BASE1)/embm:$(BASE2)/common:$(BASE2)/mom:$(BASE2)/embm:$(BASE3)/common:$(BASE3)/mom:$(BASE3)/embm
-   
+MYPATHS = $(TMMBASE):$(MODELBASE):$(UVICESCMKIELMODS)/common:$(UVICESCMKIELMODS)/mom:$(UVICESCMKIELMODS)/embm:$(UVICBASE1)/common:$(UVICBASE1)/mom:$(UVICBASE1)/embm:$(UVICBASE2)/common:$(UVICBASE2)/mom:$(UVICBASE2)/embm
+
 INCLUDEPATHS = $(addprefix -I,$(subst :, ,$(MYPATHS)))
 
 VPATH = $(MYPATHS)
 
-SRCTMM = tmm_main.c tmm_forward_step.c tmm_forcing_utils.c \
+EXE = tmmuvok
+
+SRCTMM = tmm_main.c tmm_forward_step.c tmm_write.c tmm_forcing_utils.c \
         tmm_profile_utils.c tmm_timer.c petsc_signal_utils.c petsc_matvec_utils.c
         
-SRCUVOK = tmm_external_bc.c tmm_monitor.c tmm_misfit.c external_forcing_uvok.c 
-SRFUVOK = uvok_copy_data.F uvok_ini.F uvok_calc.F uvok_diags.F uvok_stubs.F \
+SRCMODEL = tmm_external_bc.c tmm_monitor.c tmm_misfit.c external_forcing_uvok.c 
+SRFMODEL = uvok_copy_data.F uvok_ini.F uvok_calc.F uvok_diags.F uvok_stubs.F \
         co2calc.F file_names.F gasbc.F gosbc.F iomngr.F npzd_src.F setvbc.F \
         tracer.F UVic_ESCM.F
-SRF90UVOK = uvok_diags_mod.F90
+SRF90MODEL = uvok_diags_mod.F90
 
-.SUFFIXES: 
-.SUFFIXES: .o .f .p .F .c
+OPTFILE = UVOK_TMM_OPTIONS.h
 
-SRFPPUVOK = $(SRFUVOK:.F=.f) 
+ifneq ($(strip $(OPTFILE)),)
+# Make sure OPTFILE is present in the current directory
+  ifeq (,$(wildcard $(OPTFILE)))
+    $(error $(OPTFILE) does not exist in the local directory!)
+  endif
+  CPPKEYS=$(shell awk '/^\#define/ {print "-D"$$2}' $(OPTFILE))
+  CPPFLAGS+=$(CPPKEYS)
+endif
+
+SRFPPMODEL = $(SRFMODEL:.F=.f)
+SRF90PPMODEL = $(SRF90MODEL:.F90=.f90)
 OBJTMM = $(SRCTMM:.c=.o)
-OBJCUVOK = $(SRCUVOK:.c=.o)
-OBJFUVOK = $(SRF90UVOK:.F90=.o) $(SRFPPUVOK:.f=.o)
+OBJCMODEL = $(SRCMODEL:.c=.o)
+OBJFMODEL = $(SRF90PPMODEL:.f90=.o) $(SRFPPMODEL:.f=.o)
 
-CPPKEYS=$(shell awk '/^\#define/ {print "-D"$$2}' UVOK_TMM_OPTIONS.h)
-FPPKEYS=$(shell awk '/^\#define/ {print "$(FPPFLAG)-D"$$2}' UVOK_TMM_OPTIONS.h)
+$(OBJCMODEL) $(OBJFMODEL) $(SRF90PPMODEL) $(SRFPPMODEL): $(OPTFILE)
 
-$(OBJCUVOK) $(OBJFUVOK) $(SRFPPUVOK): UVOK_TMM_OPTIONS.h
-
-smallf: $(SRFPPUVOK)
+smallf: $(SRF90PPMODEL) $(SRFPPMODEL) $(SRFPPMODELWRITE)
 CPPCMD = cat $< |  cpp  -traditional -P $(INCLUDEPATHS) $(CPPKEYS)
+
 .F.f:
 	$(CPPCMD)  > $@
 
-%.o %.mod: %.F90
-	$(FC) $(INCLUDEPATHS) $(FPPKEYS) $(FC_FLAGS) -c -o $$(echo $@ | sed -e 's/mod$$/o/') $(FC_MODULE_OUTPUT_FLAG) $(dir $@) $<
+.F90.f90:
+	$(CPPCMD)  > $@
 
-tmmuvok: $(OBJTMM) $(OBJCUVOK) $(OBJFUVOK) chkopts
-	-${CLINKER} -o $@ $(OBJTMM) $(OBJCUVOK) $(OBJFUVOK) ${PETSC_MAT_LIB}
+%.o %.mod: %.f90
+	$(FC) $(FC_FLAGS) $(FFLAGS) -c -o $$(echo $@ | sed -e 's/mod$$/o/') $(FC_MODULE_OUTPUT_FLAG) $(dir $@) $<
+
+# %.o: %.F
+# 	$(FC) $(INCLUDEPATHS) $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) -c -o $@ $<
+
+%.o: %.c
+	$(CC) $(INCLUDEPATHS) $(PCC_FLAGS) $(CFLAGS) $(CCPPFLAGS) -c -o $@ $<
+
+$(EXE): $(OBJTMM) $(OBJCMODEL) $(OBJFMODEL) chkopts
+	-$(CLINKER) -o $@ $(OBJTMM) $(OBJCMODEL) $(OBJFMODEL) $(PETSC_MAT_LIB)
 
 cleanall:
 	make clean
-	rm -f *.f *.mod
-
-#.F.o:
-#	-${FLINKER} -c $<
-
-#.c.o:
-#	-${CLINKER} -c ${PETSC_MAT_LIB} $<  
-
-depend:
-	/usr/X11R6/bin/makedepend $(SRCF) $(SRCC)
-
-#clean: 
-#	rm -f core $(OBJ)
+	rm -f *.f *.f90 *.mod *.i *.i90

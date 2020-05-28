@@ -215,6 +215,14 @@ if READ_SWRAD
   end  
 end
 
+% river discharge
+load(freshWaterForcingFile,'Frivdischgcm')
+dischb=gridToMatrix(Frivdischgcm,Ib,boxFile,gridFile,1);
+dischb=dischb*1e3/1e4; % [kg/m^2/s] -> [g/cm^2/s]
+if ~periodicForcing
+  dischb=mean(dischb,2);
+end
+
 latb=Yboxnom(Ib);
 
 % Initial condition
@@ -365,14 +373,16 @@ if writeFiles
 	write_binary('hice.bin',hiceb,'real*8')
 	write_binary('hsno.bin',hsnob,'real*8')	
 	write_binary('wind.bin',windb,'real*8')	
-	write_binary('atmosp.bin',atmospb,'real*8')	
+	write_binary('atmosp.bin',atmospb,'real*8')
+	write_binary('disch.bin',dischb,'real*8')	
   else
     for im=1:nm
 	  write_binary(['aice_' sprintf('%02d',im-1)],aiceb(:,im),'real*8')
 	  write_binary(['hice_' sprintf('%02d',im-1)],hiceb(:,im),'real*8')
 	  write_binary(['hsno_' sprintf('%02d',im-1)],hsnob(:,im),'real*8')
 	  write_binary(['wind_' sprintf('%02d',im-1)],windb(:,im),'real*8')	  
-	  write_binary(['atmosp_' sprintf('%02d',im-1)],atmospb(:,im),'real*8')	  
+	  write_binary(['atmosp_' sprintf('%02d',im-1)],atmospb(:,im),'real*8')
+	  write_binary(['disch_' sprintf('%02d',im-1)],dischb(:,im),'real*8')
 	end
   end
   if READ_SWRAD
@@ -441,7 +451,8 @@ if writeFiles
 % Grid data
   z=z*100; % convert to cm
   dznom=dznom*100; % convert to cm
-  dzb=dzb*100; % convert to cm  
+  dzb=dzb*100; % convert to cm
+  dab_surf=dab_surf*1e4; % convert to cm^2
   write_binary('zt.bin',nz,'int')  
   write_binary('zt.bin',z,'real*8',1)
   write_binary('drF.bin',nz,'int')  

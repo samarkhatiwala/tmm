@@ -10,12 +10,13 @@
 
 #include "petscmat.h"
 #include "petsc_matvec_utils.h"
-#include "tmm_main.h"
+#include "tmm_timer.h"
 #include "tmm_forcing_utils.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
-#include "tmm_timer.h"
-
+#include "tmm_misfit.h"
+#include "tmm_main.h"
+#include "mops_biogeochem_tmm.h"
 #include "mops_biogeochem_misfit_data.h"
 
 #define TR v[0]
@@ -140,8 +141,6 @@ PetscErrorCode iniMisfit(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Vec
   ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"cbgc2.petsc",FILE_MODE_WRITE,&fdcbgc2avg);CHKERRQ(ierr);
   ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"cbgc3.petsc",FILE_MODE_WRITE,&fdcbgc3avg);CHKERRQ(ierr);
 
-//    costCount=0;
-
         } else {
 
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Only average cost function available, currently.\n");CHKERRQ(ierr);	        
@@ -182,7 +181,7 @@ PetscErrorCode calcMisfit(PetscScalar tc, PetscInt iLoop, PetscInt numTracers, V
 	  ierr = VecAXPY(mbgc1avg,one,mbgc1);CHKERRQ(ierr);
 	  ierr = VecAXPY(mbgc2avg,one,mbgc2);CHKERRQ(ierr);
 	  ierr = VecAXPY(mbgc3avg,one,mbgc3);CHKERRQ(ierr);
-	  costTimer.count++; // costCount+1;
+	  costTimer.count++;
 	}
    }
  }
@@ -300,7 +299,10 @@ possible, e.g., use functions proposed by Evans, 2003; result is again in cbgcav
                 ierr = PetscFPrintf(PETSC_COMM_WORLD,misfitf,"%10.5f\n",Gcost);CHKERRQ(ierr);           
 
         ierr = updateStepTimer("cost_", Iter0+iLoop, &costTimer);CHKERRQ(ierr);
-//                 costCount = 0;
+
+		ierr = VecSet(mbgc1avg,zero);CHKERRQ(ierr);
+		ierr = VecSet(mbgc2avg,zero);CHKERRQ(ierr);
+		ierr = VecSet(mbgc3avg,zero);CHKERRQ(ierr);
 
       } /* costCount==costNumTimeSteps */ 
       

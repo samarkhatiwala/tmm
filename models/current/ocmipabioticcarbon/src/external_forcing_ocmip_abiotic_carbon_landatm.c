@@ -7,13 +7,13 @@
 
 #include "petscmat.h"
 #include "petsc_matvec_utils.h"
-#include "tmm_main.h"
+#include "tmm_timer.h"
 #include "tmm_forcing_utils.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
-#include "tmm_timer.h"
-#include "OCMIP_ABIOTIC_CARBON_OPTIONS.h"
-#include "ocmip_abiotic_carbon_landatm.h"
+#include "tmm_misfit.h"
+#include "tmm_main.h"
+#include "ocmip_abiotic_carbon_landatm_tmm.h"
 
 /* Macros to map tracer names to vectors */
 /* v[0]=DIC */
@@ -44,9 +44,6 @@ PetscBool useWinds = PETSC_FALSE;
 PeriodicTimer windsTimer;
 PetscScalar *localuwind,*localvwind;
 PeriodicArray localuwindp, localvwindp;
-// PetscInt numWindsPeriods;
-// PetscScalar *tdpWinds; /* arrays for periodic forcing */
-// PetscScalar windsCyclePeriod, windsCycleStep;
 PetscScalar pistonVelocityCoeff=0.31; /* default piston velocity coefficient when using winds [cm/hr]*[s^2/m^2] */
 
 PetscBool useLinearChemistry = PETSC_FALSE;
@@ -59,8 +56,6 @@ PeriodicArray localxkwp, localatmospp;
 TimeDependentArray localTstd, localSstd;
 TimeDependentArray localAlktd, localficetd, localEmPtd;
 
-// PetscInt numBiogeochemPeriods;
-// PetscScalar *tdpBiogeochem; /* arrays for periodic forcing */
 PetscBool periodicBiogeochemForcing = PETSC_FALSE;
 PetscBool timeDependentBiogeochemForcing = PETSC_FALSE;
 PeriodicTimer biogeochemTimer;
@@ -97,7 +92,7 @@ PetscScalar atmModelDeltaT;
 PetscScalar daysPerYear, secondsPerYear;
 PetscScalar Fland = 0.0, Focean=0.0;
 
-PetscInt atmWriteSteps;
+StepTimer atmWriteTimer;
 PetscBool atmAppendOutput;
 FILE *atmfptime;
 PetscViewer atmfd;
@@ -225,8 +220,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
       
     atmModelDeltaT = DeltaT/secondsPerYear; /* time step in years */
 
-    ierr = PetscOptionsGetInt(PETSC_NULL,"-atm_write_steps",&atmWriteSteps,&flg);CHKERRQ(ierr);
-    if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate atmospheric model output step with the -atm_write_steps option");
+	ierr = iniStepTimer("atm_write_", Iter0, &atmWriteTimer);CHKERRQ(ierr);
 
     ierr = PetscOptionsHasName(PETSC_NULL,"-atm_append",&atmAppendOutput);CHKERRQ(ierr);
     if (atmAppendOutput) {
@@ -671,8 +665,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	  }      
     }
     
-// 	diagCount=0;
-	
   }
 
   return 0;
@@ -929,23 +921,30 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
 
   if (useAtmModel) {
 /* write instantaneous atmos model state */
-    if ((iLoop % atmWriteSteps)==0) {  /*  time to write out */
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing atmospheric model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
-      ierr = PetscFPrintf(PETSC_COMM_WORLD,atmfptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
-      ierr = writeBinaryScalarData("pCO2atm_output.bin",&pCO2atm,1,PETSC_TRUE);
-
-	  if (useEmissions) {
-		ierr = PetscPrintf(PETSC_COMM_WORLD,"Cumulative emissions at time %10.5f, step %d = %10.6f PgC\n", tc, Iter0+iLoop, cumulativeEmissions);CHKERRQ(ierr);
-      }  
-    }
-
-	if (useLandModel) {
-/*    write instantaneous land model state */
-	  if ((iLoop % atmWriteSteps)==0) {  /*  time to write out */
-		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing land model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
-		ierr = writeBinaryScalarData("land_state_output.bin",landState,3,PETSC_TRUE);
+	if (Iter0+iLoop>=atmWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+	  if (atmWriteTimer.count<=atmWriteTimer.numTimeSteps) {
+		atmWriteTimer.count++;
 	  }
-	}    
+	  if (atmWriteTimer.count==atmWriteTimer.numTimeSteps) { /* time to write out */
+
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing atmospheric model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+		ierr = PetscFPrintf(PETSC_COMM_WORLD,atmfptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
+		ierr = writeBinaryScalarData("pCO2atm_output.bin",&pCO2atm,1,PETSC_TRUE);
+
+		if (useEmissions) {
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Cumulative emissions at time %10.5f, step %d = %10.6f PgC\n", tc, Iter0+iLoop, cumulativeEmissions);CHKERRQ(ierr);
+		}  
+
+		if (useLandModel) {
+/*        write instantaneous land model state */
+		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing land model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+		  ierr = writeBinaryScalarData("land_state_output.bin",landState,3,PETSC_TRUE);
+		}
+
+		ierr = updateStepTimer("atm_write_", Iter0+iLoop, &atmWriteTimer);CHKERRQ(ierr);
+
+      }
+    }
   }
 
   if (calcDiagnostics) {  
@@ -983,7 +982,7 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
 		  }                  
         }        
         
-		diagTimer.count++; // = diagCount+1;
+		diagTimer.count++;
 	  }
 
 	  if (diagTimer.count==diagTimer.numTimeSteps) { /* time to write averages to file */
@@ -1059,7 +1058,7 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
         }
 
         ierr = updateStepTimer("diag_", Iter0+iLoop, &diagTimer);CHKERRQ(ierr);
-// 		diagCount = 0;        
+
 	  }
 	}  
   }

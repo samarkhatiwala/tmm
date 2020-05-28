@@ -7,7 +7,7 @@ mpiexec -np 2 ./tmmocmipabiolandatm \
    -t0 0.0 -iter0 0 \
    -deltat_clock 0.0013698630136986 \
    -max_steps 730 \
-   -write_steps 730 \
+   -write_time_steps 730 \
    -o dic.petsc,dic14.petsc \
    -external_forcing \
    -use_profiles \
@@ -31,7 +31,7 @@ mpiexec -np 2 ./tmmocmipabiolandatm \
    -t0 0.0 -iter0 0 \
    -deltat_clock 0.0013888888888889 \
    -max_steps 720 \
-   -write_steps 720 \
+   -write_time_steps 720 \
    -o dic.petsc,dic14.petsc \
    -external_forcing \
    -use_profiles \
@@ -71,7 +71,7 @@ mpiexec -np 2 ./tmmocmipabiolandatm \
 #          of CO2 (one for each time instant)
 #   OR
 #   B) prescribed emissions:
-#    -use_atm_model -pco2atm_ini 280.0 OR -pco2atm_ini_file filename -atm_write_steps 720 -atm_time_file -atm_append \
+#    -use_atm_model -pco2atm_ini 280.0 OR -pco2atm_ini_file filename -atm_write_time_steps 720 -atm_time_file -atm_append \
 #    -emissions_history Tem.bin,fossil_fuel_emissions.bin,land_use_emissions.bin \
 #    -use_land_model \
 #  forcing options for atmospheric DeltaC14:

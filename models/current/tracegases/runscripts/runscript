@@ -7,7 +7,7 @@ mpiexec -np 2 ./tmmtracegases \
    -t0 1945.0 -iter0 0 \
    -deltat_clock 0.0013698630136986 \
    -max_steps 730 \
-   -write_steps 730 \
+   -write_time_steps 730 \
    -o trout.petsc \
    -pickup_out pickup.petsc \
    -time_file output_time.txt \
@@ -35,7 +35,7 @@ mpiexec -np 2 ./tmmtracegases \
    -t0 1945.0 -iter0 0 \
    -deltat_clock 0.0013888888888889 \
    -max_steps 720 \
-   -write_steps 720 \
+   -write_time_steps 720 \
    -o trout.petsc \
    -pickup_out pickup.petsc \
    -time_file output_time.txt \
@@ -73,5 +73,5 @@ mpiexec -np 2 ./tmmtracegases \
 #     -xTRatm_history TxTR.bin,xTRatm.bin -spatially_variable_mixing_ratio
 #   OR
 #   prescribed emissions:
-#    -use_atm_model -xTRatm_ini 0.0 OR -xTRatm_ini_file filename -atm_write_steps 720 -atm_time_file -atm_append \
+#    -use_atm_model -xTRatm_ini 0.0 OR -xTRatm_ini_file filename -atm_write_time_steps 720 -atm_time_file -atm_append \
 #    -emissions_history Tem.bin,emissions.bin

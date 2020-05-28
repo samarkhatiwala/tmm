@@ -7,7 +7,7 @@ mpiexec -np 2 ./mops \
         -t0 0.0 -iter0 0 \
         -deltat_clock 0.0013698630136986 \
         -max_steps 730 \
-        -write_steps 730 \
+        -write_time_steps 730 \
         -o po4.petsc,dop.petsc,oxy.petsc,phy.petsc,zoo.petsc,det.petsc,no3.petsc,dic.petsc,alk.petsc \
         -external_forcing \
         -use_profiles \
@@ -35,7 +35,7 @@ mpiexec -np 2 ./mops \
         -t0 0.0 -iter0 0 \
         -deltat_clock 0.0013888888888889 \
         -max_steps 720 \
-        -write_steps 720 \
+        -write_time_steps 720 \
         -o po4.petsc,dop.petsc,oxy.petsc,phy.petsc,zoo.petsc,det.petsc,no3.petsc,dic.petsc,alk.petsc \
         -external_forcing \
         -use_profiles \

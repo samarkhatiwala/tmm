@@ -7,7 +7,7 @@ mpiexec -np 2 ./tmmmitgchemdic \
   -t0 0.0 -iter0 0 \
   -deltat_clock 0.0013698630136986 \
   -max_steps 730 \
-  -write_steps 730 \
+  -write_time_steps 730 \
   -o dic.petsc,alk.petsc,po4.petsc,dop.petsc,o2.petsc,fe.petsc \
   -external_forcing \
   -use_profiles \
@@ -30,7 +30,7 @@ mpiexec -np 2 ./tmmmitgchemdic \
   -t0 0.0 -iter0 0 \
   -deltat_clock 0.0013888888888889 \
   -max_steps 720 \
-  -write_steps 720 \
+  -write_time_steps 720 \
   -o dic.petsc,alk.petsc,po4.petsc,dop.petsc,o2.petsc,fe.petsc \
   -external_forcing \
   -use_profiles \

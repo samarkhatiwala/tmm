@@ -2,7 +2,6 @@
 #define O_co2ccn_user
 #undef O_TMM_interactive_atmosphere
 #define O_npzd_iron_diagnostics
-#undef O_TMM_partial_step_topo
 #define O_even_fluxes
 #undef O_read_my_kmt 
 #define O_read_my_grid 
@@ -62,6 +61,7 @@
 #define O_carbon
 #define O_carbon_13
 #undef O_carbon_13_coupled
+#undef O_c13ccn_data
 #define O_carbon_14
 #define O_save_carbon_carbonate_chem
 #undef O_co2ccn_data
@@ -96,4 +96,6 @@
 #undef O_agric_data_transient
 #undef O_carbon_fnpzd
 
-
+#undef O_sed
+#define O_sed_weath_diag
+#define O_sed_constrain_rainr

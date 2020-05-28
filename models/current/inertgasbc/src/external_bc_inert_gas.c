@@ -7,12 +7,13 @@
 
 #include "petscmat.h"
 #include "petsc_matvec_utils.h"
-#include "tmm_main.h"
+#include "tmm_timer.h"
 #include "tmm_forcing_utils.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
-#include "tmm_timer.h"
-#include "inert_gas_bc.h"
+#include "tmm_misfit.h"
+#include "tmm_main.h"
+#include "inert_gas_bc_tmm.h"
 
 /* Macros to map tracer names to vectors */
 #define TR v[0]
@@ -29,8 +30,6 @@ Vec atmosp,Tss,Sss;
 PeriodicVec atmospp, Tssp, Sssp;
 PetscScalar *localatmosp,*localTss,*localSss;
 
-// PetscInt numBiogeochemPeriods;
-// PetscScalar *tdpBiogeochem; /* arrays for periodic forcing */
 PetscBool periodicBiogeochemForcing = PETSC_FALSE;
 PeriodicTimer biogeochemTimer;
 
@@ -152,7 +151,6 @@ PetscErrorCode iniCalcBC(PetscScalar tc, PetscInt Iterc, PetscScalar tf, PetscIn
 	ierr = VecDuplicate(BCc,&BCdiagavg);CHKERRQ(ierr);
 	ierr = VecSet(BCdiagavg,zero);CHKERRQ(ierr);
     
-// 	diagCount=0;
   }
 
 /* Initialize biogeochem model */  
@@ -267,7 +265,7 @@ PetscErrorCode writeBC(PetscScalar tc, PetscInt iLoop, PetscInt numTracers, Vec 
 		ierr = VecAXPY(TReqdiagavg,one,TReqdiag);CHKERRQ(ierr);	  
 		ierr = VecAXPY(BCdiagavg,one,BCc);CHKERRQ(ierr);	  
 
-		diagTimer.count++; // = diagCount+1;
+		diagTimer.count++;
 	  }
 
 	  if (diagTimer.count==diagTimer.numTimeSteps) { /* time to write averages to file */
@@ -295,7 +293,7 @@ PetscErrorCode writeBC(PetscScalar tc, PetscInt iLoop, PetscInt numTracers, Vec 
 		ierr = VecSet(BCdiagavg,zero); CHKERRQ(ierr);
 
         ierr = updateStepTimer("diag_", Iter0+iLoop, &diagTimer);CHKERRQ(ierr);
-// 		diagCount = 0;
+
 	  }
 	}  
   }

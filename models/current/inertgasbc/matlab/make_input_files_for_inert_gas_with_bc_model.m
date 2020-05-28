@@ -70,15 +70,10 @@ else
 end
 
 % Use steady state T/S from GCM. Note we always load seasonal data here.
-% load(fullfile(gcmDataPath,'Theta_gcm'),'Tgcm')
-% load(fullfile(gcmDataPath,'Salt_gcm'),'Sgcm')
-% Theta=gridToMatrix(Tgcm,[],boxFile,gridFile);
-% Salt=gridToMatrix(Sgcm,[],boxFile,gridFile);
-% Use steady state T/S propagated from surface into interior using TMM.
-load(fullfile(bgcDataPath,'Theta_bc'),'Tbc')
-load(fullfile(bgcDataPath,'Salt_bc'),'Sbc')
-Theta=gridToMatrix(Tbc,[],boxFile,gridFile);
-Salt=gridToMatrix(Sbc,[],boxFile,gridFile);
+load(fullfile(gcmDataPath,'Theta_gcm'),'Tgcm')
+load(fullfile(gcmDataPath,'Salt_gcm'),'Sgcm')
+Theta=gridToMatrix(Tgcm,[],boxFile,gridFile);
+Salt=gridToMatrix(Sgcm,[],boxFile,gridFile);
 
 % now take annual mean if necessary
 if ~periodicForcing

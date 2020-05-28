@@ -1,7 +1,7 @@
 This is the TMM interface to the MITgcm 'gchem' package. It provides hooks to 
 the various biogeochemical models implemented within MITgcm making it possible 
-to use them without modification of the original code. Currently (as of Jan 3, 
-2016) only pkg/dic is supported but other models (e.g., BLING, Darwin, ...) 
+to use them without modification of the original code. Currently (as of May 27, 
+2019) only pkg/dic is supported but other models (e.g., BLING, Darwin, ...) 
 can be easily used by appropriately adapting external_forcing_mitgchem_dic.c.
 
 You will need a recent copy of MITgcm for the required header and source files 
@@ -13,26 +13,9 @@ namelist files:
 data.gchem 
 data.dic (for using pkg/dic)
 
-TMM interface files:
-external_forcing_mitgchem_dic.c
-mitgchem_copy_data.F
-mitgchem_diagnostics.F
-mitgchem_ini.F
-mitgchem_model.F
-mitgcm_stubs.F
-TMM_MITGCHEM_DIAGS.h
-mitgchem.h
-landsource.F
-DIC_OPTIONS_TMM.h
-Note: DIC_OPTIONS_TMM.h is the same as DIC_OPTIONS.h but with the Fortran-style 
-comments and #include statements (except for #include "PACKAGES_CONFIG.h") 
-commented out. The build process generates it automatically using the script 
-stripFortranComments.sh. This isn't the most robust solution so if you run into 
-problems trying doing it manually.
-
 The following source files are needed from the main MITgcm source tree. Of these 
 only SIZE.h, PTRACERS_SIZE.h and dic_biotic_forcing.F need to be modified (as 
-described below) and are supplied here. The rest are used without change by 
+described below) and are supplied in src/. The rest are used without change by 
 setting the path to the top level of the MITgcm source in Makefile.
 
 pkg/dic:
@@ -52,7 +35,6 @@ dic_ini_forcing.F
 dic_init_fixed.F
 dic_init_varia.F
 dic_read_co2_pickup.F
-dic_read_pickup.F
 dic_readparms.F
 dic_surfforcing.F
 dic_surfforcing_init.F

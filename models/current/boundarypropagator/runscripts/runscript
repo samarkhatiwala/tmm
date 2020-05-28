@@ -5,7 +5,7 @@ mpiexec -np 2 ./tmm -numtracers 7 \
   -t0 0.0 -iter0 0 \
   -deltat_clock 0.0013698630136986 \
   -max_steps 730 \
-  -write_steps 1460 \
+  -write_time_steps 1460 \
   -o G_0001.petsc,G_0002.petsc,G_0003.petsc,G_0004.petsc,G_0005.petsc,G_0006.petsc,G_0007.petsc \
   -obc Gbc_out_0001.petsc,Gbc_out_0002.petsc,Gbc_out_0003.petsc,Gbc_out_0004.petsc,Gbc_out_0005.petsc,Gbc_out_0006.petsc,Gbc_out_0007.petsc \
   -prescribed_bc \
@@ -20,7 +20,7 @@ mpiexec -np 2 ./tmm -numtracers 7 \
   -t0 0.0 -iter0 0 \
   -deltat_clock 0.0013888888888889 \
   -max_steps 720 \
-  -write_steps 1440 \
+  -write_time_steps 1440 \
   -o G_0001.petsc,G_0002.petsc,G_0003.petsc,G_0004.petsc,G_0005.petsc,G_0006.petsc,G_0007.petsc \
   -obc Gbc_out_0001.petsc,Gbc_out_0002.petsc,Gbc_out_0003.petsc,Gbc_out_0004.petsc,Gbc_out_0005.petsc,Gbc_out_0006.petsc,Gbc_out_0007.petsc \
   -prescribed_bc \

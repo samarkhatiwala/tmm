@@ -1,6 +1,10 @@
+# Set the environment variable TMMROOT to point to the top level of the TMM code
+#
+TMMBASE = ${TMMROOT}/driver/current
+MODELBASE = ${TMMROOT}/models/current/inertgasbc/src
+
 include ${PETSC_DIR}/lib/petsc/conf/variables
 include ${PETSC_DIR}/lib/petsc/conf/rules
-include ${PETSC_DIR}/lib/petsc/conf/petscvariables
 
 # Set compiler-dependent flags
 FPPFLAG=
@@ -20,41 +24,53 @@ ifneq (,$(findstring xlf,$(COMPILER)))
 	FPPFLAG+=-WF,
 	FC_FLAGS+=-qzerosize
 endif
+ifneq (,$(findstring ftn,$(COMPILER)))
+	FC_FLAGS+=
+endif
 
-STMM = tmm_main.c tmm_forward_step.c tmm_forcing_utils.c \
+MYPATHS = $(TMMBASE):$(MODELBASE)
+
+INCLUDEPATHS = $(addprefix -I,$(subst :, ,$(MYPATHS)))
+
+VPATH = $(MYPATHS)
+
+EXE = tmminertgasbc
+
+SRCTMM = tmm_main.c tmm_forward_step.c tmm_write.c tmm_forcing_utils.c \
         tmm_profile_utils.c tmm_timer.c petsc_signal_utils.c petsc_matvec_utils.c
-        
-SRCINERTGASBC = $(STMM) tmm_external_forcing.c tmm_monitor.c tmm_misfit.c external_bc_inert_gas.c
-SRFINERTGASBC = inert_gas_bc.F inert_gas_chem.F inert_gas_diagnostics.F \
-        seawater.F
 
-OBJINERTGASBC = $(SRCINERTGASBC:.c=.o) $(SRFINERTGASBC:.F=.o)
+SRCMODEL = tmm_external_forcing.c tmm_monitor.c tmm_misfit.c external_bc_inert_gas.c
+SRFMODEL = inert_gas_bc.F inert_gas_chem.F inert_gas_diagnostics.F seawater.F
 
-.SUFFIXES: 
-.SUFFIXES: .o .f .p .F .c
+OPTFILE =
 
-tmminertgasbc:
-tmminertgasbc: $(OBJINERTGASBC) chkopts
-	-${CLINKER} -o $@ $(OBJINERTGASBC) ${PETSC_MAT_LIB}
+ifneq ($(strip $(OPTFILE)),)
+# Make sure OPTFILE is present in the current directory
+  ifeq (,$(wildcard $(OPTFILE)))
+    $(error $(OPTFILE) does not exist in the local directory!)
+  endif
+  CPPFLAGS+=$(shell awk '/^\#define/ {print "-D"$$2}' $(OPTFILE))
+  FPPFLAGS+=$(shell awk '/^\#define/ {print "$(FPPFLAG)-D"$$2}' $(OPTFILE))
+endif
 
-tmminertgasbcspinup: FPPFLAGS+=$(FPPFLAG)-DAD_SAFE
-tmminertgasbcspinup: CPPFLAGS+=-DFORSPINUP
-tmminertgasbcspinup: $(OBJINERTGASBC) chkopts
-	-${CLINKER} -o $@ $(OBJINERTGASBC) ${PETSC_MAT_LIB}
-	
-tmminertgasbcjacobian: FPPFLAGS+=$(FPPFLAG)-DAD_SAFE
-tmminertgasbcjacobian: CPPFLAGS+=-DFORJACOBIAN
-tmminertgasbcjacobian: $(OBJINERTGASBC) chkopts
-	-${CLINKER} -o $@ $(OBJINERTGASBC) ${PETSC_MAT_LIB}
+OBJTMM = $(SRCTMM:.c=.o)
+OBJCMODEL = $(SRCMODEL:.c=.o)
+OBJFMODEL = $(SRF90MODEL:.F90=.o) $(SRFMODEL:.F=.o)
 
-#.F.o:
-#	-${FLINKER} -c $<
+$(OBJCMODEL) $(OBJFMODEL): $(OPTFILE)
 
-#.c.o:
-#	-${CLINKER} -c ${PETSC_MAT_LIB} $<  
+%.o %.mod: %.F90
+	$(FC) $(INCLUDEPATHS) $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) -c -o $$(echo $@ | sed -e 's/mod$$/o/') $(FC_MODULE_OUTPUT_FLAG) $(dir $@) $<
 
-depend:
-	/usr/X11R6/bin/makedepend $(SRCF) $(SRCC)
+%.o: %.F
+	$(FC) $(INCLUDEPATHS) $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) -c -o $@ $<
 
-#clean: 
-#	rm -f core $(OBJ)
+%.o: %.c
+	$(CC) $(INCLUDEPATHS) $(PCC_FLAGS) $(CFLAGS) $(CCPPFLAGS) -c -o $@ $<
+
+$(EXE): $(OBJTMM) $(OBJCMODEL) $(OBJFMODEL) chkopts
+	-$(CLINKER) -o $@ $(OBJTMM) $(OBJCMODEL) $(OBJFMODEL) $(PETSC_MAT_LIB)
+
+cleanall:
+	make clean
+	rm -f *.mod *.i *.i90

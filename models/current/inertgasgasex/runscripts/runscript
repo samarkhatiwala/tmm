@@ -7,12 +7,13 @@ mpiexec -np 2 ./tmminertgasgasex \
   -t0 0.0 -iter0 0 \
   -deltat_clock 0.0013698630136986 \
   -max_steps 730 \
-  -write_steps 730 \
+  -write_time_steps 730 \
   -o Ar_0_1_1.petsc \
   -external_forcing \
   -use_profiles \
   -biogeochem_deltat 43200.0 \
-  -inert_gas_id 2 -flux_scaling 0.0,1.0,1.0 \
+  -inert_gas_id 2 -flux_scaling 1.0,1.0,1.0 \
+  -piston_velocity_coeff 0.27 \
   -periodic_matrix \
   -matrix_cycle_period 1.0 -matrix_num_per_period 12 -matrix_periodic_times_file periodic_times_365d.bin \
   -periodic_biogeochem_forcing \
@@ -32,12 +33,13 @@ mpiexec -np 2 ./tmminertgasgasex \
   -t0 0.0 -iter0 0 \
   -deltat_clock 0.0013888888888889 \
   -max_steps 720 \
-  -write_steps 720 \
+  -write_time_steps 720 \
   -o Ar_0_1_1.petsc \
   -external_forcing \
   -use_profiles \
   -biogeochem_deltat 43200.0 \
-  -inert_gas_id 2 -flux_scaling 0.0,1.0,1.0 \
+  -inert_gas_id 2 -flux_scaling 1.0,1.0,1.0 \
+  -piston_velocity_coeff 0.27 \
   -periodic_matrix \
   -matrix_cycle_period 1.0 -matrix_num_per_period 12 \
   -periodic_biogeochem_forcing \

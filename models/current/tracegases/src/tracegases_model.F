@@ -1,5 +1,3 @@
-#include "TRACEGASES_OPTIONS.h"
-
 C !INTERFACE: ==========================================================
       SUBROUTINE TRACEGASES_MODEL(myIter,myTime,
      &                 PTR,

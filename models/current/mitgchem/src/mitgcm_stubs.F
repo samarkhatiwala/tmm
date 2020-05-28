@@ -1,4 +1,19 @@
 
+      SUBROUTINE DIC_READ_PICKUP(
+     O                            pH_isLoaded,
+     I                            myIter, myThid )
+
+      IMPLICIT NONE
+C     == Routine arguments ==
+      LOGICAL pH_isLoaded
+      INTEGER myIter
+      INTEGER myThid
+
+	  pH_isLoaded = .FALSE.
+
+      RETURN
+      END
+
       SUBROUTINE READ_REC_XY_RS( fName,field,iRec,myIter,myThid )
 
       IMPLICIT NONE

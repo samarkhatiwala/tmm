@@ -1,8 +1,8 @@
 This is the TMM interface to version 2.0 of MOBI (Model of Ocean Biogeochemistry and Isotopes; 
 http://people.oregonstate.edu/~schmita2/Models/MOBI/index.html). 
 
-(1) To use this code, first download the compatible versions of UVic ESCM 2.9 and MOBI 2.0 
-distributed from here: https://github.com/OSU-CEOAS-Schmittner/UVic2.9/wiki
+(1) To use this code, first download the compatible versions of UVic ESCM 2.9 from here: 
+https://github.com/OSU-CEOAS-Schmittner/UVic2.9/wiki
 
 (2) Next, make a directory in which you want to compile and run TMM-MOBI. We will call this 
 TEST below.
@@ -18,12 +18,12 @@ to TEST/ and make your changes.
 
 (6) Edit namelist parameters in control.in as necessary.
 
-(7) Edit the C preprocessor options in MOBI_TMM_OPTIONS.h as necessary. 
+(7) Edit the C preprocessor options in MOBI_TMM_OPTIONS.h as necessary. In particular, 
+you MUST define the directive O_co2ccn_user:
+#define O_co2ccn_user
 
 (7) Build with:
 make cleanall
-make smallf
-make tmmmobiwrite
 make tmmmobi
 
 NOTE: the Makefile endeavors to detect your compiler so that the correct compiler options 
@@ -33,7 +33,14 @@ make COMPILER=gfortran tmmmobi
 
 (8) To generate the names of tracers being simulated (as per the options set in 
 MOBI_TMM_OPTIONS.h) and their initial conditions (as would be set by UVic/MOBI 
-run in online mode), execute:
+run in online mode):
+a) Set the path at the top of make_input_files_for_mobi_model_write_ic.m and execute 
+in Matlab.
+
+b) Compile:
+make tmmmobiwrite
+
+c) Execute:
 ./tmmmobiwrite
 
 This will write out MOBI_tracer_names.txt containing the tracer names, and a corresponding 
@@ -66,6 +73,21 @@ number of levels (km) in size.h.
 (9) Set the path at the top of make_input_files_for_mobi_model.m and execute in Matlab. 
 (See NOTE-3 in #8.)
 
-(10) Edit runscript as necessary (see NOTE-2 in #8) and run the model.
+(10) Edit the namelists in control.in as necessary. The important variables you 
+must set are:
 
-(11) Set the path at the top of the load*.m scripts to read in the output in Matlab.
+a) dtts in the &tsteps namelist: this MUST match the time step argument to the run time 
+option -biogeochem_deltat. (This is the tracer advection-diffusion time step.)
+
+b) co2ccn and dc14ccn in the &carbon namelist.
+
+c) dtnpzd in the &npzd namelist: Set this so that dtts is a multiple of dtnpzd. For 
+stability, dtnpzd (in seconds) should not exceed 1/3rd of a day (in seconds).
+
+(11) Edit runscript as necessary (see NOTE-2 in #8) and run the model.
+
+NOTE-1: If turning on sediments and running on a smaller number of CPUs you should 
+unlimit stacksize. Otherwise you may get a segmentation fault.
+
+(12) Set the path at the top of the load*.m scripts to read in the output in Matlab.
+

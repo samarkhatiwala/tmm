@@ -3,7 +3,7 @@ C !INTERFACE: ==========================================================
      &                 PTRloc,
      &                 thetaloc,saltloc,u10loc,ficeloc,
      &                 atmosploc,gasID,
-     &                 Vgas,Finj,Fex,PTReq)
+     &                 pistonVelocityCoeff,Vgas,Finj,Fex,PTReq)
 
 C !DESCRIPTION:
 
@@ -18,6 +18,7 @@ C !INPUT PARAMETERS: ===================================================
       real*8 PTRloc
       real*8 thetaloc,saltloc,u10loc,ficeloc,atmosploc
       integer gasID
+      real*8 pistonVelocityCoeff ! [cm/hr]*[s^2/m^2]
 C     Output variables
       real*8 Vgas,Finj,Fex,PTReq
 
@@ -27,7 +28,7 @@ C !LOCAL VARIABLES: ====================================================
       real*8 cmph2mps
       parameter (cmph2mps=1.d0/(100.d0*60.d0*60.d0))
       real*8 Ainj, Aex
-      parameter (Ainj=2.357d-9, Aex=1.848d-5)      
+      parameter (Ainj=1.06d-9, Aex=2.19d-6)      
       real*8 u3,Vgas660,Sc,visc,G_eq,Dgas,T,S,rho
       real*8 gas_mol_fract,solfun,moldiff,sw_dens0
 CEOP
@@ -44,9 +45,7 @@ C     % gas diffusivities
       
       Sc = visc/Dgas
 
-C 	  Vgas660=(1.d0-ficeloc)*(0.222d0*(u10loc**2) + 0.333d0*u10loc)
-C   DN: Sweeney et. al. 2007 param for gas ex - ice included
-	  Vgas660=(1.d0-ficeloc)*0.27d0*(u10loc**2) 
+	  Vgas660=(1.d0-ficeloc)*pistonVelocityCoeff*(u10loc**2) 
 C /* % cm/h to m/s */
 	  Vgas=(Vgas660/sqrt(Sc/660.0d0))*cmph2mps
 

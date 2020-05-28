@@ -62,23 +62,28 @@
       real*8 S,T
 
       real*8 temp_S,conc
-      real*8 A0,A1,A2,B0,B1
+      real*8 A1,A2,A3,A4,B1,B2,B3,C1,MV
       
 C % convert T to scaled temperature
-      temp_S = log((298.15d0 - T)/(273.15d0 + T))
+      temp_S = (T+273.15d0)/100.d0
 
-C % constants from Table 4 of Hamme and Emerson 2004
-      A0 = 2.18156d0
-      A1 = 1.29108d0
-      A2 = 2.12504d0
-      B0 = -5.94737d-3
-      B1 = -5.13896d-3
+C % constants from Table 3 of Jenkins et al. 2019
+      A1 = -2.74133d2
+      A2 = 3.52620d2
+      A3 = 2.26968d2
+      A4 = -3.71339d1
+      B1 = -6.38600d-2
+      B2 = 3.53260d-2
+      B3 = -5.32580d-3
+      C1 = 1.28233d-5
+      MV = 1.00045d0
 
-C % Eqn (1) of Hamme and Emerson 2004
-      conc = exp(A0 + A1*temp_S + A2*(temp_S**2) + S*(B0 + B1*temp_S))
+C % Eqn (7) of Jenkins et al. 2019 (in mol/kg)
+      conc = exp(A1 + A2/temp_S + A3*log(temp_S) + A4*temp_S + 
+     &        S*(B1 + B2*temp_S + B3*(temp_S**2)) + C1*(S**2))/MV
 
-C % Convert from nmol/kg to umol/kg
-      Nesol = conc/1000.d0
+C % Convert from mol/kg to umol/kg
+      Nesol = conc*1000000.d0
 
       return
       end
@@ -89,24 +94,29 @@ C % Convert from nmol/kg to umol/kg
 
       real*8 S,T
 
-      real*8 temp_S
-      real*8 A0,A1,A2,A3,B0,B1,B2
+      real*8 temp_S,conc
+      real*8 A1,A2,A3,A4,B1,B2,B3,C1,MV
       
 C % convert T to scaled temperature
-      temp_S = log((298.15d0 - T)/(273.15d0 + T))
+      temp_S = (T+273.15d0)/100.d0
 
-C % constants from Table 4 of Hamme and Emerson 2004
-      A0 = 2.79150d0
-      A1 = 3.17609d0
-      A2 = 4.13116d0
-      A3 = 4.90379d0
-      B0 = -6.96233d-3
-      B1 = -7.66670d-3
-      B2 = -1.16888d-2
+C % constants from Table 3 of Jenkins et al. 2019
+      A1 = -2.27461d2
+      A2 = 3.05435d2
+      A3 = 1.80528d2
+      A4 = -2.79945d1
+      B1 = -6.69420d-2
+      B2 = 3.72010d-2
+      B3 = -5.63640d-3
+      C1 = -5.30325d-6
+      MV = 9.99038d-1
 
-C % Eqn (1) of Hamme and Emerson 2004
-      Arsol = exp(A0 + A1*temp_S + A2*(temp_S**2) + A3*(temp_S**3) + 
-     &        S*(B0 + B1*temp_S + B2*(temp_S**2)))
+C % Eqn (7) of Jenkins et al. 2019 (in mol/kg)
+      conc = exp(A1 + A2/temp_S + A3*log(temp_S) + A4*temp_S + 
+     &        S*(B1 + B2*temp_S + B3*(temp_S**2)) + C1*(S**2))/MV
+
+C % Convert from mol/kg to umol/kg
+      Arsol = conc*1000000.d0
 
       return
       end
@@ -117,30 +127,30 @@ C % Eqn (1) of Hamme and Emerson 2004
 
       real*8 S,T
 
-      real*8 temp_abs,conc
-      real*8 A1,A2,A3,A4,B1,B2,B3
-
-C % convert T to scaled temperature
-      temp_abs = T + 273.15d0
-
-C % constants from Table 2 Weiss and Kyser for mL/kg
-      A1 = -112.6840d0
-      A2 = 153.5817d0
-      A3 = 74.4690d0
-      A4 = -10.0189d0
-      B1 = -0.011213d0
-      B2 = -0.001844d0
-      B3 = 0.0011201d0
-
-C % Eqn (7) of Weiss and Kyser
-      conc = exp(A1 + A2*100.d0/temp_abs + A3*log(temp_abs/100.d0) 
-     &       + A4*temp_abs/100.d0 + S*(B1 + B2*temp_abs/100.d0 
-     &       + B3*(temp_abs/100.d0)**2))
-
-C % Convert concentration from mL/kg to umol/kg
-C % Molar volume at STP is calculated from Dymond and Smith (1980) "The virial coefficients of pure gases and mixtures", Clarendon Press, Oxford.
-      Krsol = conc/22.3511d-3
+      real*8 temp_S,conc
+      real*8 A1,A2,A3,A4,B1,B2,B3,C1,MV
       
+C % convert T to scaled temperature
+      temp_S = (T+273.15d0)/100.d0
+
+C % constants from Table 3 of Jenkins et al. 2019
+      A1 = -1.22469d2
+      A2 = 1.53565d2
+      A3 = 7.01969d1
+      A4 = -8.52524d0
+      B1 = -4.95220d-2
+      B2 = 2.44340d-2
+      B3 = -3.39680d-3
+      C1 = 4.19208d-6
+      MV = 9.97232d-1
+
+C % Eqn (7) of Jenkins et al. 2019 (in mol/kg)
+      conc = exp(A1 + A2/temp_S + A3*log(temp_S) + A4*temp_S + 
+     &        S*(B1 + B2*temp_S + B3*(temp_S**2)) + C1*(S**2))/MV
+
+C % Convert from mol/kg to umol/kg
+      Krsol = conc*1000000.d0
+
       return
       end
 
@@ -150,21 +160,29 @@ C % Molar volume at STP is calculated from Dymond and Smith (1980) "The virial c
 
       real*8 S,T
 
-      real*8 temp_S
-      real*8 A0,A1,A2,B0,B1
-
+      real*8 temp_S,conc
+      real*8 A1,A2,A3,A4,B1,B2,B3,C1,MV
+      
 C % convert T to scaled temperature
-      temp_S = log((298.15d0 - T)/(273.15d0 + T))
+      temp_S = (T+273.15d0)/100.d0
 
-C % constants from fit procedure of Hamme and Emerson 2004 to Wood and Caputi data
-      A0 = -7.48679d0
-      A1 = 5.08637d0
-      A2 = 4.22243d0
-      B0 = -8.15683d-3
-      B1 = -1.20129d-2
+C % constants from Table 3 of Jenkins et al. 2019
+      A1 = -2.24510d2
+      A2 = 2.92823d2
+      A3 = 1.57613d2
+      A4 = -2.26690d1
+      B1 = -8.49150d-2
+      B2 = 4.79960d-2
+      B3 = -7.35950d-3
+      C1 = 6.69292d-6
+      MV = 9.93098d-1
 
-C % Eqn (1) of Hamme and Emerson 2004
-      Xesol = exp(A0 + A1*temp_S + A2*(temp_S**2) + S*(B0 + B1*temp_S))      
+C % Eqn (7) of Jenkins et al. 2019 (in mol/kg)
+      conc = exp(A1 + A2/temp_S + A3*log(temp_S) + A4*temp_S + 
+     &        S*(B1 + B2*temp_S + B3*(temp_S**2)) + C1*(S**2))/MV
+
+C % Convert from mol/kg to umol/kg
+      Xesol = conc*1000000.d0
 
       return
       end
@@ -204,21 +222,17 @@ C % Eqn (1) of Hamme and Emerson 2004
       real*8 S,T
 
       real*8 p1,p2
-      parameter (p1=-6.95652173913754e-06,p2=1.00122391304348)
+      parameter (p1=-6.3492708401d-6,p2=1.0011708d0)
       real*8 alpha_fit,X36,XAr,X40
       real*8 gas_mol_fract,Arsol
 
-C % alpha experimentally determined
-C       t_alpha = [2 25];
-C       alpha = [1.00121 1.00105];
-C 
-C       alpha_fit = polyval(polyfit(t_alpha,alpha,1),T);
+C % alpha experimentally determined (Seltzer et al., 2019)
 
       alpha_fit=p1*T + p2
 
       X36 = gas_mol_fract(6)
       XAr = gas_mol_fract(2)
-      X40 = 0.996349
+      X40 = 0.996349d0
       Ar36sol = Arsol(S,T)/((alpha_fit*(XAr*X40)/X36)+1.d0)
 
       return
@@ -238,8 +252,8 @@ C % convert T to scaled temperature
 
 C % constants from Table 1 of Garcia & Gordon for the fit to Benson and Krause (1984)
       A0 = 5.80871d0 
-      A1 = 3.20291
-      A2 = 4.17887
+      A1 = 3.20291d0
+      A2 = 4.17887d0
       A3 = 5.10006d0
       A4 = -9.86643d-2
       A5 = 3.80369d0
@@ -286,11 +300,11 @@ C % Corrected Eqn (8) of Garcia and Gordon 1992
         Ea = 18500.d0
       elseif (gasID.eq.6) then !'Ar36')
 C     % adjust diffusivity by fractionation factor alpha
-        alphaD = 0.995d0
+        alphaD = 0.9963d0
         A = 2.227d-6*(1.d0/(alphaD**2))
         Ea = 16680.d0
 C     % adjust diffusivity by fractionation factor alpha
-        alphaD = 0.995d0
+        alphaD = 0.9963d0
         moldiff = moldiff/(alphaD**2)
       elseif (gasID.eq.7) then ! 'O2')
         A = 4.286d-6

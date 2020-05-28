@@ -5,15 +5,19 @@
      &     dz_loc,z,
 # if defined O_carbon
 #if defined O_co2ccn_data || defined O_TMM_interactive_atmosphere
+#   if defined O_carbon_co2_2d
      &     co2atm, 
+#   else
+     &     co2atm, 
+#   endif      
 #endif     
-     &     winds_loc,
-#endif      
 # if defined O_c14ccn_data
-     &     dc14ccnnatm, dc14ccnsatm, dc14ccneatm,
+     &     dc14ccnnhatm, dc14ccneqatm, dc14ccnshatm,
 #endif      
-#if defined O_carbon && defined O_carbon_13_coupled && defined O_TMM_interactive_atmosphere
+#if defined O_c13ccn_data || defined O_carbon_13_coupled
      &     c13o2atm,
+#endif
+     &     winds_loc,
 #endif      
 #  if defined O_npzd_fe_limitation
      &     fe_dissolved_loc,
@@ -32,9 +36,16 @@
      &     emp_loc, emp_glob, 
 # if defined O_carbon
      &     gasexfluxloc, totfluxloc, 
-# endif     
-#if defined O_carbon && defined O_carbon_13_coupled && defined O_TMM_interactive_atmosphere
+#if defined O_carbon_13_coupled
      &     c13gasexfluxloc,
+#endif
+# endif
+#if defined O_sed
+# if defined O_embm
+     &     globdisch, localdisch,
+# endif
+     &     timeToRunSedModel,
+     &     globwflx, totlocalwflx,
 #endif
      &     debugFlag)
 
@@ -55,15 +66,16 @@
       real co2atm
 #   endif      
 #endif      
-      real winds_loc(nx_loc)
-#endif
 
 # if defined O_c14ccn_data
-      real dc14ccnnatm, dc14ccnsatm, dc14ccneatm
+      real dc14ccnnhatm, dc14ccneqatm, dc14ccnshatm
 #endif      
 
-#if defined O_carbon && defined O_carbon_13_coupled && defined O_TMM_interactive_atmosphere
+#if defined O_c13ccn_data || defined O_carbon_13_coupled
       real c13o2atm
+#endif
+
+      real winds_loc(nx_loc)
 #endif
       
 #  if defined O_npzd_fe_limitation
@@ -84,9 +96,16 @@
       real emp_loc(nx_loc), emp_glob
 # if defined O_carbon
       real gasexfluxloc(nx_loc), totfluxloc(nx_loc)
-# endif
-#if defined O_carbon && defined O_carbon_13_coupled && defined O_TMM_interactive_atmosphere
+#if defined O_carbon_13_coupled
       real c13gasexfluxloc(nx_loc)
+#endif
+# endif
+#if defined O_sed
+# if defined O_embm
+      real globdisch, localdisch(nx_loc)
+# endif
+      integer timeToRunSedModel
+      real globwflx, totlocalwflx
 #endif
       integer debugFlag
 
@@ -152,93 +171,14 @@ C# endif
 C# if defined O_carbon_fnpzd
 C#include "calendar.h"
 # endif
+# if defined O_sed
+#include "sed.h"
+# endif
 
 # if defined O_npzd || defined O_carbon_14
       real src(imt,km,jsmw:jemw,nsrc)
       common/mobicomm/src
 # endif
-
-#ifdef O_TMM_partial_step_topo
-CSPK Recompute local grid-dependent data
-      dzt(:) = c0
-      dzw(:) = c0
-      zt(:) = c0
-      zw(:) = c0
-
-      do k=1,km_loc
-        dzt(k) = dz_loc(k)
-        zt(k) = z(k)      
-      enddo
-
-      zw(1) = dz_loc(1)      
-      do k=2,km_loc
-        zw(k) = zw(k-1) + dz_loc(k)
-      enddo
-      
-      do k=1,km_loc-1
-        dzw(k) = zt(k+1) - zt(k)
-      enddo
-      dzw(0) = zt(1)
-      dzw(km_loc) = zw(km_loc) - zt(km_loc)
-
-      do k=1,km_loc
-        c2dzt(k) = c2*dzt(k)
-        dzt2r(k) = c1/c2dzt(k)
-      enddo
-
-      dzwr(km_loc)  = c1/dzw(km_loc)
-      dzw2r(km_loc) = p5/dzw(km_loc)
-
-      do k=1,km_loc
-        dzwr(k-1)    = c1/dzw(k-1)
-        dzw2r(k-1)   = p5/dzw(k-1)
-      enddo
-
-      do k=1,km_loc
-        dztr(k)  = c1/dzt(k)
-      enddo
-CCCCC
-
-CSPK from S/R mobi_init
-!     calculate sinking speed of detritus divided by grid width
-      do k=1,km_loc
-!     linear increase wd0-200m with depth
-         if (zt(k) .lt. mwz) then
-            wd(k) = (wd0+mw*zt(k))/daylen/dzt(k) ! [s-1]
-# if defined O_npzd_caco3
-            wc(k) = (wc0+mw_c*zt(k))/daylen/dzt(k)    ! [s-1]
-# endif            
-         else
-            wd(k) = (wd0+mw*mwz)/daylen/dzt(k) ! [s-1]
-# if defined O_npzd_caco3
-            wc(k) = (wc0+mw_c*mwz)/daylen/dzt(k)    ! [s-1]
-# endif 
-         endif
-         rkwz(k) = 1./(kw*dzt(k))
-      enddo
-      ztt(1)=0.0
-      do k=1,km_loc-1
-         ztt(k+1)=(-1)*zw(k)
-      enddo
-
-CSPK from S/R mobi_init
-# if defined O_carbon || defined O_npzd_alk
-
-!---------------------------------------------------------------------
-!     calculate variables used in calcite remineralization
-!---------------------------------------------------------------------
-
-      rcak(1) = -(exp(-zw(1)/dcaco3)-1.0)/dzt(1)
-      rcab(1) = 1./dzt(1)
-      do k=2,km_loc
-        rcak(k) = -(exp(-zw(k)/dcaco3))/dzt(k)
-     &          + (exp(-zw(k-1)/dcaco3))/dzt(k)
-        rcab(k) = (exp(-zw(k-1)/dcaco3))/dzt(k)
-      enddo
-# endif
-
-C end recompute
-#endif ! O_TMM_partial_step_topo
 
 CSPK  Set some parameters
 	  dayoyr = day_loc ! relative day number referenced to the beginning of the current year
@@ -256,11 +196,6 @@ CSPK Other tracers should already have been copied by a previous call to S/R mob
           ii=ii+1
         enddo
       enddo
-C     if (debugFlag.eq.1) then
-C       write(*,*)'SPK: ',
-C    &   t(1,1,j,itemp,taum1),t(1000,1,j,itemp,taum1),
-C    &   t(nx_loc,1,j,itemp,taum1),TEMP(3000),TEMP(lSize)
-C     endif  
 
 CSPK set SBC arrays
 CSPK note: we set tau, taum1 and taup1 to all point to the same location in S/R mobi_ini
@@ -268,12 +203,16 @@ CSPK note: we set tau, taum1 and taup1 to all point to the same location in S/R 
 		 if (trsbcindex(n) .ne. 0) then
 		   call set_sbc(0, j, j, 1, nx_loc, trsbcindex(n), n, 
      &                  taup1, .false.)
-C	   if (debugFlag.eq.1) then
-C		 write(*,*)'SPK2: ',trsbcindex(n),itemp,n,mapt(n)
-C	   endif  
      
 		 endif
 	   enddo                      
+
+#ifdef O_sed
+!     S/R gosbc needs the global weathering flux (stored in variable weathflx and 
+!     calculated in S/R sed in the online model (but in the offline model that is 
+!     just the local flux). Variable weathflx is subsequently overwritten by S/R sed.
+      weathflx = globwflx
+#endif      
        
 CSPK The sequence here is based on the time stepping in UVic_ESCM.F
 
@@ -294,23 +233,30 @@ CSPK copy over winds and other data needed subsequently by S/R gasbc and S/R tra
 #   endif
 #  endif
 
+#if defined O_co2ccn_data || defined O_TMM_interactive_atmosphere
 CSPK set atmospheric CO2 here as the call to co2ccndata in gasbc is to a stub routine where 
 C    it would otherwise be read from file
-#if defined O_co2ccn_data || defined O_TMM_interactive_atmosphere
 #   if defined O_carbon_co2_2d
         at(1:nx_loc,j,2,ico2) = co2atm(1:nx_loc)
-#   else
-        co2ccn = co2atm
 #   endif
+      co2ccn = co2atm ! we always set this here because gasbc seems to use co2ccn even when O_carbon_co2_2d is defined
 #endif
 
-#if defined O_carbon && defined O_carbon_13_coupled && defined O_TMM_interactive_atmosphere
-        c13ccn = c13o2atm
-        dc13ccn = 1000.*(c13ccn/(co2ccn-c13ccn)/rc13std - 1.)        
+#if defined O_c13ccn_data || defined O_carbon_13_coupled
+      c13ccn = c13o2atm
+      dc13ccn = 1000.*(c13ccn/(co2ccn-c13ccn)/rc13std - 1.)        
 #endif
 
-CSPK set global averages here if necessary as the calls in gasbc are to stub routines
+# if defined O_c14ccn_data
+CSPK set atmospheric dc14 here as the call to c14data in gasbc is to a stub routine where 
+C    it would otherwise be read from file
+      dc14ccnn = dc14ccnnhatm
+      dc14ccne = dc14ccneqatm
+      dc14ccns = dc14ccnshatm
+#endif      
+
 #  if !defined O_constant_flux_reference
+CSPK set global averages here if necessary as the calls in gasbc are to stub routines
       itr = 0
       do n=3,nt
 C        if (itrc(n) .ne. 0) then
@@ -320,18 +266,10 @@ C        endif
       enddo
 # endif
 
-CSPK set atmospheric dc14 here as the call to c14data in gasbc is to a stub routine where 
-C    it would otherwise be read from file
-# if defined O_c14ccn_data
-      dc14ccnn = dc14ccnnatm
-      dc14ccne = dc14ccneatm
-      dc14ccns = dc14ccnsatm
-#endif      
-
+#if defined O_mtlm && defined O_carbon
 CSPK These arrays are first set to zero in S/R glsbc and then updated in S/R mtlm. They 
 C    are used in S/R gasbc but as we're not using the land model they should not be 
 C    referenced anywhere. Still, we set them to zero anyway to be safe.
-#if defined O_mtlm && defined O_carbon
 	  sbc(1:nx_loc,j,inpp) = 0.0
 	  sbc(1:nx_loc,j,isr) = 0.0
 	  sbc(1:nx_loc,j,iburn) = 0.0
@@ -343,32 +281,31 @@ C    referenced anywhere. Still, we set them to zero anyway to be safe.
 
         call gasbc (1, nx_loc, 1, jmt)
 
+#if defined O_co2ccn_data || defined O_TMM_interactive_atmosphere
 CSPK S/R gasbc modifies co2ccn. This should not have any effect if co2emit and global mean 
 C    dic flux calculated by a call to stub routine areaavg are exactly zero as we want them 
 C    to be. But to be safe, we reset its value again here.
-#if defined O_co2ccn_data || defined O_TMM_interactive_atmosphere
 #   if defined O_carbon_co2_2d
         at(1:nx_loc,j,2,ico2) = co2atm(1:nx_loc)
-#   else
-        co2ccn = co2atm
 #   endif
+      co2ccn = co2atm ! we always set this here because gasbc seems to use co2ccn even when O_carbon_co2_2d is defined
 #endif
 
 CSPK S/R gasbc modifies c13ccn. We reset it here. 
-#if defined O_carbon && defined O_carbon_13_coupled && defined O_TMM_interactive_atmosphere
-        c13ccn = c13o2atm
-        dc13ccn = 1000.*(c13ccn/(co2ccn-c13ccn)/rc13std - 1.)        
+#if defined O_c13ccn_data || defined O_carbon_13_coupled
+	  c13ccn = c13o2atm
+	  dc13ccn = 1000.*(c13ccn/(co2ccn-c13ccn)/rc13std - 1.)        
 #endif
 
+#if defined O_carbon
 CSPK S/R gasbc computes the air-sea gas exchange flux in umol cm-2 s-1. We convert it here 
 C    to mol m-2 s-1.
-#if defined O_carbon
       gasexfluxloc(1:nx_loc) = sbc(1:nx_loc,j,idicflx)*1.e-2
 #endif
 
+#if defined O_carbon_13_coupled
 CSPK S/R gasbc computes the air-sea gas exchange flux in umol cm-2 s-1. We convert it here 
 C    to mol m-2 s-1.
-#if defined O_carbon && defined O_carbon_13_coupled && defined O_TMM_interactive_atmosphere
       c13gasexfluxloc(1:nx_loc) = sbc(1:nx_loc,j,idic13flx)*1.e-2
 #endif      
 
@@ -383,8 +320,8 @@ C    to mol m-2 s-1.
 	  enddo
 #  endif
 
-C Note: we do this after call to S/R gasbc because sbc(1,1,idfeadep) is set to zero there (before being read from file)
 #if defined O_npzd_iron
+C Note: we do this after call to S/R gasbc because sbc(1,1,idfeadep) is set to zero there (before being read from file)
       sbc(1:nx_loc,j,idfeadep)=fe_adep_loc(1:nx_loc) ! note input is in molFe/m^2/s; it is converted to mmolFe/m^2/s in tracer.F so we don't do it here
       ii=1
       do i=1,nx_loc
@@ -395,10 +332,18 @@ C Note: we do this after call to S/R gasbc because sbc(1,1,idfeadep) is set to z
       enddo  
 #endif
 
+#if defined O_embm
 C Salt flux for virtual flux calculation in gosbc; emp_loc should be in cm/s
 C Note: emp_glob is now not used and global mean freshwater flux is set to zero in gosbc. 
-#if defined O_embm
       sbc(1:nx_loc,j,isflx) = emp_loc(1:nx_loc)*socn
+#endif
+
+#ifdef O_sed
+# ifdef O_embm
+CSPK  discharge is used in S/R gosbc. Units are [g/cm^2/s]
+      globaldisch = globdisch
+      disch(1:nx_loc,1) = localdisch(1:nx_loc)
+# endif      
 #endif
       
 C#if defined O_mtlm
@@ -436,7 +381,7 @@ C
 C       do loop=1,ntspos
 C         call mom
 
-CSPK S/R mom calls S/R setvbc and S/R tracer
+CSPK S/R mom calls S/R setvbc, S/R tracer and S/R sed
 
        js = 1
        je = 1
@@ -444,14 +389,26 @@ CSPK S/R mom calls S/R setvbc and S/R tracer
        ie = nx_loc
        joff = 0 ! just to be safe; for the standard UVic options joff=0
 
+CSPK S/R setvbc copies fluxes calculated and stored in the sbc arrays to the corresponding 
+C      stf arrays. These fluxes are converted to and applied as a body force term below.
        call setvbc(joff, js, je, is, ie)
        call tracer(joff, js, je, is, ie)
+
+# if defined O_sed
+	   if (timeToRunSedModel .eq. 1) then
+C		write(*,*)'SPK: calling sed ...'
+		call sed (1, nx_loc, 1, jmt)
+C		write(*,*)'SPK: done sed'		
+#ifdef O_sed_weath_diag
+		totlocalwflx = weathflx ! this is the local total weathering flux; we compute a global flux in external_forcing
+#endif		
+	   endif
+# endif
+
+CSPK S/R sed computes DIC and alkalinity fluxes from the sediments to the ocean, converts 
+C    them to body force terms, and stores them in sbc(...,ibdicfx) and sbc(...,ialkflx). 
+C    These are applied in a subsequent time step in S/R tracer.
        
-C      if (debugFlag.eq.1) then
-C      n=idic
-C      print*,'TEST:',idic,isdic,itrc(n),src(1,1,1,itrc(n)),stf(1,1,n),
-C    &    sbc(1,1,idicflx),dztr(1),tmask(1,1,1)
-C      endif
 CSPK Add surface fluxes (calculated in setvbc.F) as a body force term in surface layer. Be very careful of tracer indexing!
       do j=js,je
         do i=is,ie
@@ -462,25 +419,13 @@ C	  endif
 		  enddo
 		enddo
 	  enddo	  
-C      if (debugFlag.eq.1) then
-C      n=idic
-C      print*,'TEST:',idic,isdic,itrc(n),src(1,1,1,itrc(n)),stf(1,1,n),
-C    &    sbc(1,1,idicflx),dztr(1),tmask(1,1,1)
-C      endif
 
-CSPK Virtual flux is added above to the air-sea gas exchange flux computed in S/R gasbc. Units 
-C    are umol cm-2 s-1. We convert here to mol m-2 s-1.
 #if defined O_carbon
+CSPK Virtual flux and weathering flux (if using sediments) is added in S/R gosbc above to the 
+C    air-sea gas exchange flux computed in S/R gasbc. Units are umol cm-2 s-1. We convert here 
+C    to mol m-2 s-1. Note that 1 umol/cm^3 is numerically equal to 1 mol/m^3.
       totfluxloc(1:nx_loc) = sbc(1:nx_loc,j,idicflx)*1.e-2
 #endif
 		
-C      if (flag.eq.1) then
-C      do n=3,nt
-C        if (itrc(n) .ne. 0) then
-C         print*,n-2,mapt(n),src(1,1:km_loc,1,itrc(n))
-C        endif
-C      enddo
-C      endif
-      
       END
       

@@ -7,12 +7,13 @@
 
 #include "petscmat.h"
 #include "petsc_matvec_utils.h"
-#include "tmm_main.h"
+#include "tmm_timer.h"
 #include "tmm_forcing_utils.h"
 #include "tmm_profile_utils.h"
 #include "tmm_profile_data.h"
-#include "tmm_timer.h"
-#include "inert_gas.h"
+#include "tmm_misfit.h"
+#include "tmm_main.h"
+#include "inert_gas_tmm.h"
 
 /* Macros to map tracer names to vectors */
 #define TR v[0]
@@ -24,10 +25,11 @@ PetscScalar *localTR;
 PetscScalar *localJTR;
 PetscScalar *localfice,*localwind, *localatmosp;
 Vec TReq;
-PetscScalar *localVgas,*localFgas,*localFinj,*localFex,*localTReq;
+PetscScalar *localVgas,*localFgas,*localFinj,*localFex,*localTReq,*localTReqsurf;
 PetscScalar DeltaT, *localdzsurf;
 PetscInt gasID = 0;
 PetscScalar fluxScaling[3];
+PetscScalar pistonVelocityCoeff=0.27; /* default piston velocity coefficient [cm/hr]*[s^2/m^2] */
 
 PeriodicVec Tsp, Ssp;
 PeriodicArray localficep, localwindp, localatmospp;
@@ -36,12 +38,7 @@ PetscBool useSeparateWinds = PETSC_FALSE;
 PeriodicTimer windsTimer;
 PetscScalar *localuwind,*localvwind;
 PeriodicArray localuwindp, localvwindp;
-// PetscInt numWindsPeriods;
-// PetscScalar *tdpWinds; /* arrays for periodic forcing */
-// PetscScalar windsCyclePeriod, windsCycleStep;
 
-// PetscInt numBiogeochemPeriods;
-// PetscScalar *tdpBiogeochem; /* arrays for periodic forcing */
 PetscBool periodicBiogeochemForcing = PETSC_FALSE;
 PeriodicTimer biogeochemTimer;
 
@@ -50,6 +47,7 @@ StepTimer diagTimer;
 PetscBool appendDiagnostics = PETSC_FALSE;
 /* Add model specific diagnostic variables below */
 PetscScalar *localgasfluxdiagavg, *localinjfluxdiagavg, *localexfluxdiagavg;
+PetscScalar *localTReqsurfdiagavg;
 Vec TRsatanomdiag, TRsatanomdiagavg, TReqdiagavg;
 PetscScalar *localTRsatanomdiag;
 PetscViewer fdTRsatanomdiagavg, fdTReqdiagavg;
@@ -193,6 +191,9 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	  ierr = readProfileSurfaceScalarData("wind.bin",localwind,1);  
 	}
   }
+
+  ierr = PetscOptionsGetReal(PETSC_NULL,"-piston_velocity_coeff",&pistonVelocityCoeff,&flg);CHKERRQ(ierr); /* overwrite default value */
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"Piston velocity coefficient of %10.5f [cm/hr]*[s^2/m^2] will be used\n", pistonVelocityCoeff);CHKERRQ(ierr);      
   
   ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localfice);CHKERRQ(ierr);  
   if (periodicBiogeochemForcing) {    
@@ -206,6 +207,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localFgas);CHKERRQ(ierr);  
   ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localFinj);CHKERRQ(ierr);  
   ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localFex);CHKERRQ(ierr);    
+  ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localTReqsurf);CHKERRQ(ierr);    
 
   ierr = VecDuplicate(TR,&TReq);CHKERRQ(ierr);
   ierr = VecSet(TReq,zero);CHKERRQ(ierr);
@@ -243,28 +245,26 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
    
     inert_gas_fluxes_(&Iter,&myTime,&localTR[kl],&localTs[kl],&localSs[kl],
                           &localwind[ip],&localfice[ip],&localatmosp[ip],
-                          &gasID,&localVgas[ip],&localFinj[ip],&localFex[ip],
+                          &gasID,&pistonVelocityCoeff,&localVgas[ip],&localFinj[ip],&localFex[ip],
                           &localTReq[kl]);
 
     localFinj[ip]=fluxScaling[0]*localFinj[ip];
-    localFex[ip]=fluxScaling[1]*localFex[ip];                              
+    localFex[ip]=fluxScaling[1]*localFex[ip];
+    localTReqsurf[ip]=localTReq[kl];
   }
 
   ierr = PetscOptionsHasName(PETSC_NULL,"-calc_diagnostics",&calcDiagnostics);CHKERRQ(ierr);
   if (calcDiagnostics) {    
 /*Data for diagnostics */
     ierr = iniStepTimer("diag_", Iter0, &diagTimer);CHKERRQ(ierr);
-// 	ierr = PetscOptionsGetInt(PETSC_NULL,"-diag_start_time_step",&diagStartTimeStep,&flg);CHKERRQ(ierr);
-// 	if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate (absolute) time step at which to start storing diagnostics with the -diag_start_time_step flag");
-// 	ierr = PetscOptionsGetInt(PETSC_NULL,"-diag_time_steps",&diagNumTimeSteps,&flg);CHKERRQ(ierr);
-// 	if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate number of time averaging diagnostics time steps with the -diag_time_step flag");
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed starting at (and including) time step: %d\n", diagTimer.startTimeStep);CHKERRQ(ierr);	
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed over %d time steps\n", diagTimer.numTimeSteps);CHKERRQ(ierr);	
 
     ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localgasfluxdiagavg);CHKERRQ(ierr);  
     ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localinjfluxdiagavg);CHKERRQ(ierr);  
     ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localexfluxdiagavg);CHKERRQ(ierr);  
-    
+    ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localTReqsurfdiagavg);CHKERRQ(ierr);  
+
 	ierr = VecDuplicate(TR,&TRsatanomdiag);CHKERRQ(ierr);
 	ierr = VecSet(TRsatanomdiag,zero);CHKERRQ(ierr);
 	ierr = VecGetArray(TRsatanomdiag,&localTRsatanomdiag);CHKERRQ(ierr);
@@ -277,9 +277,9 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
       localgasfluxdiagavg[ip]=0.0;
       localinjfluxdiagavg[ip]=0.0;
       localexfluxdiagavg[ip]=0.0;
+      localTReqsurfdiagavg[ip]=0.0;      
     }
 
-// 	diagCount=0;
   }
 
   return 0;
@@ -320,11 +320,12 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
 
       inert_gas_fluxes_(&Iter,&myTime,&localTR[kl],&localTs[kl],&localSs[kl],
                             &localwind[ip],&localfice[ip],&localatmosp[ip],
-                            &gasID,&localVgas[ip],&localFinj[ip],&localFex[ip],
+                            &gasID,&pistonVelocityCoeff,&localVgas[ip],&localFinj[ip],&localFex[ip],
                             &localTReq[kl]);
 
       localFinj[ip]=fluxScaling[0]*localFinj[ip];
-      localFex[ip]=fluxScaling[1]*localFex[ip];                            
+      localFex[ip]=fluxScaling[1]*localFex[ip];
+      localTReqsurf[ip]=localTReq[kl];
     }
   }
 
@@ -405,9 +406,10 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
           localgasfluxdiagavg[ip]=localFgas[ip]+localgasfluxdiagavg[ip];
           localinjfluxdiagavg[ip]=localFinj[ip]+localinjfluxdiagavg[ip];
           localexfluxdiagavg[ip]=localFex[ip]+localexfluxdiagavg[ip];
+          localTReqsurfdiagavg[ip]=localTReqsurf[ip]+localTReqsurfdiagavg[ip];          
         }	  
 
-		diagTimer.count++; // = diagCount+1;
+		diagTimer.count++;
 	  }
 
 	  if (diagTimer.count==diagTimer.numTimeSteps) { /* time to write averages to file */
@@ -420,6 +422,7 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
           localgasfluxdiagavg[ip]=localgasfluxdiagavg[ip]/diagTimer.count;
           localinjfluxdiagavg[ip]=localinjfluxdiagavg[ip]/diagTimer.count;
           localexfluxdiagavg[ip]=localexfluxdiagavg[ip]/diagTimer.count;
+          localTReqsurfdiagavg[ip]=localTReqsurfdiagavg[ip]/diagTimer.count;          
         }	          
 
         if (!appendDiagnostics) {
@@ -432,6 +435,7 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
 		ierr = writeProfileSurfaceScalarData("gasfluxavg.bin",localgasfluxdiagavg,1,appendDiagnostics);  		
 		ierr = writeProfileSurfaceScalarData("injfluxavg.bin",localinjfluxdiagavg,1,appendDiagnostics);  		
 		ierr = writeProfileSurfaceScalarData("exfluxavg.bin",localexfluxdiagavg,1,appendDiagnostics);  		
+		ierr = writeProfileSurfaceScalarData("TReqsurfdiagavg.bin",localTReqsurfdiagavg,1,appendDiagnostics);  		
 
         appendDiagnostics=PETSC_TRUE;
 
@@ -442,10 +446,10 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
           localgasfluxdiagavg[ip]=0.0;
           localinjfluxdiagavg[ip]=0.0;
           localexfluxdiagavg[ip]=0.0;
+          localTReqsurfdiagavg[ip]=0.0;  
         }	  
 
         ierr = updateStepTimer("diag_", Iter0+iLoop, &diagTimer);CHKERRQ(ierr);
-// 		diagCount = 0;        
 	  }
 	}  
   }
@@ -481,7 +485,7 @@ PetscErrorCode finalizeExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt n
 	ierr = VecDestroy(&TRsatanomdiagavg);CHKERRQ(ierr);
     ierr = PetscViewerDestroy(&fdTRsatanomdiagavg);CHKERRQ(ierr);	  
 	ierr = VecDestroy(&TReqdiagavg);CHKERRQ(ierr);
-    ierr = PetscViewerDestroy(&fdTReqdiagavg);CHKERRQ(ierr);	  
+    ierr = PetscViewerDestroy(&fdTReqdiagavg);CHKERRQ(ierr);
   }
 
   return 0;
@@ -518,11 +522,12 @@ PetscErrorCode reInitializeExternalForcing(PetscScalar tc, PetscInt Iter, PetscI
 
     inert_gas_fluxes_(&Iter,&myTime,&localTR[kl],&localTs[kl],&localSs[kl],
                           &localwind[ip],&localfice[ip],&localatmosp[ip],
-                          &gasID,&localVgas[ip],&localFinj[ip],&localFex[ip],
+                          &gasID,&pistonVelocityCoeff,&localVgas[ip],&localFinj[ip],&localFex[ip],
                           &localTReq[kl]);
 
     localFinj[ip]=fluxScaling[0]*localFinj[ip];
-    localFex[ip]=fluxScaling[1]*localFex[ip];                          
+    localFex[ip]=fluxScaling[1]*localFex[ip];
+    localTReqsurf[ip]=localTReq[kl];                            
   }
     
   return 0;

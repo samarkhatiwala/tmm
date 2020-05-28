@@ -513,6 +513,19 @@ CSPK  Based on timeavgs.F
 
       integer is, ie, jj
 
+CSPK  These ta_XX variables are set in diago.F. But as this routine
+C     is not called by TMM-MOBI we set them here.
+	  ta_sspH(1:numProfiles,1) = sspH(1:numProfiles,1)
+	  ta_ssCO3(1:numProfiles,1) = ssCO3(1:numProfiles,1)
+	  ta_ssOc(1:numProfiles,1) = ssOc(1:numProfiles,1)
+	  ta_ssOa(1:numProfiles,1) = ssOa(1:numProfiles,1)
+	  ta_sspCO2(1:numProfiles,1) = sspCO2(1:numProfiles,1)
+
+CSPK  The array ta_rsedrr does not seem to be set anywhere in the 
+C     current version of MOBI. I think this is a bug and it should 
+C     be set to rsedrr for each horizontal location in tracer.F. 
+C     Until this is fixed it will be zero in the output file.
+
 CSPK  This is based on timeavgs.F 
         is=1
         ie=imt

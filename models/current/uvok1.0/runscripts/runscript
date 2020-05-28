@@ -7,7 +7,7 @@ mpiexec -np 4 ./tmmuvok \
   -t0 0.0 -iter0 0 \
   -deltat_clock 0.0009132420091324 \
   -max_steps 1095 \
-  -write_steps 1095 \
+  -write_time_steps 1095 \
   -o dic.petsc,c14.petsc,alk.petsc,o2.petsc,po4.petsc,phyt.petsc,zoop.petsc,detr.petsc,no3.petsc,diaz.petsc \
   -external_forcing \
   -use_profiles \

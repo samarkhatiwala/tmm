@@ -1,7 +1,7 @@
 extern void inert_gas_fluxes_(PetscInt *myIter, PetscScalar *myTime, 
                                  PetscScalar *localTR,
                                  PetscScalar *localTs,PetscScalar *localSs, PetscScalar *localwind, PetscScalar *localfice,
-                                 PetscScalar *localatmosp, PetscInt *gasID, 
+                                 PetscScalar *localatmosp, PetscInt *gasID, PetscScalar *pistonVelocityCoeff,
                                  PetscScalar *localVgas,PetscScalar *localFinj,PetscScalar *localFex,PetscScalar *localPTReq);
 
 extern void inert_gas_diagnostics_(PetscInt *Nrloc, PetscInt *myIter, PetscScalar *myTime, 

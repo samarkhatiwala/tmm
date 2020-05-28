@@ -1,6 +1,10 @@
+# Set the environment variable TMMROOT to point to the top level of the TMM code
+#
+TMMBASE = ${TMMROOT}/driver/current
+MODELBASE = ${TMMROOT}/models/current/tracegases/src
+
 include ${PETSC_DIR}/lib/petsc/conf/variables
 include ${PETSC_DIR}/lib/petsc/conf/rules
-include ${PETSC_DIR}/lib/petsc/conf/petscvariables
 
 # Set compiler-dependent flags
 FPPFLAG=
@@ -20,45 +24,53 @@ ifneq (,$(findstring xlf,$(COMPILER)))
 	FPPFLAG+=-WF,
 	FC_FLAGS+=-qzerosize
 endif
+ifneq (,$(findstring ftn,$(COMPILER)))
+	FC_FLAGS+=
+endif
 
-SRCTMM = tmm_main.c tmm_forward_step.c tmm_forcing_utils.c \
-        tmm_profile_utils.c tmm_timer.c petsc_signal_utils.c petsc_matvec_utils.c        
-SRCTRACEGASES = tmm_external_bc.c tmm_monitor.c tmm_misfit.c external_forcing_tracegases.c
-SRFTRACEGASES = tracegases_model.F tracegases_chem.F
+MYPATHS = $(TMMBASE):$(MODELBASE)
 
-.SUFFIXES: 
-.SUFFIXES: .o .f .p .F .c
+INCLUDEPATHS = $(addprefix -I,$(subst :, ,$(MYPATHS)))
+
+VPATH = $(MYPATHS)
+
+EXE = tmmtracegases
+
+SRCTMM = tmm_main.c tmm_forward_step.c tmm_write.c tmm_forcing_utils.c \
+        tmm_profile_utils.c tmm_timer.c petsc_signal_utils.c petsc_matvec_utils.c
+
+SRCMODEL = tmm_external_bc.c tmm_monitor.c tmm_misfit.c external_forcing_tracegases.c
+SRFMODEL = tracegases_model.F tracegases_chem.F
+
+OPTFILE =
+
+ifneq ($(strip $(OPTFILE)),)
+# Make sure OPTFILE is present in the current directory
+  ifeq (,$(wildcard $(OPTFILE)))
+    $(error $(OPTFILE) does not exist in the local directory!)
+  endif
+  CPPFLAGS+=$(shell awk '/^\#define/ {print "-D"$$2}' $(OPTFILE))
+  FPPFLAGS+=$(shell awk '/^\#define/ {print "$(FPPFLAG)-D"$$2}' $(OPTFILE))
+endif
 
 OBJTMM = $(SRCTMM:.c=.o)
-OBJCTRACEGASES = $(SRCTRACEGASES:.c=.o)
-OBJFTRACEGASES = $(SRFTRACEGASES:.F=.o)
+OBJCMODEL = $(SRCMODEL:.c=.o)
+OBJFMODEL = $(SRF90MODEL:.F90=.o) $(SRFMODEL:.F=.o)
 
-OBJALL = $(OBJTMM) $(OBJCTRACEGASES) $(OBJFTRACEGASES)
+$(OBJCMODEL) $(OBJFMODEL): $(OPTFILE)
 
-$(OBJALL) : TRACEGASES_OPTIONS.h
+%.o %.mod: %.F90
+	$(FC) $(INCLUDEPATHS) $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) -c -o $$(echo $@ | sed -e 's/mod$$/o/') $(FC_MODULE_OUTPUT_FLAG) $(dir $@) $<
 
-tmmtracegases:
-tmmtracegases: $(OBJALL) chkopts
-	-${CLINKER} -o $@ $(OBJALL) ${PETSC_MAT_LIB}
+%.o: %.F
+	$(FC) $(INCLUDEPATHS) $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) -c -o $@ $<
 
-tmmtracegasesspinup: FPPFLAGS+=$(FPPFLAG)-DAD_SAFE
-tmmtracegasesspinup: CPPFLAGS+=-DFORSPINUP
-tmmtracegasesspinup: $(OBJALL) chkopts
-	-${CLINKER} -o $@ $(OBJALL) ${PETSC_MAT_LIB}
+%.o: %.c
+	$(CC) $(INCLUDEPATHS) $(PCC_FLAGS) $(CFLAGS) $(CCPPFLAGS) -c -o $@ $<
 
-tmmtracegasesjacobian: FPPFLAGS+=$(FPPFLAG)-DAD_SAFE
-tmmtracegasesjacobian: CPPFLAGS+=-DFORJACOBIAN
-tmmtracegasesjacobian: $(OBJALL) chkopts
-	-${CLINKER} -o $@ $(OBJALL) ${PETSC_MAT_LIB}
+$(EXE): $(OBJTMM) $(OBJCMODEL) $(OBJFMODEL) chkopts
+	-$(CLINKER) -o $@ $(OBJTMM) $(OBJCMODEL) $(OBJFMODEL) $(PETSC_MAT_LIB)
 
-#.F.o:
-#	-${FLINKER} -c $<
-
-#.c.o:
-#	-${CLINKER} -c ${PETSC_MAT_LIB} $<  
-
-depend:
-	/usr/X11R6/bin/makedepend $(SRCF) $(SRCC)
-
-#clean: 
-#	rm -f core $(OBJ)
+cleanall:
+	make clean
+	rm -f *.mod *.i *.i90

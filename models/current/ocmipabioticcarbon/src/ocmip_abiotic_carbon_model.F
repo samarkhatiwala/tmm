@@ -1,5 +1,3 @@
-#include "OCMIP_ABIOTIC_CARBON_OPTIONS.h"
-
 C !INTERFACE: ==========================================================
       SUBROUTINE OCMIP_ABIOTIC_CARBON_MODEL(myIter,myTime,
      &                 PTR_DIC,
