@@ -15,29 +15,49 @@ required and some are optional and will take on default values.
 2) To specify the maximum number of time steps to run the model: -max_steps NN, where NN is an 
 integer.
 
-3) To specify output frequency (in time steps): -write_steps NN, where NN is an integer.
-
-4) You can specify initial conditions (tracer concentrations) in two ways:
+3) You can specify initial conditions (tracer concentrations) in two ways:
   a) With the -i option: -i XX,YY,... where XX, YY etc are the file names (strings). 
      You must provide as many file names as the number of tracers.
   b) With the -pickup option: -pickup XX, where XX is the name of the pickup (restart) 
      file. This file should contain as many vectors as the number of tracers.
 
-5) To specify the names of output files: -o XX,YY,... where XX, YY etc are the file names 
+4) To specify the names of output files: -o XX,YY,... where XX, YY etc are the file names 
 (strings). You must provide as many file names as the number of tracers.
 
-At the end of every run, the driver writes out a restart or pickup file that contains 
+Note: input and output files are in PETSc binary format.
+
+5) To specify output frequency (in time steps): -write_time_steps NN, where NN is an integer.
+
+The -write_time_steps option is controlled by a step timer object (see Sec #10) with prefix 
+"write". Thus, you can optionally control the output frequency more precisely by passing 
+-write_time_steps a comma separated list of frequencies (Sec #10(a)(ii)), specify its start 
+time (-write_start_time_step NN; see Sec #10(b)), or specify a reset frequency with 
+-write_start_time_step_reset_freq NN (Sec #10(c)).
+
+A couple of other related output options are -append (which will append output to the 
+files specified by the -o option rather than the default behavior of overwriting them) 
+and -time_file XX (which will write the output times to a text file called XX rather 
+than the default 'output_time.txt').
+
+Sometimes it is useful to write some tracers at a higher (or different) frequency than 
+the standard output. This can be done via the "-write_extra" option and then specifying 
+the indices of tracers to write out (e.g., -write_extra_tracer_indices 0,3,7), their 
+filenames (e.g., -o_extra tr0_extra.petsc,tr3_extra.petsc,tr7_extra.petsc) and whether 
+to append output (-append_extra), their output times (-time_file_extra XX, default is 
+"output_time_extra.txt"), and the output frequency via the extraWriteTimer StepTimer 
+object with prefix "write_extra". All StepTimer object options are supported 
+(-write_extra_start_time_step, -write_start_time_step_reset_freq). See Sec #10.
+
+6) At the end of every run, the driver writes out a restart or pickup file that contains 
 the tracer fields at the end of the integration. By default it is called 'pickup.petsc'. 
 But you can specify the name of this file with the -pickup_out XX option, where XX is 
 the desired filename (string). Next time you want to start from this initial condition just 
 specify the file name: -pickup XX.
 
-Note: input and output files are in PETSc binary format.
-
-6) A couple of other useful output options are -append (which will append output to the 
-files specified by the -o option rather than the default behavior of overwriting them) 
-and -time_file XX (which will write the output times to a text file called XX rather 
-than the default 'output_time.txt').
+You can also write intermediate pickup files at a specified frequency (in time steps) 
+by using the option -pickup_time_steps NN, where NN is an integer. This is controlled by 
+a step timer object with prefix "pickup", and thus can be configured more precisely with 
+options similar to those described in Sec #5 and Sec #10.
 
 7) The driver uses an internal 'clock' to keep track of time (e.g., for interpolating 
 forcing or transport matrices to the current time). The unit of this 'clock' is arbitrary 
@@ -134,28 +154,81 @@ to existing files (of the same name as given by arguments to -avg_files) with th
 The times at which time averages are written are written by default to 'time_average_output_time.txt'. 
 You can write this to a different file with: -avg_time_file XX, where XX is the name of a text file. 
 
-In addition, you must also specify the averaging interval via the option -avg_time_steps. This option 
-takes two forms:
+Time averaging is controlled by a "step timer" object with prefix "avg". This allows you to customize 
+several aspects of the averaging (or anything else the timer object is used for) at run time. In particular:
 
- a) If the averaging interval is fixed: -avg_time_steps NN, where NN is an integer giving the 
- number of time steps over which to average.
+ a) -avg_time_steps lets you specify the averaging interval. (You MUST specify this option.) 
+ This option takes two forms:
 
- b) If the averaging interval varies: -avg_time_steps NN,MM,...,PP where NN,MM,...,PP is a comma-separated 
- list of integers giving the number of time steps over which to average. The driver will first average 
- over NN time steps, then MM time steps, and so on. When it gets to the end of the list (PP), the 
- list starts over again with NN. This option is useful if, for example, your year is 365 days and you're 
- interested in calendar month averages. In this case the number of days per month and hence the number 
- of time steps per month (and over which you wish to average) varies over the course of each year. 
- Thus, if your simulation take 2 time steps per day (and assuming that the number of days per month for a 
- nominal, no-leap, 365-day year is: 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31): 
- -avg_time_steps 62,56,62,60,62,60,62,62,60,62,60,62
+   i) If the averaging interval is fixed: -avg_time_steps NN, where NN is an integer giving the 
+   number of time steps over which to average.
 
-Lastly, if, for example, you're doing a long spin-up run, you may only want to write out averages in, say, 
-the last year of the integration. In that case use: -avg_start_time_step NN, where NN is an integer specifying 
-the absolute (i.e., including iter0) time step at which (and including) to start accumulating time averages. 
-By default this is iter0 + 1. Thus, if your simulation starts at iter0=0, takes 720 time steps per year and 
-you want to start time averaging in the 2nd year: -avg_start_time_step 721.
+   ii) If the averaging interval varies: -avg_time_steps NN,MM,...,PP where NN,MM,...,PP is a comma-separated 
+   list of integers giving the number of time steps over which to average. The driver will first average 
+   over NN time steps, then MM time steps, and so on. When it gets to the end of the list (PP), the 
+   list starts over again with NN. This option is useful if, for example, your year is 365 days and you're 
+   interested in calendar month averages. In this case the number of days per month and hence the number 
+   of time steps per month (and over which you wish to average) varies over the course of each year. 
+   Thus, if your simulation take 2 time steps per day (and assuming that the number of days per month for a 
+   nominal, no-leap, 365-day year is: 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31): 
+   -avg_time_steps 62,56,62,60,62,60,62,62,60,62,60,62
 
+ b) If, for example, you're doing a long spin-up run, you may only want to write out averages in, say, 
+ the last year of the integration. In that case use: -avg_start_time_step NN, where NN is an integer specifying 
+ the absolute (i.e., including iter0) time step at which (and including) to start accumulating time averages. 
+ By default this is iter0 + 1. Thus, if your simulation starts at iter0=0, takes 720 time steps per year and 
+ you want to start time averaging in the 2nd year: -avg_start_time_step 721.
+
+ c) Lastly, if, for example, you want to do averages at intervals (e.g., taking an average of only Januaries, 
+ an annual average every 10 years, or monthly averages for a year every 100 years),  you can do this via the 
+ option -avg_start_time_step_reset_freq NN, where NN is the number of time steps by which you want to want 
+ to increment the start time step once the number of (or sum of the sequence of) time steps specified by 
+ -avg_time_steps is completed. Here are some examples:
+
+ (1) Average for 60 time steps starting at step 1, 3601, 7201 etc (i.e., average of Januaries (assuming 
+ 60 steps/month) every 5 years): 
+ -time_avg -avg_start_time_step 1 -avg_time_steps 60 -avg_start_time_step_reset_freq 3600
+
+ (2) Take 3 averages of 60 time steps each starting at step 1, 3601, 7201 etc (i.e., average of Januaries, 
+ Februaries and Marches (assuming 60 steps/month) every 5 years):
+ -time_avg -avg_start_time_step 1 -avg_time_steps 60,60,60 -avg_start_time_step_reset_freq 3600
+
+ (3) Average for 720 time steps starting at step 1, 3601, 7201 etc (i.e., annual averages (assuming 
+ 720 steps/year) every 5 years):
+ -time_avg -avg_start_time_step 1 -avg_time_steps 720 -avg_start_time_step_reset_freq 3600
+
+ (4) Average for 720 time steps starting at step 1, 3601, 7201 etc (i.e., annual averages (assuming 
+ 720 steps/year) every 5 years):
+ -time_avg -avg_start_time_step 1 -avg_time_steps 720 -avg_start_time_step_reset_freq 3600
+
+ (5) Do monthly averages every 10 years (1st year, 11th year, 21st year, etc.) (assuming 1095 steps/year 
+ and unequal number of steps per month):
+ -time_avg -avg_start_time_step 1 -avg_time_steps 93,84,93,90,93,90,93,93,90,93,90,93 -avg_start_time_step_reset_freq 10950
+
+ (6) Do monthly averages every 10 years (1st year, 11th year, 21st year, etc.) (assuming 720 steps/year 
+ and equal number of steps (60) per month):
+ -time_avg -avg_start_time_step 1 -avg_time_steps 60,60,60,60,60,60,60,60,60,60,60,60 -avg_start_time_step_reset_freq 7200
+
+ Here is some additional information about this option:
+  - The value of the reset frequency is programmatically available via the PetscInt field startTimeStepResetFreq 
+    of the timer object (e.g., avgTimer.startTimeStepResetFreq).
+
+  - The start time is incremented when updateStepTimer is called AND if you’re at the end of the sequence of 
+    steps specified by the option -avg_time_steps. If you only specify a single number for this option then the 
+    start time will be incremented after those many time steps. (This is important. See examples above, especially 
+    1, 4 and 5.)
+
+  - When the start time is incremented the flag haveResetStartTimeStep is set to PETSC_TRUE. This allows the 
+    user to programmatically check if the start time has been incremented, e.g.,
+
+	if (avgTimer.haveResetStartTimeStep) {
+	  do something
+	}
+
+Everything described above for the averaging step timer object applies to any step timer object. Thus, for any 
+step timer object with prefix PREFIX (e.g., "write", "pickup", "write_extra"), the following command line options 
+can be specified: -PREFIX_time_steps, -PREFIX_start_time_step and -PREFIX_start_time_step_reset_freq.
+ 
 11) Forcings: In addition to transporting tracers you can include source/sink terms ("forcings"). The TMM 
 driver allows this to be specified in three ways, any combination of which can be turned on: 
  a) Forcing term read from file (can be periodic, constant, or time-dependent) with: -forcing_from_file
@@ -170,7 +243,7 @@ provide a list of file names via: -forcing_files XX,YY,..., where XX, YY etc are
 (strings). You must provide as many file names as the number of tracers. Forcing is assumed 
 discrete in time i.e., already multiplied by any physical time step.
 
-There are now 3 possibilities: 
+There are now three possibilities: 
 i) Periodic forcing: -periodic_forcing
 In this case the file names specified with -forcing_files are interpreted as prefixes as described 
 above (#9) for TMs. Also, as described above (#8) for TMs, you must specify the times at which 

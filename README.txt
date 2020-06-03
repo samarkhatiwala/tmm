@@ -15,8 +15,8 @@ presentation by Iris Kriest: https://ftp.geomar.de/users/ikriest/TMM/MOPS-TMM-20
 
 Quick-start instructions:
 
-1) Install PETSc (http://www.mcs.anl.gov/petsc/). The TMM driver code is compatible 
-with PETSc version 3.6.x.
+1) Install PETSc (http://www.mcs.anl.gov/petsc/) and set the PETSC_DIR and PETSC_ARCH 
+environment variables. The TMM driver code is compatible with PETSc version 3.6.x.
 
 2) Download Matlab scripts and add to your Matlab path:
 http://kelvin.earth.ox.ac.uk/spk/Research/TMM/tmm_matlab_code.tar.gz
@@ -37,25 +37,38 @@ mkdir TMM
 cd TMM/
 git clone https://github.com/samarkhatiwala/tmm.git
 
-5) For each model, e.g., tmm/models/current/mops2.0/ there is a Matlab script to generate 
-all input data (e.g., mops2.0/matlab/make_input_files_for_mops_model). Change the top-level 
-path at the very top of the script (and, depending on the model, some paths to other data 
-files), change any other options you want, and execute. It should generate all necessary 
-input data. With luck! (If there is missing data email me for it.)
+Set the environment variable TMMROOT to point to the top level of the TMM directory.
 
-6) Compile code (e.g., for mops2.0):
-cd $HOME/TMM/tmm/
-mkdir Work/
-cd Work
-# First copy the driver code ...
-cp -p $HOME/TMM/tmm/driver/current/* .
-# ... and then the model specific code
-cp -p $HOME/TMM/tmm/models/current/mops2.0/src/* .
+5) For each model, e.g., $TMMROOT/models/current/mops2.0/ there is model-specific code (in src/); 
+Matlab script(s) in matlab/ to generate input data (e.g., make_input_files_for_mops_model.m) and 
+read model output (e.g., load_output.m); and run scripts and other runtime data such as 
+namelists in runscripts/. 
+
+To try out one of these models, make a directory, e.g., Test/, and copy the following to it:
+
+cp -p $TMMROOT/models/current/mops2.0/src/Makefile .
+
+(If there is a file *_TMM_OPTIONS.h in src/ copy that as well, e.g.,
+cp -p $TMMROOT/models/current/mobi2.0/src/MOBI_TMM_OPTIONS.h .
+Edit this file to set compile-time C/Fortran preprocessor options.)
+
+Compile the code:
+(For some models you may have to first set additional environment variables as described 
+in the corresponding Makefile.)
+
 make mops
 
-7) Copy all input data created in step 5 above and run scripts 
-(e.g., $HOME/TMM/tmm/models/current/mops2.0/runscripts) to Work/
+Copy the matlab and run scripts:
 
-8) Execute model using the example run scripts.
+cp -p -R $TMMROOT/models/current/mops2.0/matlab/* .
+cp -p $TMMROOT/models/current/mops2.0/runscripts/* .
 
-9) Load output using the example load_output.m script.
+Change the variable base_path at the very top of the make_input*.m and load_output*.m scripts 
+to point to the top level of any of the transport matrix configurations you downloaded in #3 
+above. Execute the make_input* script (e.g., make_input_files_for_mops_model.m). It should 
+generate all necessary input data. With luck! (If there is missing data email me for it.)
+
+Execute model using the example run scripts.
+
+Load output using the example load_output.m script.
+
