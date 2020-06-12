@@ -14,14 +14,14 @@ PetscErrorCode iniPeriodicTimer( const char pre[], PeriodicTimer *thetimer )
     PetscBool flg, flg1;
     PetscInt it;
 	PetscViewer fd;
-	PetscInt fp;
+	int fp;
     char timeFile[PETSC_MAX_PATH_LEN];
 
 /*  read time data */
-    ierr = PetscOptionsGetReal(pre,"-cycle_period",&thetimer->cyclePeriod,&flg);CHKERRQ(ierr);
+    ierr = PetscOptionsGetReal(NULL,pre,"-cycle_period",&thetimer->cyclePeriod,&flg);CHKERRQ(ierr);
     if (!flg) SETERRQ1(PETSC_COMM_WORLD,1,"Must indicate cycling time with the -%scycle_period option",pre);
 
-    ierr = PetscOptionsGetReal(pre,"-cycle_step",&thetimer->cycleStep,&flg);CHKERRQ(ierr);
+    ierr = PetscOptionsGetReal(NULL,pre,"-cycle_step",&thetimer->cycleStep,&flg);CHKERRQ(ierr);
     if (flg) {
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"WARNING!: Cycling step has been specified for periodic object %s\n",pre);CHKERRQ(ierr);
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"  This is a legacy option retained for backward compatibility and will be removed in future releases\n");CHKERRQ(ierr);
@@ -33,15 +33,15 @@ PetscErrorCode iniPeriodicTimer( const char pre[], PeriodicTimer *thetimer )
 		thetimer->tdp[it]=(-thetimer->cycleStep/2.0) + it*thetimer->cycleStep;
 	  } 	
     } else {
-      ierr = PetscOptionsGetInt(pre,"-num_per_period",&thetimer->numPerPeriod,&flg1);CHKERRQ(ierr);
+      ierr = PetscOptionsGetInt(NULL,pre,"-num_per_period",&thetimer->numPerPeriod,&flg1);CHKERRQ(ierr);
       if (!flg1) SETERRQ1(PETSC_COMM_WORLD,1,"Must indicate number of fields per period with the -%snum_per_period option",pre);
 /*    array for holding extended time array */
 	  PetscMalloc((thetimer->numPerPeriod+2)*sizeof(PetscScalar), &thetimer->tdp);
-      ierr = PetscOptionsGetString(pre,"-periodic_times_file",timeFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
+      ierr = PetscOptionsGetString(NULL,pre,"-periodic_times_file",timeFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
       if (flg1) {
 		ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,timeFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
 		ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-		ierr = PetscBinaryRead(fp,&thetimer->tdp[1],thetimer->numPerPeriod,PETSC_SCALAR);CHKERRQ(ierr);  
+		ierr = PetscBinaryRead(fp,&thetimer->tdp[1],thetimer->numPerPeriod,NULL,PETSC_SCALAR);CHKERRQ(ierr);  
 		ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 		thetimer->tdp[0]=thetimer->tdp[thetimer->numPerPeriod]-thetimer->cyclePeriod;
 		thetimer->tdp[thetimer->numPerPeriod+1]=thetimer->tdp[1]+thetimer->cyclePeriod;
@@ -73,11 +73,11 @@ PetscErrorCode iniStepTimer( const char pre[], PetscInt Iter0, StepTimer *thetim
 
 /*  read time step data */
     thetimer->startTimeStep = Iter0 + 1; /* by default we start at first time step */
-    ierr = PetscOptionsGetInt(pre,"-start_time_step",&thetimer->startTimeStep,&flg);CHKERRQ(ierr);
+    ierr = PetscOptionsGetInt(NULL,pre,"-start_time_step",&thetimer->startTimeStep,&flg);CHKERRQ(ierr);
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Start time step for StepTimer object %s is %d\n", pre, thetimer->startTimeStep);CHKERRQ(ierr);	  
 
     thetimer->maxNumIntervals=MAX_NUM_INTERVALS;
-    ierr = PetscOptionsGetIntArray(pre,"-time_steps",tmparr,&thetimer->maxNumIntervals,&flg);CHKERRQ(ierr);
+    ierr = PetscOptionsGetIntArray(NULL,pre,"-time_steps",tmparr,&thetimer->maxNumIntervals,&flg);CHKERRQ(ierr);
     if (!flg) SETERRQ1(PETSC_COMM_WORLD,1,"Must indicate number of step timer time steps with the -%stime_steps flag",pre);
 
     if (thetimer->maxNumIntervals==1) {
@@ -98,7 +98,7 @@ PetscErrorCode iniStepTimer( const char pre[], PetscInt Iter0, StepTimer *thetim
     }
 
     thetimer->startTimeStepResetFreq=-1;
-    ierr = PetscOptionsGetInt(pre,"-start_time_step_reset_freq",&thetimer->startTimeStepResetFreq,&flg);CHKERRQ(ierr);
+    ierr = PetscOptionsGetInt(NULL,pre,"-start_time_step_reset_freq",&thetimer->startTimeStepResetFreq,&flg);CHKERRQ(ierr);
     if (flg) {
 	  PetscInt tmp=0;
 	  if (!thetimer->fixedStep) {
@@ -162,20 +162,20 @@ PetscErrorCode iniTimeDependentTimer( const char pre[], TimeDependentTimer *thet
     PetscBool flg;
     PetscInt it;    
 	PetscViewer fd;
-	PetscInt fp;
+	int fp;
     char timeFile[PETSC_MAX_PATH_LEN];
 
 /*  read time data */
-    ierr = PetscOptionsGetInt(pre,"-num_times",&thetimer->numTimes,&flg);CHKERRQ(ierr);
+    ierr = PetscOptionsGetInt(NULL,pre,"-num_times",&thetimer->numTimes,&flg);CHKERRQ(ierr);
     if (!flg) SETERRQ1(PETSC_COMM_WORLD,1,"Must indicate number of time slices with the -%snum_times option",pre);
 
 	ierr = PetscMalloc((thetimer->numTimes)*sizeof(PetscScalar), &thetimer->tdt);CHKERRQ(ierr);
-	ierr = PetscOptionsGetString(pre,"-times_file",timeFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+	ierr = PetscOptionsGetString(NULL,pre,"-times_file",timeFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
     if (!flg) SETERRQ1(PETSC_COMM_WORLD,1,"Must indicate name of time file with the -%stimes_file option",pre);
 	
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,timeFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-	ierr = PetscBinaryRead(fp,&thetimer->tdt[0],thetimer->numTimes,PETSC_SCALAR);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,&thetimer->tdt[0],thetimer->numTimes,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Time-dependent object %s specified at times:\n",pre);CHKERRQ(ierr);            

@@ -16,7 +16,9 @@ presentation by Iris Kriest: https://ftp.geomar.de/users/ikriest/TMM/MOPS-TMM-20
 Quick-start instructions:
 
 1) Install PETSc (http://www.mcs.anl.gov/petsc/) and set the PETSC_DIR and PETSC_ARCH 
-environment variables. The TMM driver code is compatible with PETSc version 3.6.x.
+environment variables. The TMM driver code is compatible with PETSc version 3.13 
+(this is the latest version as of June 12, 2020). For the older version of the TMM 
+code compatible with PETSc 3.6.x, you can checkout branch petsc3.6.
 
 2) Download Matlab scripts and add to your Matlab path:
 http://kelvin.earth.ox.ac.uk/spk/Research/TMM/tmm_matlab_code.tar.gz

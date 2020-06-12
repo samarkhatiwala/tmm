@@ -33,14 +33,14 @@ PetscErrorCode iniTMMWrite(PetscScalar tc, PetscInt Iter, PetscInt numTracers, V
   PetscBool flg;
   PetscErrorCode ierr;
 
-  ierr = PetscOptionsHasName(PETSC_NULL,"-write_extra",&doExtraWrite);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-write_extra",&doExtraWrite);CHKERRQ(ierr);
 
   if (doExtraWrite) {    
     ierr=PetscPrintf(PETSC_COMM_WORLD,"Extra tracer output has been activated\n");CHKERRQ(ierr);
     ierr = iniStepTimer("write_extra_", Iter0, &extraWriteTimer);CHKERRQ(ierr);
 
     numExtraTracers=MAXNUMTRACERS;    
-    ierr = PetscOptionsGetIntArray(PETSC_NULL,"-write_extra_tracer_indices",itrExtra,&numExtraTracers,&flg);CHKERRQ(ierr);
+    ierr = PetscOptionsGetIntArray(NULL,NULL,"-write_extra_tracer_indices",itrExtra,&numExtraTracers,&flg);CHKERRQ(ierr);
 	if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate extra tracer indices with the -write_extra_tracer_indices option!");
 
 /* Output file */
@@ -48,7 +48,7 @@ PetscErrorCode iniTMMWrite(PetscScalar tc, PetscInt Iter, PetscInt numTracers, V
 	  outFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
 	}
 
-	ierr = PetscOptionsGetStringArray(PETSC_NULL,"-o_extra",outFile,&numExtraTracers,&flg);CHKERRQ(ierr);
+	ierr = PetscOptionsGetStringArray(NULL,NULL,"-o_extra",outFile,&numExtraTracers,&flg);CHKERRQ(ierr);
 	if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate extra output file name(s) with the -o_extra option");
 
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Extra output will be written to:\n");CHKERRQ(ierr);
@@ -56,7 +56,7 @@ PetscErrorCode iniTMMWrite(PetscScalar tc, PetscInt Iter, PetscInt numTracers, V
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"   Tracer %d: %s\n", itrExtra[itr],outFile[itr]);CHKERRQ(ierr);
 	}
 
-	ierr = PetscOptionsHasName(PETSC_NULL,"-append_extra",&appendOutput);CHKERRQ(ierr);
+	ierr = PetscOptionsHasName(NULL,NULL,"-append_extra",&appendOutput);CHKERRQ(ierr);
 	if (appendOutput) {
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Extra output will be appended\n");CHKERRQ(ierr);
 	  OUTPUT_FILE_MODE=FILE_MODE_APPEND;
@@ -66,7 +66,7 @@ PetscErrorCode iniTMMWrite(PetscScalar tc, PetscInt Iter, PetscInt numTracers, V
 	}    
 
 /* Output times */
-	ierr = PetscOptionsGetString(PETSC_NULL,"-time_file_extra",outTimeFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+	ierr = PetscOptionsGetString(NULL,NULL,"-time_file_extra",outTimeFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
 	if (!flg) {
 	  strcpy(outTimeFile,"");
 	  sprintf(outTimeFile,"%s","output_time_extra.txt");

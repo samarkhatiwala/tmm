@@ -20,12 +20,12 @@ PetscErrorCode iniProfileData(PetscInt myId)
   PetscErrorCode ierr;
   PetscInt ipro, ip;
   PetscViewer fd;
-  PetscInt fp;
+  int fp;
   PetscInt dum;
   PetscBool useProfileNumberPartitioning = PETSC_FALSE;
 
   useProfiles = PETSC_FALSE;
-  ierr = PetscOptionsHasName(PETSC_NULL,"-use_profiles",&useProfiles);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-use_profiles",&useProfiles);CHKERRQ(ierr);
 
   if (useProfiles) {
   
@@ -34,21 +34,21 @@ PetscErrorCode iniProfileData(PetscInt myId)
 /*  Read in total number of profiles */
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"gStartIndices.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-	ierr = PetscBinaryRead(fp,&totalNumProfiles,1,PETSC_INT);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,&totalNumProfiles,1,NULL,PETSC_INT);CHKERRQ(ierr);
 	if (totalNumProfiles<=0) SETERRQ(PETSC_COMM_WORLD,1,"Invalid total number of profiles! Must be >0");
 
 /*  Read in starting and ending global indices of profiles. NOTE: these have a base 1 index. */
 	ierr = PetscMalloc(totalNumProfiles*sizeof(PetscInt),&gStartIndices);CHKERRQ(ierr);
-	ierr = PetscBinaryRead(fp,gStartIndices,totalNumProfiles,PETSC_INT);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,gStartIndices,totalNumProfiles,NULL,PETSC_INT);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Done reading gStartIndices.bin\n");CHKERRQ(ierr);
 
 	ierr = PetscMalloc(totalNumProfiles*sizeof(PetscInt),&gEndIndices);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"gEndIndices.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-	ierr = PetscBinaryRead(fp,&dum,1,PETSC_INT);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,&dum,1,NULL,PETSC_INT);CHKERRQ(ierr);
 	if (dum != totalNumProfiles) SETERRQ(PETSC_COMM_WORLD,1,"Total number of profiles don't match!");
-	ierr = PetscBinaryRead(fp,gEndIndices,totalNumProfiles,PETSC_INT);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,gEndIndices,totalNumProfiles,NULL,PETSC_INT);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Done reading gEndIndices.bin\n");CHKERRQ(ierr);
 
@@ -67,7 +67,7 @@ PetscErrorCode iniProfileData(PetscInt myId)
 	  gSizes[ipro] = 0; /* initialize all with 0 */
 	}
 
-    ierr = PetscOptionsHasName(PETSC_NULL,"-partition_by_number_of_profiles",&useProfileNumberPartitioning);CHKERRQ(ierr);
+    ierr = PetscOptionsHasName(NULL,NULL,"-partition_by_number_of_profiles",&useProfileNumberPartitioning);CHKERRQ(ierr);
     if (useProfileNumberPartitioning) {
   /* Let PETSc do this for us but this allocates the same number of profiles (rather than boxes) per process */
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Partitioning by number of profiles\n");CHKERRQ(ierr);
@@ -167,7 +167,7 @@ PetscErrorCode readProfileSurfaceIntData(const char *fileName, PetscInt *arr, Pe
 /*   size_t m1, m2; */
   off_t  off, offset;  
   PetscViewer fd;
-  PetscInt fp;
+  int fp;
   PetscInt iShift;
 
 /*   m1 = totalNumProfiles*sizeof(PetscInt); */
@@ -176,7 +176,7 @@ PetscErrorCode readProfileSurfaceIntData(const char *fileName, PetscInt *arr, Pe
 /*   ierr = PetscMalloc(m1,&tmpArr);CHKERRQ(ierr); */
 /*   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,fileName,FILE_MODE_READ,&fd);CHKERRQ(ierr); */
 /*   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr); */
-/*   ierr = PetscBinaryRead(fp,tmpArr,totalNumProfiles,PETSC_INT);CHKERRQ(ierr); */
+/*   ierr = PetscBinaryRead(fp,tmpArr,totalNumProfiles,NULL,PETSC_INT);CHKERRQ(ierr); */
 /*   ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr); */
 
 /* Shift file pointer to start of data owned by local process */
@@ -185,7 +185,7 @@ PetscErrorCode readProfileSurfaceIntData(const char *fileName, PetscInt *arr, Pe
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,fileName,FILE_MODE_READ,&fd);CHKERRQ(ierr);
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
   ierr = PetscBinarySeek(fp,off,PETSC_BINARY_SEEK_SET,&offset);CHKERRQ(ierr);
-  ierr = PetscBinaryRead(fp,arr,numValsPerProfile*lNumProfiles,PETSC_INT);CHKERRQ(ierr);
+  ierr = PetscBinaryRead(fp,arr,numValsPerProfile*lNumProfiles,NULL,PETSC_INT);CHKERRQ(ierr);
   ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 
 /*   for (ip=0; ip<totalNumProfiles; ip++) { */
@@ -212,7 +212,7 @@ PetscErrorCode readProfileSurfaceScalarData(const char *fileName, PetscScalar *a
 /*   size_t m1, m2; */
   off_t  off, offset;  
   PetscViewer fd;
-  PetscInt fp;
+  int fp;
   PetscInt iShift;
   PetscMPIInt numProcessors, myId;
 
@@ -226,7 +226,7 @@ PetscErrorCode readProfileSurfaceScalarData(const char *fileName, PetscScalar *a
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,fileName,FILE_MODE_READ,&fd);CHKERRQ(ierr);
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
   ierr = PetscBinarySeek(fp,off,PETSC_BINARY_SEEK_SET,&offset);CHKERRQ(ierr);
-  ierr = PetscBinaryRead(fp,arr,numValsPerProfile*lNumProfiles,PETSC_SCALAR);CHKERRQ(ierr);
+  ierr = PetscBinaryRead(fp,arr,numValsPerProfile*lNumProfiles,NULL,PETSC_SCALAR);CHKERRQ(ierr);
   ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
   
   return 0;
@@ -242,7 +242,7 @@ PetscErrorCode readProfileSurfaceScalarDataRecord(const char *fileName, PetscSca
   PetscErrorCode ierr;
   off_t  off, offset;  
   PetscViewer fd;
-  PetscInt fp;
+  int fp;
   PetscInt iShift;
   PetscMPIInt numProcessors, myId;
 
@@ -256,7 +256,7 @@ PetscErrorCode readProfileSurfaceScalarDataRecord(const char *fileName, PetscSca
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,fileName,FILE_MODE_READ,&fd);CHKERRQ(ierr);
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
   ierr = PetscBinarySeek(fp,off,PETSC_BINARY_SEEK_SET,&offset);CHKERRQ(ierr);
-  ierr = PetscBinaryRead(fp,arr,numValsPerProfile*lNumProfiles,PETSC_SCALAR);CHKERRQ(ierr);
+  ierr = PetscBinaryRead(fp,arr,numValsPerProfile*lNumProfiles,NULL,PETSC_SCALAR);CHKERRQ(ierr);
   ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
   
   return 0;
@@ -364,7 +364,7 @@ PetscErrorCode writeProfileSurfaceScalarData(const char *fileName, PetscScalar *
   size_t m1, m2;
 /*   off_t  off, offset;   */
   PetscViewer fd;
-  PetscInt fp;
+  int fp;
 /*   PetscInt iShift; */
   PetscMPIInt numProcessors, myId;
 
@@ -396,7 +396,7 @@ PetscErrorCode writeProfileSurfaceScalarData(const char *fileName, PetscScalar *
 	}  
   
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-	ierr = PetscBinaryWrite(fp,tmpArr,numValsPerProfile*totalNumProfiles,PETSC_SCALAR,PETSC_TRUE);CHKERRQ(ierr);
+	ierr = PetscBinaryWrite(fp,tmpArr,numValsPerProfile*totalNumProfiles,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
   }
   

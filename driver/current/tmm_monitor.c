@@ -23,11 +23,11 @@ PetscErrorCode iniMonitor(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Ve
   PetscErrorCode ierr;
   PetscBool flg;
   
-  ierr = PetscOptionsGetInt(PETSC_NULL,"-monitor_start_time_step",&monitorStartTimeStep,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetInt(NULL,NULL,"-monitor_start_time_step",&monitorStartTimeStep,&flg);CHKERRQ(ierr);
   if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate (absolute) time step at which to start monitor with the -monitor_start_time_step flag");
-  ierr = PetscOptionsGetInt(PETSC_NULL,"-monitor_steps",&monitorSteps,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetInt(NULL,NULL,"-monitor_steps",&monitorSteps,&flg);CHKERRQ(ierr);
   if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate frequency with which solution is monitored with the -monitor_steps flag");
-  ierr = PetscOptionsGetInt(PETSC_NULL,"-monitor_write_steps",&monitorWriteSteps,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetInt(NULL,NULL,"-monitor_write_steps",&monitorWriteSteps,&flg);CHKERRQ(ierr);
   if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate frequency at which monitor data is written out with the -monitor_write_steps flag");
 
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Solution will be monitored starting at time step: %d\n", monitorStartTimeStep);CHKERRQ(ierr);	

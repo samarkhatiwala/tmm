@@ -72,18 +72,18 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   PetscInt maxValsToRead;
     
 #if defined (FORSPINUP) || defined (FORJACOBIAN)
-  ierr = PetscOptionsHasName(PETSC_NULL,"-relax_tracer",&relaxTracer);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-relax_tracer",&relaxTracer);CHKERRQ(ierr);
   if (relaxTracer) {  
 
     maxValsToRead = numTracers;
-    ierr = PetscOptionsGetRealArray(PETSC_NULL,"-relax_tau",relaxTau,&maxValsToRead,&flg);
+    ierr = PetscOptionsGetRealArray(NULL,NULL,"-relax_tau",relaxTau,&maxValsToRead,&flg);
     if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate tracer relaxation tau with the -relax_tau option");
     if (maxValsToRead != numTracers) {
       SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of relaxation tau values specified");
     }
 
     maxValsToRead = numTracers;
-    ierr = PetscOptionsGetRealArray(PETSC_NULL,"-relax_value",relaxValue,&maxValsToRead,&flg);
+    ierr = PetscOptionsGetRealArray(NULL,NULL,"-relax_value",relaxValue,&maxValsToRead,&flg);
     if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate relaxation values with the -relax_value option");
     if (maxValsToRead != numTracers) {
       SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of relaxation values specified");
@@ -110,17 +110,17 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   }
   ierr = VecGetArray(JTR,&localJTR);CHKERRQ(ierr);
 
-  ierr = PetscOptionsGetInt(PETSC_NULL,"-inert_gas_id",&gasID,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetInt(NULL,NULL,"-inert_gas_id",&gasID,&flg);CHKERRQ(ierr);
   if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate inert gas tracer ID with the -inert_gas_id option");  
 
-  ierr = PetscOptionsGetReal(PETSC_NULL,"-biogeochem_deltat",&DeltaT,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetReal(NULL,NULL,"-biogeochem_deltat",&DeltaT,&flg);CHKERRQ(ierr);
   if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate biogeochemical time step in seconds with the -biogeochem_deltat option");  
 
   fluxScaling[0]=1.0;
   fluxScaling[1]=1.0;
   fluxScaling[2]=1.0;
   maxValsToRead = 3;
-  ierr = PetscOptionsGetRealArray(PETSC_NULL,"-flux_scaling",fluxScaling,&maxValsToRead,&flg);
+  ierr = PetscOptionsGetRealArray(NULL,NULL,"-flux_scaling",fluxScaling,&maxValsToRead,&flg);
   if (flg) {
     if (maxValsToRead != 3) {
       SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of scaling values specified");
@@ -131,7 +131,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     ierr=PetscPrintf(PETSC_COMM_WORLD,"  Fgas: %15.11f\n",fluxScaling[2]);CHKERRQ(ierr);
   }
 
-  ierr = PetscOptionsHasName(PETSC_NULL,"-periodic_biogeochem_forcing",&periodicBiogeochemForcing);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-periodic_biogeochem_forcing",&periodicBiogeochemForcing);CHKERRQ(ierr);
 
   if (periodicBiogeochemForcing) {    
     ierr=PetscPrintf(PETSC_COMM_WORLD,"Periodic biogeochemical forcing specified\n");CHKERRQ(ierr);
@@ -161,7 +161,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = readProfileSurfaceScalarData("dzsurf.bin",localdzsurf,1);  
 
 /* Forcing fields */  
-  ierr = PetscOptionsHasName(PETSC_NULL,"-use_separate_winds",&useSeparateWinds);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-use_separate_winds",&useSeparateWinds);CHKERRQ(ierr);
   if (useSeparateWinds) {
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Separate winds specified: gas transfer velocity will be computed using winds\n");CHKERRQ(ierr);        
 	if (!periodicBiogeochemForcing) SETERRQ(PETSC_COMM_WORLD,1,"Separate winds can only be used with periodic biogeochemical forcing!");          
@@ -175,7 +175,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	localvwindp.firstTime = PETSC_TRUE;
 	localvwindp.arrayLength = lNumProfiles;    
 
-	ierr = PetscOptionsHasName(PETSC_NULL,"-periodic_winds_cycle_period",&flg);CHKERRQ(ierr);
+	ierr = PetscOptionsHasName(NULL,NULL,"-periodic_winds_cycle_period",&flg);CHKERRQ(ierr);
 	if (flg) {
 	  ierr = iniPeriodicTimer("periodic_winds_", &windsTimer);CHKERRQ(ierr);
 	} else {
@@ -192,7 +192,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	}
   }
 
-  ierr = PetscOptionsGetReal(PETSC_NULL,"-piston_velocity_coeff",&pistonVelocityCoeff,&flg);CHKERRQ(ierr); /* overwrite default value */
+  ierr = PetscOptionsGetReal(NULL,NULL,"-piston_velocity_coeff",&pistonVelocityCoeff,&flg);CHKERRQ(ierr); /* overwrite default value */
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Piston velocity coefficient of %10.5f [cm/hr]*[s^2/m^2] will be used\n", pistonVelocityCoeff);CHKERRQ(ierr);      
   
   ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localfice);CHKERRQ(ierr);  
@@ -253,7 +253,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     localTReqsurf[ip]=localTReq[kl];
   }
 
-  ierr = PetscOptionsHasName(PETSC_NULL,"-calc_diagnostics",&calcDiagnostics);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-calc_diagnostics",&calcDiagnostics);CHKERRQ(ierr);
   if (calcDiagnostics) {    
 /*Data for diagnostics */
     ierr = iniStepTimer("diag_", Iter0, &diagTimer);CHKERRQ(ierr);

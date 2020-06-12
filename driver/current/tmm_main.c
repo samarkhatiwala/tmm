@@ -129,7 +129,7 @@ int main(int argc,char **args)
 #if defined (FORSPINUP) || defined (FORJACOBIAN)
   PetscViewer fdin[MAXNUMTRACERS];
   PetscInt itjac;
-  PetscInt fp;  
+  int fp;  
 #endif
   
 /* run time options */
@@ -175,38 +175,38 @@ int main(int argc,char **args)
   
 /* Process options and load files */  
 /* Number of tracers */
-  ierr = PetscOptionsGetInt(PETSC_NULL,"-numtracers",&numTracers,&flg1);CHKERRQ(ierr);
+  ierr = PetscOptionsGetInt(NULL,NULL,"-numtracers",&numTracers,&flg1);CHKERRQ(ierr);
   if (numTracers>MAXNUMTRACERS) {
    SETERRQ(PETSC_COMM_WORLD,1,"Number of tracers exceeds maximum allowable. Please increase the variable MAXNUMTRACERS and recompile");
   }  
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of tracers to be integrated: %d\n", numTracers);CHKERRQ(ierr); 
 
 /* Time step data */
-  ierr = PetscOptionsGetReal(PETSC_NULL,"-deltat_clock",&deltaTClock,&flg1);CHKERRQ(ierr);
+  ierr = PetscOptionsGetReal(NULL,NULL,"-deltat_clock",&deltaTClock,&flg1);CHKERRQ(ierr);
 
-  ierr = PetscOptionsGetReal(PETSC_NULL,"-t0",&time0,&flg1);CHKERRQ(ierr);  
-  ierr = PetscOptionsGetInt(PETSC_NULL,"-iter0",&Iter0,&flg2);CHKERRQ(ierr);
+  ierr = PetscOptionsGetReal(NULL,NULL,"-t0",&time0,&flg1);CHKERRQ(ierr);  
+  ierr = PetscOptionsGetInt(NULL,NULL,"-iter0",&Iter0,&flg2);CHKERRQ(ierr);
   if ((flg1) && (!flg2)) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate both or neither time0 and Iter0 with the -t0 and -iter0 flags");
   if ((!flg1) && (flg2)) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate both or neither time0 and Iter0 with the -t0 and -iter0 flags");        
-  ierr = PetscOptionsGetInt(PETSC_NULL,"-max_steps",&maxSteps,&flg1);CHKERRQ(ierr);
+  ierr = PetscOptionsGetInt(NULL,NULL,"-max_steps",&maxSteps,&flg1);CHKERRQ(ierr);
   if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate maximum number of steps with the -max_steps option");
 
 // Catch deprecated option
   PetscInt dum;
-  ierr = PetscOptionsGetInt(PETSC_NULL,"-write_steps",&dum,&flg1);CHKERRQ(ierr);
+  ierr = PetscOptionsGetInt(NULL,NULL,"-write_steps",&dum,&flg1);CHKERRQ(ierr);
   if (flg1) SETERRQ(PETSC_COMM_WORLD,1,"ERROR!: The -write_steps option has been deprecated. Use the StepTimer object with prefix 'write'");
 
   ierr = iniStepTimer("write_", Iter0, &writeTimer);CHKERRQ(ierr);
 
 /*Data for time averaging */
-  ierr = PetscOptionsHasName(PETSC_NULL,"-time_avg",&doTimeAverage);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-time_avg",&doTimeAverage);CHKERRQ(ierr);
   if (doTimeAverage) {
     ierr = iniStepTimer("avg_", Iter0, &avgTimer);CHKERRQ(ierr);
 	for (itr=0; itr<numTracers; itr++) {
 	  avgOutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
 	}
 	maxValsToRead = numTracers;
-	ierr = PetscOptionsGetStringArray(PETSC_NULL,"-avg_files",avgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+	ierr = PetscOptionsGetStringArray(NULL,NULL,"-avg_files",avgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
 	if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate file name(s) for writing time averages with the -avg_files option");
 	if (maxValsToRead != numTracers) {
 	  SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of time average file names specified");
@@ -218,7 +218,7 @@ int main(int argc,char **args)
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"   Tracer %d: %s\n", itr,avgOutFile[itr]);CHKERRQ(ierr);
 	}
 
-	ierr = PetscOptionsHasName(PETSC_NULL,"-avg_append",&avgAppendOutput);CHKERRQ(ierr);
+	ierr = PetscOptionsHasName(NULL,NULL,"-avg_append",&avgAppendOutput);CHKERRQ(ierr);
 	if (avgAppendOutput) {
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Time averages will be appended\n");CHKERRQ(ierr);
 	  AVG_FILE_MODE=FILE_MODE_APPEND;
@@ -228,7 +228,7 @@ int main(int argc,char **args)
 	}
 
 /* Output times */
-	ierr = PetscOptionsGetString(PETSC_NULL,"-avg_time_file",avgOutTimeFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
+	ierr = PetscOptionsGetString(NULL,NULL,"-avg_time_file",avgOutTimeFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
 	if (!flg1) {
 	  strcpy(avgOutTimeFile,"");
 	  sprintf(avgOutTimeFile,"%s","time_average_output_time.txt");
@@ -257,9 +257,9 @@ int main(int argc,char **args)
 #endif
 
 /* Matrices */
-  ierr = PetscOptionsGetString(PETSC_NULL,"-me",mateFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-me",mateFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
   if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate binary matrix file with the -me option");
-  ierr = PetscOptionsGetString(PETSC_NULL,"-mi",matiFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-mi",matiFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
   if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate binary matrix file with the -mi options");
 
   ierr = MatCreate(PETSC_COMM_WORLD,&Ae);CHKERRQ(ierr);
@@ -276,8 +276,8 @@ int main(int argc,char **args)
   ierr = MatSetType(Ai,MATMPIAIJ);CHKERRQ(ierr);        
   ierr = MatSetFromOptions(Ai);CHKERRQ(ierr);
   
-  ierr = PetscOptionsHasName(PETSC_NULL,"-periodic_matrix",&periodicMatrix);CHKERRQ(ierr);
-  ierr = PetscOptionsHasName(PETSC_NULL,"-time_dependent_matrix",&timeDependentMatrix);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-periodic_matrix",&periodicMatrix);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-time_dependent_matrix",&timeDependentMatrix);CHKERRQ(ierr);
   if (periodicMatrix & timeDependentMatrix) {
     SETERRQ(PETSC_COMM_WORLD,1,"Cannot use both -periodic_matrix and -time_dependent_matrix together!");
   }
@@ -372,7 +372,7 @@ int main(int argc,char **args)
     outFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
   }
   maxValsToRead = numTracers;
-  ierr = PetscOptionsGetStringArray(PETSC_NULL,"-o",outFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+  ierr = PetscOptionsGetStringArray(NULL,NULL,"-o",outFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
   if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate output file name(s) with the -o option");
   if (maxValsToRead != numTracers) {
     SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of output file names specified");
@@ -381,7 +381,7 @@ int main(int argc,char **args)
   for (itr=0; itr<numTracers; itr++) {
     ierr = PetscPrintf(PETSC_COMM_WORLD,"   Tracer %d: %s\n", itr,outFile[itr]);CHKERRQ(ierr);
   }  
-  ierr = PetscOptionsHasName(PETSC_NULL,"-append",&appendOutput);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-append",&appendOutput);CHKERRQ(ierr);
   if (appendOutput) {
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Output will be appended\n");CHKERRQ(ierr);
     OUTPUT_FILE_MODE=FILE_MODE_APPEND;
@@ -391,7 +391,7 @@ int main(int argc,char **args)
   }    
 
 /* Output times */
-  ierr = PetscOptionsGetString(PETSC_NULL,"-time_file",outTimeFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-time_file",outTimeFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
   if (!flg1) {
 	strcpy(outTimeFile,"");
     sprintf(outTimeFile,"%s","output_time.txt");
@@ -399,14 +399,14 @@ int main(int argc,char **args)
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Output times will be written to %s\n",outTimeFile);CHKERRQ(ierr);
 
 /* File name for final pickup */
-  ierr = PetscOptionsGetString(PETSC_NULL,"-pickup_out",pickupoutFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-pickup_out",pickupoutFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
   if (!flg1) {
 	strcpy(pickupoutFile,"");
     sprintf(pickupoutFile,"%s","pickup.petsc");
   }
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Final pickup will be written to %s\n",pickupoutFile);CHKERRQ(ierr);
 
-  ierr = PetscOptionsHasName(PETSC_NULL,"-pickup_time_steps",&writePickup);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-pickup_time_steps",&writePickup);CHKERRQ(ierr);
   if (writePickup) {
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Intermediate pickups will be written to pickup_ITERATIONNUMBER.petsc\n");CHKERRQ(ierr);
     ierr = iniStepTimer("pickup_", Iter0, &pickupTimer);CHKERRQ(ierr);
@@ -420,7 +420,7 @@ int main(int argc,char **args)
   for (itr=0; itr<numTracers; itr++) {
     iniFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
   }
-  ierr = PetscOptionsGetString(PETSC_NULL,"-pickup",pickupFile,PETSC_MAX_PATH_LEN-1,&pickupFromFile);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-pickup",pickupFile,PETSC_MAX_PATH_LEN-1,&pickupFromFile);CHKERRQ(ierr);
   if (pickupFromFile) {
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Pickup file has been specified\n");CHKERRQ(ierr);
     ierr = PetscPrintf(PETSC_COMM_WORLD,"  Reading initial conditions from %s\n", pickupFile);CHKERRQ(ierr);
@@ -431,7 +431,7 @@ int main(int argc,char **args)
     ierr = PetscViewerDestroy(&fdp);CHKERRQ(ierr);          
   } else {
     maxValsToRead = numTracers;
-    ierr = PetscOptionsGetStringArray(PETSC_NULL,"-i",iniFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+    ierr = PetscOptionsGetStringArray(NULL,NULL,"-i",iniFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
     if (flg1) {  /* read from file */
       if (maxValsToRead != numTracers) {
         SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of input file names specified");
@@ -459,9 +459,9 @@ int main(int argc,char **args)
 /* 1) Forcing term read from file (can be periodic, constant, or time-dependent) */
 /* 2) External forcing computed in S/R calcExternalForcing */
 /* 3) Prescribed boundary condition (can be periodic, constant, or time-dependent) */
-  ierr = PetscOptionsHasName(PETSC_NULL,"-forcing_from_file",&useForcingFromFile);CHKERRQ(ierr);
-  ierr = PetscOptionsHasName(PETSC_NULL,"-prescribed_bc",&usePrescribedBC);CHKERRQ(ierr);
-  ierr = PetscOptionsHasName(PETSC_NULL,"-external_forcing",&useExternalForcing);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-forcing_from_file",&useForcingFromFile);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-prescribed_bc",&usePrescribedBC);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-external_forcing",&useExternalForcing);CHKERRQ(ierr);
 
   if (useForcingFromFile) {  
   	ierr=PetscPrintf(PETSC_COMM_WORLD,"Forcing from file(s) specified\n");CHKERRQ(ierr);  
@@ -469,14 +469,14 @@ int main(int argc,char **args)
 	  forcingFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
 	}
 	maxValsToRead = numTracers;
-	ierr = PetscOptionsGetStringArray(PETSC_NULL,"-forcing_files",forcingFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+	ierr = PetscOptionsGetStringArray(NULL,NULL,"-forcing_files",forcingFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
 	if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"MUST specify forcing files with the -forcing_files option");
     if (maxValsToRead != numTracers) {
       SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of forcing file names specified");
     }    
     ierr = VecDuplicateVecs(templateVec,numTracers,&uf);CHKERRQ(ierr);    
 /*  There are 3 possibilities: periodic, constant, and time-dependent forcing */
-    ierr = PetscOptionsHasName(PETSC_NULL,"-periodic_forcing",&periodicForcing);CHKERRQ(ierr);
+    ierr = PetscOptionsHasName(NULL,NULL,"-periodic_forcing",&periodicForcing);CHKERRQ(ierr);
     if (periodicForcing) {
 /*    Read some info. Forcing is read in interpPeriodicForcing. */
       numForcing=-1;
@@ -491,19 +491,19 @@ int main(int argc,char **args)
       ierr = iniPeriodicTimer("forcing_", &forcingTimer);CHKERRQ(ierr);
     } else { /* constant or (nonperiodic) time dependent forcing */
 /*    Read info AND forcing here */    
-      ierr = PetscOptionsHasName(PETSC_NULL,"-time_dependent_forcing",&timeDependentForcing);CHKERRQ(ierr);
+      ierr = PetscOptionsHasName(NULL,NULL,"-time_dependent_forcing",&timeDependentForcing);CHKERRQ(ierr);
       if (timeDependentForcing) {      
         ierr=PetscPrintf(PETSC_COMM_WORLD,"Time dependent forcing specified\n");CHKERRQ(ierr);
-        ierr = PetscOptionsGetInt(PETSC_NULL,"-number_forcing_vecs",&numForcing,&flg2);CHKERRQ(ierr);
+        ierr = PetscOptionsGetInt(NULL,NULL,"-number_forcing_vecs",&numForcing,&flg2);CHKERRQ(ierr);
         if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate number of forcing vectors in file with the -number_forcing_vecs option");
 /*      Make sure we have all the time info         */
-        ierr = PetscOptionsGetReal(PETSC_NULL,"-t0",&time0,&flg2);CHKERRQ(ierr);
+        ierr = PetscOptionsGetReal(NULL,NULL,"-t0",&time0,&flg2);CHKERRQ(ierr);
         if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate initial time with the -t0 option");
-        ierr = PetscOptionsGetReal(PETSC_NULL,"-deltat_clock",&deltaTClock,&flg2);CHKERRQ(ierr);
+        ierr = PetscOptionsGetReal(NULL,NULL,"-deltat_clock",&deltaTClock,&flg2);CHKERRQ(ierr);
         if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate time step with the -deltat_clock option");      
-        ierr = PetscOptionsGetReal(PETSC_NULL,"-tfini",&tf0,&flg2);CHKERRQ(ierr);
+        ierr = PetscOptionsGetReal(NULL,NULL,"-tfini",&tf0,&flg2);CHKERRQ(ierr);
         if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate first forcing time with the -tfini option");
-        ierr = PetscOptionsGetReal(PETSC_NULL,"-tfend",&tf1,&flg2);CHKERRQ(ierr);
+        ierr = PetscOptionsGetReal(NULL,NULL,"-tfend",&tf1,&flg2);CHKERRQ(ierr);
         if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate last forcing time with the -tfend option");        
         utdf = malloc(numTracers*sizeof(Vec *));
         for (itr=0; itr<numTracers; itr++) {   
@@ -542,7 +542,7 @@ int main(int argc,char **args)
 		ufoutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
 	  }
 	  maxValsToRead = numTracers;
-	  ierr = PetscOptionsGetStringArray(PETSC_NULL,"-ouf",ufoutFile,&maxValsToRead,&doWriteUF);CHKERRQ(ierr);
+	  ierr = PetscOptionsGetStringArray(NULL,NULL,"-ouf",ufoutFile,&maxValsToRead,&doWriteUF);CHKERRQ(ierr);
 	  if (doWriteUF) {
 		if (maxValsToRead != numTracers) {
 		  SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of forcing-from-file (uf) output file names specified");
@@ -558,7 +558,7 @@ int main(int argc,char **args)
 			ufavgOutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
 		  }
 		  maxValsToRead = numTracers;
-		  ierr = PetscOptionsGetStringArray(PETSC_NULL,"-ufavg_files",ufavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+		  ierr = PetscOptionsGetStringArray(NULL,NULL,"-ufavg_files",ufavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
 		  if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate file name(s) for writing time averages with the -ufavg_files option");
 		  if (maxValsToRead != numTracers) {
 			SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of forcing-from-file (uf) time average file names specified");
@@ -573,7 +573,7 @@ int main(int argc,char **args)
 
     applyForcingFromFile = PETSC_TRUE;
     
-    ierr = PetscOptionsGetInt(PETSC_NULL,"-forcing_from_file_cutoff_step",&forcingFromFileCutOffStep,&flg1);CHKERRQ(ierr);
+    ierr = PetscOptionsGetInt(NULL,NULL,"-forcing_from_file_cutoff_step",&forcingFromFileCutOffStep,&flg1);CHKERRQ(ierr);
     if (forcingFromFileCutOffStep>0) {
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Forcing from file will be turned off after time step %d\n",forcingFromFileCutOffStep);CHKERRQ(ierr);    
     }
@@ -593,7 +593,7 @@ int main(int argc,char **args)
 	  uefoutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
 	}
 	maxValsToRead = numTracers;
-	ierr = PetscOptionsGetStringArray(PETSC_NULL,"-ouef",uefoutFile,&maxValsToRead,&doWriteUEF);CHKERRQ(ierr);
+	ierr = PetscOptionsGetStringArray(NULL,NULL,"-ouef",uefoutFile,&maxValsToRead,&doWriteUEF);CHKERRQ(ierr);
 	if (doWriteUEF) {
 	  if (maxValsToRead != numTracers) {
 		SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of external forcing (uef) output file names specified");
@@ -609,7 +609,7 @@ int main(int argc,char **args)
 		  uefavgOutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
 		}
 		maxValsToRead = numTracers;
-		ierr = PetscOptionsGetStringArray(PETSC_NULL,"-uefavg_files",uefavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+		ierr = PetscOptionsGetStringArray(NULL,NULL,"-uefavg_files",uefavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
 		if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate file name(s) for writing time averages with the -uefavg_files option");
 		if (maxValsToRead != numTracers) {
 		  SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of external forcing (uef) time average file names specified");
@@ -623,7 +623,7 @@ int main(int argc,char **args)
 
     applyExternalForcing = PETSC_TRUE;
 
-    ierr = PetscOptionsGetInt(PETSC_NULL,"-external_forcing_cutoff_step",&externalForcingCutOffStep,&flg1);CHKERRQ(ierr);
+    ierr = PetscOptionsGetInt(NULL,NULL,"-external_forcing_cutoff_step",&externalForcingCutOffStep,&flg1);CHKERRQ(ierr);
     if (externalForcingCutOffStep>0) {
       ierr = PetscPrintf(PETSC_COMM_WORLD,"External forcing will be turned off after time step %d\n",externalForcingCutOffStep);CHKERRQ(ierr);    
     }
@@ -638,7 +638,7 @@ int main(int argc,char **args)
 
 	ierr = VecCreate(PETSC_COMM_WORLD,&bcTemplateVec);CHKERRQ(ierr);
     
-    ierr = PetscOptionsHasName(PETSC_NULL,"-calc_bc",&doCalcBC);CHKERRQ(ierr);
+    ierr = PetscOptionsHasName(NULL,NULL,"-calc_bc",&doCalcBC);CHKERRQ(ierr);
     if (doCalcBC) {
       ierr = PetscPrintf(PETSC_COMM_WORLD,"BCs will be calculated\n");CHKERRQ(ierr);    
 
@@ -648,7 +648,7 @@ int main(int argc,char **args)
         ierr = VecSetFromOptions(bcTemplateVec);CHKERRQ(ierr);
         ierr = VecGetSize(bcTemplateVec,&gBCSize);CHKERRQ(ierr);
       } else {
-        ierr = PetscOptionsGetInt(PETSC_NULL,"-bc_vec_size",&gBCSize,&flg1);CHKERRQ(ierr);
+        ierr = PetscOptionsGetInt(NULL,NULL,"-bc_vec_size",&gBCSize,&flg1);CHKERRQ(ierr);
         if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate size of BC vector with the -bc_vec_size option");
         ierr = VecSetSizes(bcTemplateVec,PETSC_DECIDE,gBCSize);CHKERRQ(ierr);      
         ierr = VecSetFromOptions(bcTemplateVec);CHKERRQ(ierr);
@@ -672,14 +672,14 @@ int main(int argc,char **args)
         bcFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
       }
       maxValsToRead = numTracers;
-      ierr = PetscOptionsGetStringArray(PETSC_NULL,"-bc_files",bcFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+      ierr = PetscOptionsGetStringArray(NULL,NULL,"-bc_files",bcFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
       if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"MUST specify BC files with the -bc_files option");
       if (maxValsToRead != numTracers) {
         SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of BC file names specified");
       }    
 
 /*    There are 3 possibilities: periodic, constant, and time-dependent BCs */
-      ierr = PetscOptionsHasName(PETSC_NULL,"-periodic_bc",&periodicBC);CHKERRQ(ierr);
+      ierr = PetscOptionsHasName(NULL,NULL,"-periodic_bc",&periodicBC);CHKERRQ(ierr);
       if (periodicBC) {
 /*      Read some info. BC is read in interpPeriodicVector */
         ierr=PetscPrintf(PETSC_COMM_WORLD,"Periodic BC from file(s) specified\n");CHKERRQ(ierr);
@@ -702,19 +702,19 @@ int main(int argc,char **args)
         ierr = iniPeriodicTimer("bc_", &bcTimer);CHKERRQ(ierr);
       } else { /* constant or (nonperiodic) time dependent BC */
 /*      Read info AND BC here */    
-        ierr = PetscOptionsHasName(PETSC_NULL,"-time_dependent_bc",&timeDependentBC);CHKERRQ(ierr);
+        ierr = PetscOptionsHasName(NULL,NULL,"-time_dependent_bc",&timeDependentBC);CHKERRQ(ierr);
         if (timeDependentBC) {      
           ierr=PetscPrintf(PETSC_COMM_WORLD,"Time dependent BC specified\n");CHKERRQ(ierr);
-          ierr = PetscOptionsGetInt(PETSC_NULL,"-number_bc_vecs",&numBC,&flg2);CHKERRQ(ierr);
+          ierr = PetscOptionsGetInt(NULL,NULL,"-number_bc_vecs",&numBC,&flg2);CHKERRQ(ierr);
           if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate number of BC vectors in file with the -number_bc_vecs option");
 /*        Make sure we have all the time info         */
-          ierr = PetscOptionsGetReal(PETSC_NULL,"-t0",&time0,&flg2);CHKERRQ(ierr);
+          ierr = PetscOptionsGetReal(NULL,NULL,"-t0",&time0,&flg2);CHKERRQ(ierr);
           if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate initial time with the -t0 option");
-          ierr = PetscOptionsGetReal(PETSC_NULL,"-deltat_clock",&deltaTClock,&flg2);CHKERRQ(ierr);
+          ierr = PetscOptionsGetReal(NULL,NULL,"-deltat_clock",&deltaTClock,&flg2);CHKERRQ(ierr);
           if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate time step with the -deltat_clock option");      
-          ierr = PetscOptionsGetReal(PETSC_NULL,"-tbcini",&tbc0,&flg2);CHKERRQ(ierr);
+          ierr = PetscOptionsGetReal(NULL,NULL,"-tbcini",&tbc0,&flg2);CHKERRQ(ierr);
           if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate first BC time with the -tbcini option");
-          ierr = PetscOptionsGetReal(PETSC_NULL,"-tbcend",&tbc1,&flg2);CHKERRQ(ierr);
+          ierr = PetscOptionsGetReal(NULL,NULL,"-tbcend",&tbc1,&flg2);CHKERRQ(ierr);
           if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate last BC time with the -tbcend option");        
 
 /*        Load one vector here as a template */
@@ -773,7 +773,7 @@ int main(int argc,char **args)
     
     applyBC = PETSC_TRUE;
 
-    ierr = PetscOptionsGetInt(PETSC_NULL,"-bc_cutoff_step",&bcCutOffStep,&flg1);CHKERRQ(ierr);
+    ierr = PetscOptionsGetInt(NULL,NULL,"-bc_cutoff_step",&bcCutOffStep,&flg1);CHKERRQ(ierr);
     if (bcCutOffStep>0) {
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Prescribed BC will be turned off after time step %d\n",bcCutOffStep);CHKERRQ(ierr);    
     }
@@ -783,7 +783,7 @@ int main(int argc,char **args)
 	  bcoutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
 	}
 	maxValsToRead = numTracers;
-	ierr = PetscOptionsGetStringArray(PETSC_NULL,"-obc",bcoutFile,&maxValsToRead,&doWriteBC);CHKERRQ(ierr);
+	ierr = PetscOptionsGetStringArray(NULL,NULL,"-obc",bcoutFile,&maxValsToRead,&doWriteBC);CHKERRQ(ierr);
 	if (doWriteBC) {
 	  if (maxValsToRead != numTracers) {
 		SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of BC output file names specified");
@@ -797,7 +797,7 @@ int main(int argc,char **args)
 		  bcavgOutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
 		}
 		maxValsToRead = numTracers;
-		ierr = PetscOptionsGetStringArray(PETSC_NULL,"-bcavg_files",bcavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+		ierr = PetscOptionsGetStringArray(NULL,NULL,"-bcavg_files",bcavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
 		if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate file name(s) for writing time averages with the -bcavg_files option");
 		if (maxValsToRead != numTracers) {
 		  SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of BC time average file names specified");
@@ -810,9 +810,9 @@ int main(int argc,char **args)
     }
     
 /*  Matrices */
-	ierr = PetscOptionsGetString(PETSC_NULL,"-mbe",matbeFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
+	ierr = PetscOptionsGetString(NULL,NULL,"-mbe",matbeFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
 	if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate binary boundary matrix file name with the -mbe option");
-	ierr = PetscOptionsGetString(PETSC_NULL,"-mbi",matbiFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
+	ierr = PetscOptionsGetString(NULL,NULL,"-mbi",matbiFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
 	if (!flg1) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate binary boundary matrix file name with the -mbi options");
 
 	ierr = MatCreate(PETSC_COMM_WORLD,&Be);CHKERRQ(ierr);
@@ -892,7 +892,7 @@ int main(int argc,char **args)
     ierr = PetscPrintf(PETSC_COMM_WORLD,"No prescribed BC's specified\n");CHKERRQ(ierr);  
   }  
 
-  ierr = PetscOptionsGetString(PETSC_NULL,"-rescale_forcing_file",rfsFile,PETSC_MAX_PATH_LEN-1,&rescaleForcing);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-rescale_forcing_file",rfsFile,PETSC_MAX_PATH_LEN-1,&rescaleForcing);CHKERRQ(ierr);
   if (rescaleForcing) {  
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Forcing will be rescaled\n");CHKERRQ(ierr); 	    
     ierr = VecDuplicate(templateVec,&Rfs);CHKERRQ(ierr);    
@@ -911,13 +911,13 @@ int main(int argc,char **args)
   ierr = iniTMMWrite(time0,Iter0,numTracers,v,appendOutput);CHKERRQ(ierr);
 
 /* initialize monitor */
-  ierr = PetscOptionsHasName(PETSC_NULL,"-monitor",&useMonitor);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-monitor",&useMonitor);CHKERRQ(ierr);
   if (useMonitor) {  
     ierr = iniMonitor(time0,Iter0,numTracers,v);CHKERRQ(ierr);
   }
 
 /* initialize misfit */
-  ierr = PetscOptionsHasName(PETSC_NULL,"-calc_misfit",&doMisfit);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-calc_misfit",&doMisfit);CHKERRQ(ierr);
   if (doMisfit) {  
     ierr = iniMisfit(time0,Iter0,numTracers,v);CHKERRQ(ierr);
   }
@@ -995,7 +995,7 @@ int main(int argc,char **args)
 #ifdef FORSPINUP
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"itjac.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-  ierr = PetscBinaryRead(fp,&itjac,1,PETSC_INT);CHKERRQ(ierr);  
+  ierr = PetscBinaryRead(fp,&itjac,1,NULL,PETSC_INT);CHKERRQ(ierr);  
   ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Setting iteration number to: %d\n", itjac);CHKERRQ(ierr);
@@ -1009,7 +1009,7 @@ int main(int argc,char **args)
 #ifdef FORJACOBIAN
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"itjac.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-  ierr = PetscBinaryRead(fp,&itjac,1,PETSC_INT);CHKERRQ(ierr);  
+  ierr = PetscBinaryRead(fp,&itjac,1,NULL,PETSC_INT);CHKERRQ(ierr);  
   ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Setting iteration number to: %d\n", itjac);CHKERRQ(ierr);
@@ -1255,7 +1255,7 @@ int main(int argc,char **args)
 
 		ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"itjac.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
 		ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-		ierr = PetscBinaryRead(fp,&itjac,1,PETSC_INT);CHKERRQ(ierr);  
+		ierr = PetscBinaryRead(fp,&itjac,1,NULL,PETSC_INT);CHKERRQ(ierr);  
 		ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 
 		ierr = PetscPrintf(PETSC_COMM_WORLD,"Setting iteration number to: %d\n", itjac);CHKERRQ(ierr);
@@ -1302,7 +1302,7 @@ int main(int argc,char **args)
   
 		  ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"itjac.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
 		  ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-		  ierr = PetscBinaryRead(fp,&itjac,1,PETSC_INT);CHKERRQ(ierr);  
+		  ierr = PetscBinaryRead(fp,&itjac,1,NULL,PETSC_INT);CHKERRQ(ierr);  
 		  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	
 		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Setting iteration number to: %d\n", itjac);CHKERRQ(ierr);
@@ -1351,7 +1351,7 @@ int main(int argc,char **args)
 
 		  ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"itjac.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
 		  ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-		  ierr = PetscBinaryRead(fp,&itjac,1,PETSC_INT);CHKERRQ(ierr);  
+		  ierr = PetscBinaryRead(fp,&itjac,1,NULL,PETSC_INT);CHKERRQ(ierr);  
 		  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);          
 		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Setting iteration number to: %d\n", itjac);CHKERRQ(ierr);
 		}		

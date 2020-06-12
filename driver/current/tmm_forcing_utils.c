@@ -353,7 +353,7 @@ PetscErrorCode writeBinaryScalarData(const char *fileName, PetscScalar *arr, Pet
 {
   PetscErrorCode ierr;
   PetscViewer fd;
-  PetscInt fp;
+  int fp;
   PetscMPIInt myId;
 
   ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&myId);CHKERRQ(ierr);  
@@ -366,7 +366,7 @@ PetscErrorCode writeBinaryScalarData(const char *fileName, PetscScalar *arr, Pet
 	}  
   
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-	ierr = PetscBinaryWrite(fp,arr,N,PETSC_SCALAR,PETSC_FALSE);CHKERRQ(ierr);
+	ierr = PetscBinaryWrite(fp,arr,N,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
   }
   

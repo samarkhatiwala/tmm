@@ -129,7 +129,7 @@ StepTimer atmWriteTimer;
 PetscBool atmAppendOutput;
 FILE *atmfptime;
 PetscViewer atmfd;
-PetscInt atmfp;
+int atmfp;
 char atmOutTimeFile[PETSC_MAX_PATH_LEN];  
 PetscScalar pCO2atmavg, Foceanavg, Flandavg, landStateavg[3];
 
@@ -166,7 +166,7 @@ PetscBool diagAppendOutput = PETSC_FALSE;
 PetscFileMode DIAG_FILE_MODE;
 FILE *diagfptime;
 PetscViewer diagfd;
-PetscInt diagfp;
+int diagfp;
 char diagOutTimeFile[PETSC_MAX_PATH_LEN];
 /* Add model specific diagnostic variables below */
 #define MAXDIAGS2d 40
@@ -195,7 +195,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   PetscInt ip, il;
   PetscInt itr;
   PetscViewer fd;
-  PetscInt fp;
+  int fp;
   PetscInt maxValsToRead;  
   PetscBool flg;
   PetscScalar myTime;
@@ -207,18 +207,18 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 #endif
   
 #if defined (FORSPINUP) || defined (FORJACOBIAN)
-  ierr = PetscOptionsHasName(PETSC_NULL,"-relax_tracer",&relaxTracer);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-relax_tracer",&relaxTracer);CHKERRQ(ierr);
   if (relaxTracer) {  
 
     maxValsToRead = numTracers;
-    ierr = PetscOptionsGetRealArray(PETSC_NULL,"-relax_tau",relaxTau,&maxValsToRead,&flg);
+    ierr = PetscOptionsGetRealArray(NULL,NULL,"-relax_tau",relaxTau,&maxValsToRead,&flg);
     if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate tracer relaxation tau with the -relax_tau option");
     if (maxValsToRead != numTracers) {
       SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of relaxation tau values specified");
     }
 
     maxValsToRead = numTracers;
-    ierr = PetscOptionsGetRealArray(PETSC_NULL,"-relax_value",relaxValue,&maxValsToRead,&flg);
+    ierr = PetscOptionsGetRealArray(NULL,NULL,"-relax_value",relaxValue,&maxValsToRead,&flg);
     if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate relaxation values with the -relax_value option");
     if (maxValsToRead != numTracers) {
       SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of relaxation values specified");
@@ -244,18 +244,18 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = VecGetArrays(v,numTracers,&localTR);CHKERRQ(ierr);
   ierr = VecGetArrays(ut,numTracers,&localJTR);CHKERRQ(ierr);
   
-  ierr = PetscOptionsGetReal(PETSC_NULL,"-biogeochem_deltat",&DeltaT,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetReal(NULL,NULL,"-biogeochem_deltat",&DeltaT,&flg);CHKERRQ(ierr);
   if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate biogeochemical time step in seconds with the -biogeochem_deltat option");  
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Ocean time step for BGC length is  %12.7f seconds\n",DeltaT);CHKERRQ(ierr);
 
-  ierr = PetscOptionsGetReal(PETSC_NULL,"-days_per_year",&daysPerYear,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetReal(NULL,NULL,"-days_per_year",&daysPerYear,&flg);CHKERRQ(ierr);
   if (!flg) {
     daysPerYear = 360.0;
   }
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of days per year is %12.7f\n",daysPerYear);CHKERRQ(ierr);
   secondsPerYear = 86400.0*daysPerYear;
 
-  ierr = PetscOptionsHasName(PETSC_NULL,"-periodic_biogeochem_forcing",&periodicBiogeochemForcing);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-periodic_biogeochem_forcing",&periodicBiogeochemForcing);CHKERRQ(ierr);
 
   if (periodicBiogeochemForcing) {    
     ierr=PetscPrintf(PETSC_COMM_WORLD,"Periodic biogeochemical forcing specified\n");CHKERRQ(ierr);
@@ -284,7 +284,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Done reading T/S\n");CHKERRQ(ierr);
 
 #ifdef O_sed
-  ierr = PetscOptionsGetInt(PETSC_NULL,"-num_ocean_steps_per_sed_step",&numOceanStepsPerSedStep,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetInt(NULL,NULL,"-num_ocean_steps_per_sed_step",&numOceanStepsPerSedStep,&flg);CHKERRQ(ierr);
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of ocean steps per sediment step = %d\n",numOceanStepsPerSedStep);CHKERRQ(ierr);
   ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localsedmask);CHKERRQ(ierr);   
 #endif
@@ -295,7 +295,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   }
   EmPglobavg = 0.0; /* set this to zero for now */  
 
-  ierr = PetscOptionsHasName(PETSC_NULL,"-no_use_emp",&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-no_use_emp",&flg);CHKERRQ(ierr);
   if (flg) {
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Warning: -no_use_emp has been specified. E-P will be set to zero.\n");CHKERRQ(ierr);
 	useEmP = PETSC_FALSE;
@@ -327,17 +327,17 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"zt.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-  ierr = PetscBinaryRead(fp,&nzmax,1,PETSC_INT);CHKERRQ(ierr);  
+  ierr = PetscBinaryRead(fp,&nzmax,1,NULL,PETSC_INT);CHKERRQ(ierr);  
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of vertical layers is %d \n",nzmax);CHKERRQ(ierr);
   ierr = PetscMalloc(nzmax*sizeof(PetscScalar),&zt);CHKERRQ(ierr); 
-  ierr = PetscBinaryRead(fp,zt,nzmax,PETSC_SCALAR);CHKERRQ(ierr);  
+  ierr = PetscBinaryRead(fp,zt,nzmax,NULL,PETSC_SCALAR);CHKERRQ(ierr);  
   ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"drF.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-  ierr = PetscBinaryRead(fp,&nzmax,1,PETSC_INT);CHKERRQ(ierr);  
+  ierr = PetscBinaryRead(fp,&nzmax,1,NULL,PETSC_INT);CHKERRQ(ierr);  
   ierr = PetscMalloc(nzmax*sizeof(PetscScalar),&drF);CHKERRQ(ierr); 
-  ierr = PetscBinaryRead(fp,drF,nzmax,PETSC_SCALAR);CHKERRQ(ierr);  
+  ierr = PetscBinaryRead(fp,drF,nzmax,NULL,PETSC_SCALAR);CHKERRQ(ierr);  
   ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 
   ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localdA);CHKERRQ(ierr);
@@ -551,7 +551,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   maxValsToRead = 2;
   pCO2atmFiles[0] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* time file */
   pCO2atmFiles[1] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* atmospheric pCO2 history file */
-  ierr = PetscOptionsGetStringArray(PETSC_NULL,"-pco2atm_history",pCO2atmFiles,&maxValsToRead,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetStringArray(NULL,NULL,"-pco2atm_history",pCO2atmFiles,&maxValsToRead,&flg);CHKERRQ(ierr);
   if (flg) { /* Read atmospheric pCO2 history */
 	if (maxValsToRead != 2) {
 	  SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of file names specified for atmospheric pCO2 history");
@@ -560,16 +560,16 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	/* read time data */
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,pCO2atmFiles[0],FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-	ierr = PetscBinaryRead(fp,&numpCO2atm_hist,1,PETSC_INT);CHKERRQ(ierr);  
+	ierr = PetscBinaryRead(fp,&numpCO2atm_hist,1,NULL,PETSC_INT);CHKERRQ(ierr);  
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of points in atmospheric pCO2 history file is %d \n",numpCO2atm_hist);CHKERRQ(ierr);  
 	ierr = PetscMalloc(numpCO2atm_hist*sizeof(PetscScalar),&TpCO2atm_hist);CHKERRQ(ierr); 
-	ierr = PetscBinaryRead(fp,TpCO2atm_hist,numpCO2atm_hist,PETSC_SCALAR);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,TpCO2atm_hist,numpCO2atm_hist,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	/* read atmospheric pCO2 data */
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,pCO2atmFiles[1],FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
 	ierr = PetscMalloc(numpCO2atm_hist*sizeof(PetscScalar),&pCO2atm_hist);CHKERRQ(ierr); 
-	ierr = PetscBinaryRead(fp,pCO2atm_hist,numpCO2atm_hist,PETSC_SCALAR);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,pCO2atm_hist,numpCO2atm_hist,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	
 	pCO2atm = pCO2atm_hist[0];
@@ -583,13 +583,13 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Using interactive atmospheric model\n");CHKERRQ(ierr);  
 
 /* overwrite namelist value */
-  ierr = PetscOptionsGetReal(PETSC_NULL,"-pco2atm_ini",&pCO2atm,&flg);CHKERRQ(ierr); /* read from command line */
+  ierr = PetscOptionsGetReal(NULL,NULL,"-pco2atm_ini",&pCO2atm,&flg);CHKERRQ(ierr); /* read from command line */
   if (!flg) {
-	ierr = PetscOptionsGetString(PETSC_NULL,"-pco2atm_ini_file",pCO2atmIniFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+	ierr = PetscOptionsGetString(NULL,NULL,"-pco2atm_ini_file",pCO2atmIniFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
 	if (flg) { /* read from binary file */
 	  ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,pCO2atmIniFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	  ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-	  ierr = PetscBinaryRead(fp,&pCO2atm,1,PETSC_SCALAR);CHKERRQ(ierr);
+	  ierr = PetscBinaryRead(fp,&pCO2atm,1,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	}
   }
@@ -597,13 +597,13 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
 #if defined O_carbon_13_coupled
 /* overwrite namelist value */
-  ierr = PetscOptionsGetReal(PETSC_NULL,"-dc13atm_ini",&dc13atm,&flg);CHKERRQ(ierr); /* read from command line */
+  ierr = PetscOptionsGetReal(NULL,NULL,"-dc13atm_ini",&dc13atm,&flg);CHKERRQ(ierr); /* read from command line */
   if (!flg) {
-	ierr = PetscOptionsGetString(PETSC_NULL,"-dc13atm_ini_file",dc13atmIniFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+	ierr = PetscOptionsGetString(NULL,NULL,"-dc13atm_ini_file",dc13atmIniFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
 	if (flg) { /* read from binary file */
 	  ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,dc13atmIniFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	  ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-	  ierr = PetscBinaryRead(fp,&dc13atm,1,PETSC_SCALAR);CHKERRQ(ierr);
+	  ierr = PetscBinaryRead(fp,&dc13atm,1,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	}
   }
@@ -619,7 +619,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
   ierr = iniStepTimer("atm_write_", Iter0, &atmWriteTimer);CHKERRQ(ierr);
 
-  ierr = PetscOptionsHasName(PETSC_NULL,"-atm_append",&atmAppendOutput);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-atm_append",&atmAppendOutput);CHKERRQ(ierr);
   if (atmAppendOutput) {
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Atmospheric model output will be appended\n");CHKERRQ(ierr);
   } else {
@@ -627,7 +627,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   }    
 
 /* Output times */
-  ierr = PetscOptionsGetString(PETSC_NULL,"-atm_time_file",atmOutTimeFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-atm_time_file",atmOutTimeFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
   if (!flg) {
 	strcpy(atmOutTimeFile,"");
 	sprintf(atmOutTimeFile,"%s","atm_output_time.txt");
@@ -648,14 +648,14 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Atmospheric model output will be appended. Initial condition will NOT be written\n");CHKERRQ(ierr);      
   }
 
-  ierr = PetscOptionsHasName(PETSC_NULL,"-use_land_model",&useLandModel);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-use_land_model",&useLandModel);CHKERRQ(ierr);
   if (useLandModel) {
 	SETERRQ(PETSC_COMM_WORLD,1,"Land model not yet supported!");
   
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Using interactive land model\n");CHKERRQ(ierr);      
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,"land_ini.bin",FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-	ierr = PetscBinaryRead(fp,landState,3,PETSC_SCALAR);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,landState,3,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
 
 	if (!atmAppendOutput) {
@@ -671,7 +671,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   emFiles[0] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* time file */
   emFiles[1] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* fossil fuel emissions file */
   emFiles[2] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* land use emissions file */
-  ierr = PetscOptionsGetStringArray(PETSC_NULL,"-emissions_history",emFiles,&maxValsToRead,&useEmissions);CHKERRQ(ierr);
+  ierr = PetscOptionsGetStringArray(NULL,NULL,"-emissions_history",emFiles,&maxValsToRead,&useEmissions);CHKERRQ(ierr);
   if (useEmissions) { /* Read emissions history */
 	if (maxValsToRead != 3) {
 	  SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of file names specified for emissions");
@@ -680,24 +680,24 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	/* read time data */
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,emFiles[0],FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-	ierr = PetscBinaryRead(fp,&numEmission_hist,1,PETSC_INT);CHKERRQ(ierr);  
+	ierr = PetscBinaryRead(fp,&numEmission_hist,1,NULL,PETSC_INT);CHKERRQ(ierr);  
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of points in CO2 emission files is %d \n",numEmission_hist);CHKERRQ(ierr);  
 	ierr = PetscMalloc(numEmission_hist*sizeof(PetscScalar),&Tem_hist);CHKERRQ(ierr); 
-	ierr = PetscBinaryRead(fp,Tem_hist,numEmission_hist,PETSC_SCALAR);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,Tem_hist,numEmission_hist,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	/* read fossil fuel emissions */
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,emFiles[1],FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
 	ierr = PetscMalloc(numEmission_hist*sizeof(PetscScalar),&E_hist);CHKERRQ(ierr); 
-	ierr = PetscBinaryRead(fp,E_hist,numEmission_hist,PETSC_SCALAR);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,E_hist,numEmission_hist,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	/* read land use emissions */
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,emFiles[2],FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
 	ierr = PetscMalloc(numEmission_hist*sizeof(PetscScalar),&D_hist);CHKERRQ(ierr); 
-	ierr = PetscBinaryRead(fp,D_hist,numEmission_hist,PETSC_SCALAR);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,D_hist,numEmission_hist,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
-	ierr = PetscOptionsHasName(PETSC_NULL,"-interp_emissions",&interpEmissions);CHKERRQ(ierr);
+	ierr = PetscOptionsHasName(NULL,NULL,"-interp_emissions",&interpEmissions);CHKERRQ(ierr);
 	if (interpEmissions) {      
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Warning: Emissions will be interpolated in time. If you're prescribing annual emissions\n");CHKERRQ(ierr);     
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"         interpolation may lead to a different net emission input than what is prescribed\n");CHKERRQ(ierr);     
@@ -717,7 +717,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   C14atmFiles[1] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* NH atmospheric DeltaC14 history file */
   C14atmFiles[2] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* EQ atmospheric DeltaC14 history file */
   C14atmFiles[3] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* SH atmospheric DeltaC14 history file */
-  ierr = PetscOptionsGetStringArray(PETSC_NULL,"-c14atm_history",C14atmFiles,&maxValsToRead,&timeDependentAtmosphericC14);CHKERRQ(ierr);
+  ierr = PetscOptionsGetStringArray(NULL,NULL,"-c14atm_history",C14atmFiles,&maxValsToRead,&timeDependentAtmosphericC14);CHKERRQ(ierr);
   if (timeDependentAtmosphericC14) { /* Read atmospheric Delta C14 history */
 	if (maxValsToRead != 4) {
 	  SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of file names specified for atmospheric Delta C14 history");
@@ -726,17 +726,17 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	/* read time data */
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,C14atmFiles[0],FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-	ierr = PetscBinaryRead(fp,&numC14atm_hist,1,PETSC_INT);CHKERRQ(ierr);  
+	ierr = PetscBinaryRead(fp,&numC14atm_hist,1,NULL,PETSC_INT);CHKERRQ(ierr);  
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of points in atmospheric Delta C14 history files is %d \n",numC14atm_hist);CHKERRQ(ierr);  
 	ierr = PetscMalloc(numC14atm_hist*sizeof(PetscScalar),&TC14atm_hist);CHKERRQ(ierr); 
-	ierr = PetscBinaryRead(fp,TC14atm_hist,numC14atm_hist,PETSC_SCALAR);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,TC14atm_hist,numC14atm_hist,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	/* read atmospheric Delta C14 data */
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading NH atmospheric Delta C14 history from %s\n",C14atmFiles[1]);CHKERRQ(ierr);      
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,C14atmFiles[1],FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
 	ierr = PetscMalloc(numC14atm_hist*sizeof(PetscScalar),&C14atmnh_hist);CHKERRQ(ierr); 
-	ierr = PetscBinaryRead(fp,C14atmnh_hist,numC14atm_hist,PETSC_SCALAR);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,C14atmnh_hist,numC14atm_hist,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	dc14ccnnhatm = C14atmnh_hist[0];
 //
@@ -744,7 +744,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,C14atmFiles[2],FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
 	ierr = PetscMalloc(numC14atm_hist*sizeof(PetscScalar),&C14atmeq_hist);CHKERRQ(ierr); 
-	ierr = PetscBinaryRead(fp,C14atmeq_hist,numC14atm_hist,PETSC_SCALAR);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,C14atmeq_hist,numC14atm_hist,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	dc14ccneqatm = C14atmeq_hist[0];
 //
@@ -752,7 +752,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,C14atmFiles[3],FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
 	ierr = PetscMalloc(numC14atm_hist*sizeof(PetscScalar),&C14atmsh_hist);CHKERRQ(ierr); 
-	ierr = PetscBinaryRead(fp,C14atmsh_hist,numC14atm_hist,PETSC_SCALAR);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,C14atmsh_hist,numC14atm_hist,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	dc14ccnshatm = C14atmsh_hist[0];	
   }	else {
@@ -761,7 +761,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
     dc14atmvals[1]=0.0;
     dc14atmvals[2]=0.0;    
     maxValsToRead = 3;
-    ierr = PetscOptionsGetRealArray(PETSC_NULL,"-c14atm_vals",dc14atmvals,&maxValsToRead,&flg);
+    ierr = PetscOptionsGetRealArray(NULL,NULL,"-c14atm_vals",dc14atmvals,&maxValsToRead,&flg);
     dc14ccnnhatm=dc14atmvals[0];
     dc14ccneqatm=dc14atmvals[1];
     dc14ccnshatm=dc14atmvals[2];
@@ -780,7 +780,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   maxValsToRead = 2;
   C13atmFiles[0] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* time file */
   C13atmFiles[1] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char)); /* atmospheric deltaC13 history file */
-  ierr = PetscOptionsGetStringArray(PETSC_NULL,"-c13atm_history",C13atmFiles,&maxValsToRead,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetStringArray(NULL,NULL,"-c13atm_history",C13atmFiles,&maxValsToRead,&flg);CHKERRQ(ierr);
   if (flg) { /* Read atmospheric delta C13 history */
 	if (maxValsToRead != 2) {
 	  SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of file names specified for atmospheric delta C13 history");
@@ -789,16 +789,16 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	/* read time data */
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,C13atmFiles[0],FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
-	ierr = PetscBinaryRead(fp,&numC13atm_hist,1,PETSC_INT);CHKERRQ(ierr);  
+	ierr = PetscBinaryRead(fp,&numC13atm_hist,1,NULL,PETSC_INT);CHKERRQ(ierr);  
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Number of points in atmospheric delta C13 history file is %d \n",numC13atm_hist);CHKERRQ(ierr);  
 	ierr = PetscMalloc(numC13atm_hist*sizeof(PetscScalar),&TC13atm_hist);CHKERRQ(ierr); 
-	ierr = PetscBinaryRead(fp,TC13atm_hist,numC13atm_hist,PETSC_SCALAR);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,TC13atm_hist,numC13atm_hist,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	/* read atmospheric delta C13 data */
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,C13atmFiles[1],FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
 	ierr = PetscMalloc(numC13atm_hist*sizeof(PetscScalar),&C13atm_hist);CHKERRQ(ierr); 
-	ierr = PetscBinaryRead(fp,C13atm_hist,numC13atm_hist,PETSC_SCALAR);CHKERRQ(ierr);
+	ierr = PetscBinaryRead(fp,C13atm_hist,numC13atm_hist,NULL,PETSC_SCALAR);CHKERRQ(ierr);
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 	
 	dc13atm = C13atm_hist[0];
@@ -875,7 +875,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Finished pushing sediment arrays\n");CHKERRQ(ierr);  
   
 /* Initial conditions     */
-  ierr = PetscOptionsGetString(PETSC_NULL,"-ised_mixed",sedMixedIniFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-ised_mixed",sedMixedIniFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
   if (flg) {
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading sediment mixed tracers initial conditions from %s\n", sedMixedIniFile);CHKERRQ(ierr);    
     ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,sedMixedIniFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
@@ -885,7 +885,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 // 	 ierr = VecSet(sedMixedTracers,zero);CHKERRQ(ierr);
   }
 
-  ierr = PetscOptionsGetString(PETSC_NULL,"-ised_Buried",sedBuriedIniFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-ised_Buried",sedBuriedIniFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
   if (flg) {
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading sediment buried tracers initial conditions from %s\n", sedBuriedIniFile);CHKERRQ(ierr);    
     ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,sedBuriedIniFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
@@ -900,15 +900,15 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = iniStepTimer("sed_write_", Iter0, &sedWriteTimer);CHKERRQ(ierr);
     
 /* Output file */
-  ierr = PetscOptionsGetString(PETSC_NULL,"-osed_mixed",sedMixedOutFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-osed_mixed",sedMixedOutFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
   if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate sediment mixed tracers output file name with the -osed_mixed option");
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Sediment mixed tracers will be written to %s\n", sedMixedOutFile);CHKERRQ(ierr);    
 
-  ierr = PetscOptionsGetString(PETSC_NULL,"-osed_buried",sedBuriedOutFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-osed_buried",sedBuriedOutFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
   if (!flg) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate sediment buried tracers output file name with the -osed_buried option");
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Sediment buried tracers will be written to %s\n", sedBuriedOutFile);CHKERRQ(ierr);    
   
-  ierr = PetscOptionsHasName(PETSC_NULL,"-sed_append",&sedAppendOutput);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-sed_append",&sedAppendOutput);CHKERRQ(ierr);
   if (sedAppendOutput) {
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Sediment model output will be appended\n");CHKERRQ(ierr);
     SED_OUTPUT_FILE_MODE=FILE_MODE_APPEND;
@@ -918,7 +918,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   }    
 
 /* Output times */
-  ierr = PetscOptionsGetString(PETSC_NULL,"-sed_time_file",sedOutTimeFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-sed_time_file",sedOutTimeFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
   if (!flg) {
 	strcpy(sedOutTimeFile,"");
 	sprintf(sedOutTimeFile,"%s","sed_output_time.txt");
@@ -940,14 +940,14 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   }
 
 /* File name for final pickup */
-  ierr = PetscOptionsGetString(PETSC_NULL,"-sed_mixed_pickup_out",sedMixedPickupOutFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-sed_mixed_pickup_out",sedMixedPickupOutFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
   if (!flg) {
 	strcpy(sedMixedPickupOutFile,"");
     sprintf(sedMixedPickupOutFile,"%s","sed_mixed_pickup.petsc");
   }
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Final sediment mixed tracers pickup will be written to %s\n",sedMixedPickupOutFile);CHKERRQ(ierr);
 
-  ierr = PetscOptionsGetString(PETSC_NULL,"-sed_buried_pickup_out",sedBuriedPickupOutFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-sed_buried_pickup_out",sedBuriedPickupOutFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
   if (!flg) {
 	strcpy(sedBuriedPickupOutFile,"");
     sprintf(sedBuriedPickupOutFile,"%s","sed_buried_pickup.petsc");
@@ -957,14 +957,14 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Finished initializing sediment arrays\n");CHKERRQ(ierr);  
 #endif
 
-  ierr = PetscOptionsHasName(PETSC_NULL,"-calc_diagnostics",&calcDiagnostics);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-calc_diagnostics",&calcDiagnostics);CHKERRQ(ierr);
   if (calcDiagnostics) {    
 /*Data for diagnostics */
     ierr = iniStepTimer("diag_", Iter0, &diagTimer);CHKERRQ(ierr);
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed starting at (and including) time step: %d\n", diagTimer.startTimeStep);CHKERRQ(ierr);	
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed over %d time steps\n", diagTimer.numTimeSteps);CHKERRQ(ierr);	
 
-	ierr = PetscOptionsHasName(PETSC_NULL,"-diag_append",&diagAppendOutput);CHKERRQ(ierr);
+	ierr = PetscOptionsHasName(NULL,NULL,"-diag_append",&diagAppendOutput);CHKERRQ(ierr);
 	if (diagAppendOutput) {
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostic output will be appended\n");CHKERRQ(ierr);
 	  DIAG_FILE_MODE=FILE_MODE_APPEND;
@@ -974,7 +974,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	}
 
 /* Output times */
-	ierr = PetscOptionsGetString(PETSC_NULL,"-diag_time_file",diagOutTimeFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+	ierr = PetscOptionsGetString(NULL,NULL,"-diag_time_file",diagOutTimeFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
 	if (!flg) {
 	  strcpy(diagOutTimeFile,"");
 	  sprintf(diagOutTimeFile,"%s","diagnostic_output_time.txt");

@@ -39,7 +39,7 @@ PetscErrorCode iniMisfit(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Vec
  
 /* Type of cost function; so far, only annual averages to PO4, O2 and NO3 available */
 
-  ierr = PetscOptionsGetString(PETSC_NULL,"-misfit_file",misfitFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"-misfit_file",misfitFile,PETSC_MAX_PATH_LEN-1,&flg);CHKERRQ(ierr);
   if (!flg) {
   strcpy(misfitFile,"");
   sprintf(misfitFile,"%s","misfit.txt");
@@ -47,7 +47,7 @@ PetscErrorCode iniMisfit(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Vec
   ierr = PetscPrintf(PETSC_COMM_WORLD,"misfit will be written to %s\n",misfitFile);CHKERRQ(ierr);
   ierr = PetscFOpen(PETSC_COMM_WORLD,misfitFile,"w",&misfitf);CHKERRQ(ierr);  
 
-  ierr = PetscOptionsHasName(PETSC_NULL,"-average_cost",&averageCost);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-average_cost",&averageCost);CHKERRQ(ierr);
 	if (averageCost) {
 
     ierr = iniStepTimer("cost_", Iter0, &costTimer);CHKERRQ(ierr);

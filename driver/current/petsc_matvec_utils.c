@@ -56,13 +56,13 @@ PetscErrorCode VecLoadIntoVectorRandomAccess(PetscViewer viewer,Vec vec, PetscIn
 /*   iRec: the record to read (iRec=1 is the first record; iRec=numRecs is the last record) */
   
   PetscErrorCode ierr;
-  PetscInt fd;
+  int fp;
   off_t off,offset;
       
   PetscFunctionBegin;
   off = PETSC_BINARY_SCALAR_SIZE*(length+1)*(iRec-1);  
-  ierr = PetscViewerBinaryGetDescriptor(viewer,&fd);CHKERRQ(ierr);
-  ierr = PetscBinarySeek(fd,off,PETSC_BINARY_SEEK_SET,&offset);CHKERRQ(ierr);
+  ierr = PetscViewerBinaryGetDescriptor(viewer,&fp);CHKERRQ(ierr);
+  ierr = PetscBinarySeek(fp,off,PETSC_BINARY_SEEK_SET,&offset);CHKERRQ(ierr);
   ierr = VecLoad(vec,viewer);CHKERRQ(ierr); /* IntoVector */
   PetscFunctionReturn(0);
 }
@@ -116,15 +116,15 @@ PetscErrorCode MatGetSizeFromFile(const char filename[], PetscInt *M, PetscInt *
 
   PetscErrorCode ierr;
   PetscInt       header[4];
-  PetscInt       fd;
+  int       fp;
   PetscViewer    viewer;
       
   PetscFunctionBegin;
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,filename,FILE_MODE_READ,&viewer);CHKERRQ(ierr);
-  ierr = PetscViewerBinaryGetDescriptor(viewer,&fd);CHKERRQ(ierr);
+  ierr = PetscViewerBinaryGetDescriptor(viewer,&fp);CHKERRQ(ierr);
 
 /* Read header */
-  ierr = PetscBinaryRead(fd,(char *)header,4,PETSC_INT);CHKERRQ(ierr);
+  ierr = PetscBinaryRead(fp,(char *)header,4,NULL,PETSC_INT);CHKERRQ(ierr);
   ierr = PetscViewerDestroy(&viewer);CHKERRQ(ierr);
 
   /* error checking on file */
@@ -136,3 +136,22 @@ PetscErrorCode MatGetSizeFromFile(const char filename[], PetscInt *M, PetscInt *
 
   PetscFunctionReturn(0);
 }
+
+// #undef __FUNCT__
+// #define __FUNCT__ "VecWrite"
+// PetscErrorCode VecWrite(const char *fileName, Vec v, PetscBool appendToFile)
+// {
+//   PetscErrorCode ierr;
+//   PetscViewer viewer;
+// 
+//   if (appendToFile) {
+// 	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,fileName,FILE_MODE_APPEND,&viewer);CHKERRQ(ierr);
+//   } else {
+// 	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,fileName,FILE_MODE_WRITE,&viewer);CHKERRQ(ierr);
+//   }  
+// 
+//   ierr = VecView(v,viewer);CHKERRQ(ierr);
+//   ierr = PetscViewerDestroy(&viewer);CHKERRQ(ierr);      
+// 
+//   return 0;
+// }

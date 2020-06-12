@@ -95,10 +95,10 @@ CPPCMD = cat $< |  cpp  -traditional -P $(INCLUDEPATHS) $(CPPKEYS)
 %.o: %.c
 	$(CC) $(INCLUDEPATHS) $(PCC_FLAGS) $(CFLAGS) $(CCPPFLAGS) -c -o $@ $<
 
-$(EXE): $(OBJTMM) $(OBJCMODEL) $(OBJFMODEL) chkopts
+$(EXE): $(OBJTMM) $(OBJCMODEL) $(OBJFMODEL)
 	-$(CLINKER) -o $@ $(OBJTMM) $(OBJCMODEL) $(OBJFMODEL) $(PETSC_MAT_LIB)
 
-$(EXEWRITE): $(OBJFMODELWRITE) chkopts
+$(EXEWRITE): $(OBJFMODELWRITE)
 	-$(FLINKER) -o $@ $(OBJFMODELWRITE)
 
 cleanall:

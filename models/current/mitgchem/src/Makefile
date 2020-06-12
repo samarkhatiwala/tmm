@@ -92,7 +92,7 @@ CPPCMD = cat $< |  cpp  -traditional -P $(INCLUDEPATHS) -DWORDLENGTH=4 -DALLOW_T
 %.o: %.c
 	$(CC) $(INCLUDEPATHS) $(PCC_FLAGS) $(CFLAGS) $(CCPPFLAGS) -c -o $@ $<
 
-$(EXE): $(OBJTMM) $(OBJCMODEL) $(OBJFMODEL) chkopts
+$(EXE): $(OBJTMM) $(OBJCMODEL) $(OBJFMODEL)
 	-$(CLINKER) -o $@ $(OBJTMM) $(OBJCMODEL) $(OBJFMODEL) $(PETSC_MAT_LIB)
 
 cleanall:

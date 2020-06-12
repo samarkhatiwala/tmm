@@ -45,7 +45,7 @@ OBJTMM = $(SRCTMM:.c=.o)
 %.o: %.c
 	$(CC) $(INCLUDEPATHS) $(PCC_FLAGS) $(CFLAGS) $(CCPPFLAGS) -c -o $@ $<
 
-$(EXE): $(OBJTMM) chkopts
+$(EXE): $(OBJTMM)
 	-$(CLINKER) -o $@ $(OBJTMM) $(PETSC_MAT_LIB)
 
 cleanall:
