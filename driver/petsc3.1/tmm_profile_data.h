@@ -1,3 +1,0 @@
-extern PetscInt *gNumProfiles, *gStartIndices, *gEndIndices, *lStartIndices, *lEndIndices;
-extern PetscInt *lProfileLength, lNumProfiles, lSize, numPrevProfiles, totalNumProfiles;
-extern PetscTruth useProfiles;
