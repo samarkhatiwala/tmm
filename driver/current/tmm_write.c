@@ -18,7 +18,7 @@ StepTimer extraWriteTimer;
 char *outFile[MAXNUMTRACERS];
 PetscFileMode OUTPUT_FILE_MODE;
 char outTimeFile[PETSC_MAX_PATH_LEN];  
-PetscBool appendOutput = PETSC_FALSE;
+PetscBool appendExtraOutput = PETSC_FALSE;
 FILE *fptime;
 PetscViewer fdout[MAXNUMTRACERS];
 PetscInt numExtraTracers;
@@ -26,7 +26,7 @@ PetscInt itrExtra[MAXNUMTRACERS];
 
 #undef __FUNCT__
 #define __FUNCT__ "iniTMMWrite"
-PetscErrorCode iniTMMWrite(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Vec *v, PetscBool append)
+PetscErrorCode iniTMMWrite(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Vec *v)
 {
 
   PetscInt itr;
@@ -56,8 +56,8 @@ PetscErrorCode iniTMMWrite(PetscScalar tc, PetscInt Iter, PetscInt numTracers, V
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"   Tracer %d: %s\n", itrExtra[itr],outFile[itr]);CHKERRQ(ierr);
 	}
 
-	ierr = PetscOptionsHasName(NULL,NULL,"-append_extra",&appendOutput);CHKERRQ(ierr);
-	if (appendOutput) {
+	ierr = PetscOptionsHasName(NULL,NULL,"-append_extra",&appendExtraOutput);CHKERRQ(ierr);
+	if (appendExtraOutput) {
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Extra output will be appended\n");CHKERRQ(ierr);
 	  OUTPUT_FILE_MODE=FILE_MODE_APPEND;
 	} else {
@@ -77,18 +77,22 @@ PetscErrorCode iniTMMWrite(PetscScalar tc, PetscInt Iter, PetscInt numTracers, V
 	  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,outFile[itr],OUTPUT_FILE_MODE,&fdout[itr]);CHKERRQ(ierr);
 	}
 
-	if (!appendOutput) {
+	if (!appendExtraOutput) {
 	  ierr = PetscFOpen(PETSC_COMM_WORLD,outTimeFile,"w",&fptime);CHKERRQ(ierr);  
-	  ierr = PetscFPrintf(PETSC_COMM_WORLD,fptime,"%d   %10.5f\n",Iter0,time0);CHKERRQ(ierr);     
-	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing extra output at time %10.5f, step %d\n", time0,Iter0);CHKERRQ(ierr);  
-	  for (itr=0; itr<numExtraTracers; itr++) {       
-		ierr = VecView(v[itrExtra[itr]],fdout[itr]);CHKERRQ(ierr);
-	  }
+	  if (Iter0==extraWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing extra output at time %10.5f, step %d\n", tc, Iter0);CHKERRQ(ierr);
+		ierr = PetscFPrintf(PETSC_COMM_WORLD,fptime,"%d   %10.5f\n",Iter0,tc);CHKERRQ(ierr);
+		for (itr=0; itr<numExtraTracers; itr++) {		
+		  ierr = VecView(v[itrExtra[itr]],fdout[itr]);CHKERRQ(ierr);
+		}
+	  }	  
 	} else {
-		ierr = PetscFOpen(PETSC_COMM_WORLD,outTimeFile,"a",&fptime);CHKERRQ(ierr);  
+  	  ierr = PetscFOpen(PETSC_COMM_WORLD,outTimeFile,"a",&fptime);CHKERRQ(ierr);
+	  if (Iter0==extraWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
 		ierr = PetscPrintf(PETSC_COMM_WORLD,"Opening extra output file(s) for output. Initial condition will NOT be written\n");CHKERRQ(ierr);
+	  }	
 	}
-
+    
   }
 
   return 0;
@@ -105,22 +109,33 @@ PetscErrorCode doTMMWrite(PetscScalar tc, PetscInt iLoop, PetscInt numTracers, V
   PetscErrorCode ierr;
 
   if (doExtraWrite) {
-	if (Iter0+iLoop>=extraWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
-	  if (extraWriteTimer.count<=extraWriteTimer.numTimeSteps) {
+// 	if (Iter0+iLoop==extraWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+// 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing extra output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+// 	  ierr = PetscFPrintf(PETSC_COMM_WORLD,fptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);
+// 	  for (itr=0; itr<numExtraTracers; itr++) {		
+// 		ierr = VecView(v[itrExtra[itr]],fdout[itr]);CHKERRQ(ierr);
+// 	  }
+// 	}
+  
+	if (Iter0+iLoop>extraWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+	  if (extraWriteTimer.count<extraWriteTimer.numTimeSteps) {
 		extraWriteTimer.count++;
 	  }
-	  if (extraWriteTimer.count==extraWriteTimer.numTimeSteps) { /* time to write out */
+	}
 
+	if (Iter0+iLoop>=extraWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+      if ((extraWriteTimer.count==extraWriteTimer.numTimeSteps) || (Iter0+iLoop==extraWriteTimer.startTimeStep)) { /* time to write out */
 		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing extra output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
 		ierr = PetscFPrintf(PETSC_COMM_WORLD,fptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);
 		for (itr=0; itr<numExtraTracers; itr++) {		
 		  ierr = VecView(v[itrExtra[itr]],fdout[itr]);CHKERRQ(ierr);
         }
-        
+      }
+      
+      if (extraWriteTimer.count==extraWriteTimer.numTimeSteps) {
 		ierr = updateStepTimer("write_extra_", Iter0+iLoop, &extraWriteTimer);CHKERRQ(ierr);
-
 	  }
-	}
+    }
   }  
 
   return 0;

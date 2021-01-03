@@ -272,12 +272,17 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
     if (!atmAppendOutput) {
       ierr = PetscFOpen(PETSC_COMM_WORLD,atmOutTimeFile,"w",&atmfptime);CHKERRQ(ierr);  
-      ierr = PetscFPrintf(PETSC_COMM_WORLD,atmfptime,"%d   %10.5f\n",Iter0,time0);CHKERRQ(ierr);     
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing atmospheric output at time %10.5f, step %d\n", tc,Iter);CHKERRQ(ierr);  
-      ierr = writeBinaryScalarData("pCO2atm_output.bin",&pCO2atm,1,PETSC_FALSE);
+	  if (Iter0==atmWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+		ierr = PetscFPrintf(PETSC_COMM_WORLD,atmfptime,"%d   %10.5f\n",Iter0,time0);CHKERRQ(ierr);     
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing atmospheric output at time %10.5f, step %d\n", tc,Iter);CHKERRQ(ierr);  
+		ierr = writeBinaryScalarData("pCO2atm_output.bin",&pCO2atm,1,PETSC_FALSE);
+	  }	  
+      
     } else {
       ierr = PetscFOpen(PETSC_COMM_WORLD,atmOutTimeFile,"a",&atmfptime);CHKERRQ(ierr);  
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Atmospheric model output will be appended. Initial condition will NOT be written\n");CHKERRQ(ierr);      
+	  if (Iter0==atmWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */      
+		ierr = PetscPrintf(PETSC_COMM_WORLD,"Atmospheric model output will be appended. Initial condition will NOT be written\n");CHKERRQ(ierr);      
+	  }	
     }
 
     if (useLandModel) {
@@ -532,8 +537,8 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = PetscOptionsHasName(NULL,NULL,"-calc_diagnostics",&calcDiagnostics);CHKERRQ(ierr);
   if (calcDiagnostics) {    
 /*Data for diagnostics */
-    ierr = iniStepTimer("diag_", Iter0, &diagTimer);CHKERRQ(ierr);
-	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed starting at (and including) time step: %d\n", diagTimer.startTimeStep);CHKERRQ(ierr);	
+    ierr = iniStepTimer("diag_", Iter0+1, &diagTimer);CHKERRQ(ierr);
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed starting at and including (absolute) time step: %d\n", diagTimer.startTimeStep);CHKERRQ(ierr);	
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed over %d time steps\n", diagTimer.numTimeSteps);CHKERRQ(ierr);	
 
 	ierr = VecDuplicate(TR,&bioac);CHKERRQ(ierr);
@@ -779,12 +784,15 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
 
   if (useAtmModel) {
 /* write instantaneous atmos model state */
-	if (Iter0+iLoop>=atmWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
-	  if (atmWriteTimer.count<=atmWriteTimer.numTimeSteps) {
+	if (Iter0+iLoop>atmWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+	  if (atmWriteTimer.count<atmWriteTimer.numTimeSteps) {
 		atmWriteTimer.count++;
 	  }
-	  if (atmWriteTimer.count==atmWriteTimer.numTimeSteps) { /* time to write out */
-    
+	}
+
+	if (Iter0+iLoop>=atmWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+      if ((atmWriteTimer.count==atmWriteTimer.numTimeSteps) || (Iter0+iLoop==atmWriteTimer.startTimeStep)) { /* time to write out */
+
 		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing atmospheric model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
 		ierr = PetscFPrintf(PETSC_COMM_WORLD,atmfptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
 		ierr = writeBinaryScalarData("pCO2atm_output.bin",&pCO2atm,1,PETSC_TRUE);
@@ -798,17 +806,19 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
 		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing land model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
 		  ierr = writeBinaryScalarData("land_state_output.bin",landState,3,PETSC_TRUE);
 		}
-
-		ierr = updateStepTimer("atm_write_", Iter0+iLoop, &atmWriteTimer);CHKERRQ(ierr);
-
+		
       }
+
+      if (atmWriteTimer.count==atmWriteTimer.numTimeSteps) {
+		ierr = updateStepTimer("atm_write_", Iter0+iLoop, &atmWriteTimer);CHKERRQ(ierr);
+	  }
     }
   }
 
   if (calcDiagnostics) {  
 	if (Iter0+iLoop>=diagTimer.startTimeStep) { /* start time averaging (note: startTimeStep is ABSOLUTE time step) */  
 
-	  if (diagTimer.count<=diagTimer.numTimeSteps) { /* still within same averaging block so accumulate */
+	  if (diagTimer.count<diagTimer.numTimeSteps) { /* still within same averaging block so accumulate */
 
 		ierr = VecAXPY(bioacavg,one,bioac);CHKERRQ(ierr);
         for (ip=0; ip<lNumProfiles; ip++) {

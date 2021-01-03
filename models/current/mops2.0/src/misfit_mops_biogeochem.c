@@ -50,8 +50,8 @@ PetscErrorCode iniMisfit(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Vec
   ierr = PetscOptionsHasName(NULL,NULL,"-average_cost",&averageCost);CHKERRQ(ierr);
 	if (averageCost) {
 
-    ierr = iniStepTimer("cost_", Iter0, &costTimer);CHKERRQ(ierr);
-	ierr = PetscPrintf(PETSC_COMM_WORLD,"Cost for misfit function will be computed starting at (and including) time step: %d\n", costTimer.startTimeStep);CHKERRQ(ierr);	
+    ierr = iniStepTimer("cost_", Iter0+1, &costTimer);CHKERRQ(ierr);
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Cost for misfit function will be computed starting at and including (absolute) time step: %d\n", costTimer.startTimeStep);CHKERRQ(ierr);	
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Cost for misfit function will be computed over %d time steps\n", costTimer.numTimeSteps);CHKERRQ(ierr);	
 
 /* Read fractional volume of each box for scaling according to box size */
@@ -177,7 +177,7 @@ PetscErrorCode calcMisfit(PetscScalar tc, PetscInt iLoop, PetscInt numTracers, V
 
 /* IK : Add all tracer snapshots, and increase counter by one */ 
  
-    if (costTimer.count<=costTimer.numTimeSteps) {
+    if (costTimer.count<costTimer.numTimeSteps) {
 	  ierr = VecAXPY(mbgc1avg,one,mbgc1);CHKERRQ(ierr);
 	  ierr = VecAXPY(mbgc2avg,one,mbgc2);CHKERRQ(ierr);
 	  ierr = VecAXPY(mbgc3avg,one,mbgc3);CHKERRQ(ierr);

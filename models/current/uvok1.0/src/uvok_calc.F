@@ -99,21 +99,24 @@
 #include "mw.h"
 #include "scalar.h"
 #include "tmngr.h"
-# if defined O_npzd || defined O_carbon_14
+#if defined O_co2ccn_data || defined O_TMM_interactive_atmosphere
+#include "cembm.h"
+#endif
+#if defined O_npzd || defined O_carbon_14
 #include "npzd.h"
 #include "calendar.h"
-# endif
-# if defined O_save_convection || defined O_carbon_14
+#endif
+#if defined O_save_convection || defined O_carbon_14
 #include "diaga.h"
       real rrc14std
-# endif
-# if defined O_ice
-#  if defined O_ice_cpts
+#endif
+#if defined O_ice
+# if defined O_ice_cpts
 #include "cpts.h"
-#  endif
-#include "ice.h"
 # endif
-# if defined O_npzd
+#include "ice.h"
+#endif
+#if defined O_npzd
 C     real t_in(km), po4_in(km)
 C#  if defined O_npzd_o2
 C     real o2_in(km)
@@ -131,16 +134,16 @@ C#  if defined O_npzd_fe_limitation
 C     real felimit_in(km), felimit_D_in(km)
 C#  endif
 C     real expo, tnpzd(km,ntnpzd)
-#  if defined O_embm
+# if defined O_embm
 #include "atm.h"
-#   if defined O_carbon_13
+#  if defined O_carbon_13
 #include "cembm.h"
-#   endif
 #  endif
+# endif
 C# endif
 C# if defined O_carbon_fnpzd
 C#include "calendar.h"
-# endif
+#endif
 
 # if defined O_npzd || defined O_carbon_14
       real src(imt,km,jsmw:jemw,nsrc)

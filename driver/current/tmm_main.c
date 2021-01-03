@@ -27,6 +27,7 @@ static char help[] = "\n";
 PetscScalar deltaTClock, time0;
 PetscInt maxSteps, Iter0;
 StepTimer writeTimer;
+PetscBool appendOutput = PETSC_FALSE;
 PetscInt *gIndices, gLow, gHigh;
 PetscInt *gBCIndices, lBCSize, gBCSize, gbcLow, gbcHigh;
 PetscBool doMisfit = PETSC_FALSE;
@@ -36,7 +37,7 @@ extern PetscErrorCode forwardStep(PetscScalar tc, PetscInt iLoop, PetscScalar dt
                                   PetscBool useForcingFromFile, PetscBool useExternalForcing, PetscBool usePrescribedBC, 
                                   Vec *v, Mat Ae, Mat Ai, Mat Be, Mat Bi, Vec *uf, Vec *uef, Vec *bcc, Vec *bcf, Vec *vtmp);
 
-extern PetscErrorCode iniTMMWrite(PetscScalar tc, PetscInt it, PetscInt ntr, Vec *v, PetscBool append);
+extern PetscErrorCode iniTMMWrite(PetscScalar tc, PetscInt it, PetscInt ntr, Vec *v);
 extern PetscErrorCode doTMMWrite(PetscScalar tc, PetscInt it, PetscInt ntr, Vec *v);
 extern PetscErrorCode finalizeTMMWrite(PetscScalar tc, PetscInt it, PetscInt ntr);
 
@@ -101,7 +102,6 @@ int main(int argc,char **args)
   PetscBool writePickup = PETSC_FALSE;
   StepTimer pickupTimer;
   char outTimeFile[PETSC_MAX_PATH_LEN];  
-  PetscBool appendOutput = PETSC_FALSE;
   PetscFileMode OUTPUT_FILE_MODE;
   PetscBool doWriteBC = PETSC_FALSE;
   PetscBool doWriteUF = PETSC_FALSE;
@@ -201,7 +201,7 @@ int main(int argc,char **args)
 /*Data for time averaging */
   ierr = PetscOptionsHasName(NULL,NULL,"-time_avg",&doTimeAverage);CHKERRQ(ierr);
   if (doTimeAverage) {
-    ierr = iniStepTimer("avg_", Iter0, &avgTimer);CHKERRQ(ierr);
+    ierr = iniStepTimer("avg_", Iter0+1, &avgTimer);CHKERRQ(ierr);
 	for (itr=0; itr<numTracers; itr++) {
 	  avgOutFile[itr] = (char *) malloc(PETSC_MAX_PATH_LEN*sizeof(char));
 	}
@@ -211,7 +211,7 @@ int main(int argc,char **args)
 	if (maxValsToRead != numTracers) {
 	  SETERRQ(PETSC_COMM_WORLD,1,"Insufficient number of time average file names specified");
 	}  
-	ierr = PetscPrintf(PETSC_COMM_WORLD,"Time averages will be computed starting at (and including) time step: %d\n", avgTimer.startTimeStep);CHKERRQ(ierr);
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Time averages will be computed starting at and including (absolute) time step: %d\n", avgTimer.startTimeStep);CHKERRQ(ierr);
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Time averages will be computed over %d time steps\n", avgTimer.numTimeSteps);CHKERRQ(ierr);	
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Time averages will be written to:\n");CHKERRQ(ierr);
 	for (itr=0; itr<numTracers; itr++) {
@@ -908,7 +908,7 @@ int main(int argc,char **args)
 	}  
   }
 
-  ierr = iniTMMWrite(time0,Iter0,numTracers,v,appendOutput);CHKERRQ(ierr);
+  ierr = iniTMMWrite(time0,Iter0,numTracers,v);CHKERRQ(ierr);
 
 /* initialize monitor */
   ierr = PetscOptionsHasName(NULL,NULL,"-monitor",&useMonitor);CHKERRQ(ierr);
@@ -951,15 +951,33 @@ int main(int argc,char **args)
 
   if (!appendOutput) {
     ierr = PetscFOpen(PETSC_COMM_WORLD,outTimeFile,"w",&fptime);CHKERRQ(ierr);  
-    ierr = PetscFPrintf(PETSC_COMM_WORLD,fptime,"%d   %10.5f\n",Iter0,time0);CHKERRQ(ierr);     
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing output at time %10.5f, step %d\n", time0,Iter0);CHKERRQ(ierr);  
-    for (itr=0; itr<numTracers; itr++) {       
-      ierr = VecView(v[itr],fdout[itr]);CHKERRQ(ierr);
-    }
+	if (Iter0==writeTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+	  ierr = PetscFPrintf(PETSC_COMM_WORLD,fptime,"%d   %10.5f\n",Iter0,time0);CHKERRQ(ierr);     
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing output at time %10.5f, step %d\n", time0,Iter0);CHKERRQ(ierr);  
+	  for (itr=0; itr<numTracers; itr++) {       
+		ierr = VecView(v[itr],fdout[itr]);CHKERRQ(ierr);
+	  }
+	}  
   } else {
-	  ierr = PetscFOpen(PETSC_COMM_WORLD,outTimeFile,"a",&fptime);CHKERRQ(ierr);  
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"Opening file(s) for output. Initial condition will NOT be written\n");CHKERRQ(ierr);  
+	ierr = PetscFOpen(PETSC_COMM_WORLD,outTimeFile,"a",&fptime);CHKERRQ(ierr);
+	if (Iter0==writeTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Opening file(s) for output. Initial condition will NOT be written\n");CHKERRQ(ierr);  
+	}  
   }
+
+  if (writePickup) {
+	if (Iter0==pickupTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing pickup at time %10.5f, step %d\n", time0, Iter0);CHKERRQ(ierr);
+	  strcpy(tmpFile,"");
+	  sprintf(tmpFile,"pickup_%d.petsc",Iter0);
+	  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,tmpFile,FILE_MODE_WRITE,&fdp);CHKERRQ(ierr);
+	  for (itr=0; itr<numTracers; itr++) {
+		ierr = VecView(v[itr],fdp);CHKERRQ(ierr);
+	  }
+	  ierr = PetscViewerDestroy(&fdp);CHKERRQ(ierr);      
+	}
+  }
+  
 #endif
 
   if (doTimeAverage) {  
@@ -1168,53 +1186,65 @@ int main(int argc,char **args)
 
 /* write output */
 #if !defined (FORSPINUP) && !defined (FORJACOBIAN)
+	if (Iter0+iLoop>writeTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+/*    We do this here in case writeExternalForcing etc want to use writeTimer */	
+	  if (writeTimer.count<writeTimer.numTimeSteps) {
+	    writeTimer.count++;
+	  }
+    }
     if (applyExternalForcing) {
       ierr = writeExternalForcing(tc,iLoop,numTracers,v,uef);CHKERRQ(ierr);
     }
     if (doCalcBC) {
       ierr = writeBC(tc,iLoop,numTracers,v,bcc,bcf);CHKERRQ(ierr); 
     }
+
 	if (Iter0+iLoop>=writeTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
-	  if (writeTimer.count<=writeTimer.numTimeSteps) {
-	    writeTimer.count++;
-	  }
-	  if (writeTimer.count==writeTimer.numTimeSteps) { /* time to write out */
-		ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
-		ierr = PetscFPrintf(PETSC_COMM_WORLD,fptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
-		for (itr=0; itr<numTracers; itr++) {
-		  ierr = VecView(v[itr],fdout[itr]);CHKERRQ(ierr);
-		}
+	  if ((writeTimer.count==writeTimer.numTimeSteps) || (Iter0+iLoop==writeTimer.startTimeStep)) { /* time to write out */
+	
+		 ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
+		 ierr = PetscFPrintf(PETSC_COMM_WORLD,fptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
+		 for (itr=0; itr<numTracers; itr++) {
+		   ierr = VecView(v[itr],fdout[itr]);CHKERRQ(ierr);
+		 }
 
-		if (doWriteUF) {
-		  for (itr=0; itr<numTracers; itr++) {
-			ierr = VecView(uf[itr],fdufout[itr]);CHKERRQ(ierr);
-		  }
-		}
+		 if (doWriteUF) {
+		   for (itr=0; itr<numTracers; itr++) {
+			 ierr = VecView(uf[itr],fdufout[itr]);CHKERRQ(ierr);
+		   }
+		 }
 
-		if (doWriteUEF) {
-		  for (itr=0; itr<numTracers; itr++) {
-			ierr = VecView(uef[itr],fduefout[itr]);CHKERRQ(ierr);
-		  }
-		}
+		 if (doWriteUEF) {
+		   for (itr=0; itr<numTracers; itr++) {
+			 ierr = VecView(uef[itr],fduefout[itr]);CHKERRQ(ierr);
+		   }
+		 }
 	  
 		if (doWriteBC) {
 		  for (itr=0; itr<numTracers; itr++) {
 			ierr = VecView(bcf[itr],fdbcout[itr]);CHKERRQ(ierr);
 		  }
 		}
-
+		
+      }
+      
+      if (writeTimer.count==writeTimer.numTimeSteps) {
 		ierr = updateStepTimer("write_", Iter0+iLoop, &writeTimer);CHKERRQ(ierr);
-	  }
+      }
+      
     }
     
     ierr = doTMMWrite(tc,iLoop,numTracers,v);CHKERRQ(ierr);
 
     if (writePickup) {
-	  if (Iter0+iLoop>=pickupTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
-		if (pickupTimer.count<=pickupTimer.numTimeSteps) {
+	  if (Iter0+iLoop>pickupTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+		if (pickupTimer.count<pickupTimer.numTimeSteps) {
 		  pickupTimer.count++;
 		}
-		if (pickupTimer.count==pickupTimer.numTimeSteps) { /* time to write out */
+      }		
+
+	  if (Iter0+iLoop>=pickupTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+        if ((pickupTimer.count==pickupTimer.numTimeSteps) || (Iter0+iLoop==pickupTimer.startTimeStep)) { /* time to write out */
 		  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing pickup at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
 		  strcpy(tmpFile,"");
 		  sprintf(tmpFile,"pickup_%d.petsc",Iter0+iLoop);
@@ -1223,7 +1253,9 @@ int main(int argc,char **args)
 			ierr = VecView(v[itr],fdp);CHKERRQ(ierr);
 		  }
 		  ierr = PetscViewerDestroy(&fdp);CHKERRQ(ierr);      
+        }
 
+        if (pickupTimer.count==pickupTimer.numTimeSteps) {
 		  ierr = updateStepTimer("pickup_", Iter0+iLoop, &pickupTimer);CHKERRQ(ierr);
 		}
 	  }
@@ -1272,7 +1304,7 @@ int main(int argc,char **args)
 #ifdef FORJACOBIAN
     if (doTimeAverage) {
 	  if (Iter0+iLoop>=avgTimer.startTimeStep) { /* start time averaging (note: startTimeStep is ABSOLUTE time step) */
-		if (avgTimer.count<=avgTimer.numTimeSteps) { /* still within same averaging block so accumulate */
+		if (avgTimer.count<avgTimer.numTimeSteps) { /* still within same averaging block so accumulate */
 		  for (itr=0; itr<numTracers; itr++) {
 			ierr = VecAXPY(vavg[itr],one,uef[itr]);CHKERRQ(ierr);
 		  }          
@@ -1362,7 +1394,7 @@ int main(int argc,char **args)
 #ifndef FORJACOBIAN    
     if (doTimeAverage) {
       if (Iter0+iLoop>=avgTimer.startTimeStep) { /* start time averaging (note: startTimeStep is ABSOLUTE time step) */
-        if (avgTimer.count<=avgTimer.numTimeSteps) { /* still within same averaging block so accumulate */
+        if (avgTimer.count<avgTimer.numTimeSteps) { /* still within same averaging block so accumulate */
 /*           ierr = PetscPrintf(PETSC_COMM_WORLD,"Accumulating for time average\n");CHKERRQ(ierr);               */
 		  for (itr=0; itr<numTracers; itr++) {
 			ierr = VecAXPY(vavg[itr],one,v[itr]);CHKERRQ(ierr);

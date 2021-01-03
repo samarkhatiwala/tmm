@@ -66,9 +66,6 @@ Ssteady=gridToMatrix(Sgcm,[],boxFile,gridFile);
 
 clear Tgcm Sgcm % make some space
 
-Ts=Tsteady(Ii,:);
-Ss=Ssteady(Ii,:);
-
 % Boundary conditions
 Cbc{1}=Tsteady(Ib,:);
 Cbc{2}=Ssteady(Ib,:);

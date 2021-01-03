@@ -63,7 +63,7 @@ PetscErrorCode iniPeriodicTimer( const char pre[], PeriodicTimer *thetimer )
     
 }
 
-PetscErrorCode iniStepTimer( const char pre[], PetscInt Iter0, StepTimer *thetimer )
+PetscErrorCode iniStepTimer( const char pre[], PetscInt startTimeStep, StepTimer *thetimer )
 {
 
     PetscErrorCode ierr;
@@ -72,9 +72,12 @@ PetscErrorCode iniStepTimer( const char pre[], PetscInt Iter0, StepTimer *thetim
     PetscInt tmparr[MAX_NUM_INTERVALS];
 
 /*  read time step data */
-    thetimer->startTimeStep = Iter0 + 1; /* by default we start at first time step */
+    thetimer->startTimeStep = startTimeStep; /* by default we start at first time step */
     ierr = PetscOptionsGetInt(NULL,pre,"-start_time_step",&thetimer->startTimeStep,&flg);CHKERRQ(ierr);
-	ierr = PetscPrintf(PETSC_COMM_WORLD,"Start time step for StepTimer object %s is %d\n", pre, thetimer->startTimeStep);CHKERRQ(ierr);	  
+    if (thetimer->startTimeStep < startTimeStep) {
+      SETERRQ2(PETSC_COMM_WORLD,1,"Specified start time step for StepTimer object %s is < %d",pre,startTimeStep);
+    }  
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Start time step (absolute) for StepTimer object %s is %d\n", pre, thetimer->startTimeStep);CHKERRQ(ierr);	  
 
     thetimer->maxNumIntervals=MAX_NUM_INTERVALS;
     ierr = PetscOptionsGetIntArray(NULL,pre,"-time_steps",tmparr,&thetimer->maxNumIntervals,&flg);CHKERRQ(ierr);
@@ -127,7 +130,7 @@ PetscErrorCode updateStepTimer( const char pre[], PetscInt Iter, StepTimer *thet
     PetscBool endOfSequence = PETSC_TRUE;
     PetscErrorCode ierr;
     
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"Updating StepTimer object %s at iter %d\n", pre,Iter);CHKERRQ(ierr);        
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"Updating StepTimer object %s at (absolute) time step %d\n", pre,Iter);CHKERRQ(ierr);        
 
 	thetimer->count=0; /* reset counter */
     thetimer->haveResetStartTimeStep=PETSC_FALSE;
@@ -142,13 +145,13 @@ PetscErrorCode updateStepTimer( const char pre[], PetscInt Iter, StepTimer *thet
         endOfSequence = PETSC_FALSE;
       }       
       thetimer->numTimeSteps=thetimer->timeIntervals[thetimer->currInterval];
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"New interval for StepTimer object %s at iter %d is %d\n", pre,Iter,thetimer->numTimeSteps);CHKERRQ(ierr);
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"New interval for StepTimer object %s at (absolute) time step %d is %d\n", pre,Iter,thetimer->numTimeSteps);CHKERRQ(ierr);
     }
 
     if ((thetimer->startTimeStepResetFreq > 0) && (endOfSequence)) {
       thetimer->startTimeStep = thetimer->startTimeStep + thetimer->startTimeStepResetFreq;
       thetimer->haveResetStartTimeStep=PETSC_TRUE;
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"New start time step for StepTimer object %s is %d\n", pre, thetimer->startTimeStep);CHKERRQ(ierr);
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"New start time step (absolute) for StepTimer object %s is %d\n", pre, thetimer->startTimeStep);CHKERRQ(ierr);
     }
 
     return 0;

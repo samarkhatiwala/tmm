@@ -137,8 +137,8 @@ PetscErrorCode iniCalcBC(PetscScalar tc, PetscInt Iterc, PetscScalar tf, PetscIn
     ierr = VecGetArray(TReqdiag,&localTReqdiag);CHKERRQ(ierr);
   
 /*Data for diagnostics */
-    ierr = iniStepTimer("diag_", Iter0, &diagTimer);CHKERRQ(ierr);
-	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed starting at (and including) time step: %d\n", diagTimer.startTimeStep);CHKERRQ(ierr);	
+    ierr = iniStepTimer("diag_", Iter0+1, &diagTimer);CHKERRQ(ierr);
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed starting at and including (absolute) time step: %d\n", diagTimer.startTimeStep);CHKERRQ(ierr);	
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed over %d time steps\n", diagTimer.numTimeSteps);CHKERRQ(ierr);	
     
 	ierr = VecDuplicate(TR,&TRsatanomdiag);CHKERRQ(ierr);
@@ -259,7 +259,7 @@ PetscErrorCode writeBC(PetscScalar tc, PetscInt iLoop, PetscInt numTracers, Vec 
   if (calcDiagnostics) {  
 	if (Iter0+iLoop>=diagTimer.startTimeStep) { /* start time averaging (note: startTimeStep is ABSOLUTE time step) */  
   
-	  if (diagTimer.count<=diagTimer.numTimeSteps) { /* still within same averaging block so accumulate */
+	  if (diagTimer.count<diagTimer.numTimeSteps) { /* still within same averaging block so accumulate */
 
 		ierr = VecAXPY(TRsatanomdiagavg,one,TRsatanomdiag);CHKERRQ(ierr);	  
 		ierr = VecAXPY(TReqdiagavg,one,TReqdiag);CHKERRQ(ierr);	  

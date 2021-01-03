@@ -48,6 +48,8 @@ to append output (-append_extra), their output times (-time_file_extra XX, defau
 object with prefix "write_extra". All StepTimer object options are supported 
 (-write_extra_start_time_step, -write_start_time_step_reset_freq). See Sec #10.
 
+IMPORTANT: See the note at the end of Sec #10.
+
 6) At the end of every run, the driver writes out a restart or pickup file that contains 
 the tracer fields at the end of the integration. By default it is called 'pickup.petsc'. 
 But you can specify the name of this file with the -pickup_out XX option, where XX is 
@@ -227,8 +229,20 @@ several aspects of the averaging (or anything else the timer object is used for)
 
 Everything described above for the averaging step timer object applies to any step timer object. Thus, for any 
 step timer object with prefix PREFIX (e.g., "write", "pickup", "write_extra"), the following command line options 
-can be specified: -PREFIX_time_steps, -PREFIX_start_time_step and -PREFIX_start_time_step_reset_freq.
- 
+can be specified: -PREFIX_time_steps, -PREFIX_start_time_step and -PREFIX_start_time_step_reset_freq. However, 
+see the note below.
+
+IMPORTANT: step timer objects for writing out instantaneous outputs at specific time steps work slightly different 
+from those used for time averaging. In particular, for objects such as -write_, -write_extra, -pickup_, -atm_write_, 
+etc, in the -PREFIX_start_time_step NN option, NN can be set to any value >= Iter0. If -PREFIX_start_time_step is 
+not given, NN will default to Iter0 (0 or that set via the -iter0 option). This means that the initial field of 
+whatever it is you're writing out (corresponding to absolute time step Iter0) can also be written out (and will be 
+by default if you don't specify -PREFIX_start_time_step). To handle this correctly requires a few extra lines of 
+code so if you're trying to add a step time object to your own model have a look at tmm_write.c (and the associated 
+calls in tmm_main.c). On the other hand, for timer objects used to do averaging, NN can be set to any value > Iter0. 
+If -PREFIX_start_time_step is not given, NN will default to Iter0+1 so that time averaging starts at and includes 
+the first time step.
+
 11) Forcings: In addition to transporting tracers you can include source/sink terms ("forcings"). The TMM 
 driver allows this to be specified in three ways, any combination of which can be turned on: 
  a) Forcing term read from file (can be periodic, constant, or time-dependent) with: -forcing_from_file

@@ -128,8 +128,6 @@ PetscScalar Fland = 0.0, Focean=0.0;
 StepTimer atmWriteTimer;
 PetscBool atmAppendOutput;
 FILE *atmfptime;
-PetscViewer atmfd;
-int atmfp;
 char atmOutTimeFile[PETSC_MAX_PATH_LEN];  
 PetscScalar pCO2atmavg, Foceanavg, Flandavg, landStateavg[3];
 
@@ -172,8 +170,8 @@ char diagOutTimeFile[PETSC_MAX_PATH_LEN];
 #define MAXDIAGS2d 40
 #define MAXDIAGS3d 40
 PetscScalar *localDiag2davg[MAXDIAGS2d];
-Vec *Diag3d, *Diag3davg;
-PetscScalar **localDiag3d, **localDiag3davg;
+Vec *Diag3davg;
+PetscScalar **localDiag3davg;
 PetscInt numDiags2d = 0, numDiags3d = 0, id2d, id3d;
 PetscViewer fddiag3dout[MAXDIAGS3d];
 char *Diag2dFile[MAXDIAGS2d], *Diag3dFile[MAXDIAGS3d];
@@ -636,16 +634,20 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
   if (!atmAppendOutput) {
 	ierr = PetscFOpen(PETSC_COMM_WORLD,atmOutTimeFile,"w",&atmfptime);CHKERRQ(ierr);  
-	ierr = PetscFPrintf(PETSC_COMM_WORLD,atmfptime,"%d   %10.5f\n",Iter0,time0);CHKERRQ(ierr);     
-	ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing atmospheric output at time %10.5f, step %d\n", tc,Iter);CHKERRQ(ierr);  
-	ierr = writeBinaryScalarData("pCO2atm_output.bin",&pCO2atm,1,PETSC_FALSE);
+	if (Iter0==atmWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+	  ierr = PetscFPrintf(PETSC_COMM_WORLD,atmfptime,"%d   %10.5f\n",Iter0,time0);CHKERRQ(ierr);     
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing atmospheric output at time %10.5f, step %d\n", tc,Iter);CHKERRQ(ierr);  
+	  ierr = writeBinaryScalarData("pCO2atm_output.bin",&pCO2atm,1,PETSC_FALSE);
 #if defined O_carbon_13_coupled
-	ierr = writeBinaryScalarData("pC13O2atm_output.bin",&pC13O2atm,1,PETSC_FALSE);
-	ierr = writeBinaryScalarData("dc13atm_output.bin",&dc13atm,1,PETSC_FALSE);
+	  ierr = writeBinaryScalarData("pC13O2atm_output.bin",&pC13O2atm,1,PETSC_FALSE);
+	  ierr = writeBinaryScalarData("dc13atm_output.bin",&dc13atm,1,PETSC_FALSE);
 #endif	
+	}
   } else {
 	ierr = PetscFOpen(PETSC_COMM_WORLD,atmOutTimeFile,"a",&atmfptime);CHKERRQ(ierr);  
-	ierr = PetscPrintf(PETSC_COMM_WORLD,"Atmospheric model output will be appended. Initial condition will NOT be written\n");CHKERRQ(ierr);      
+	if (Iter0==atmWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */      	
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Atmospheric model output will be appended. Initial condition will NOT be written\n");CHKERRQ(ierr);      
+	}  
   }
 
   ierr = PetscOptionsHasName(NULL,NULL,"-use_land_model",&useLandModel);CHKERRQ(ierr);
@@ -930,13 +932,17 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 
   if (!sedAppendOutput) {
 	ierr = PetscFOpen(PETSC_COMM_WORLD,sedOutTimeFile,"w",&sedfptime);CHKERRQ(ierr);  
-	ierr = PetscFPrintf(PETSC_COMM_WORLD,sedfptime,"%d   %10.5f\n",Iter0,time0);CHKERRQ(ierr);     
-	ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing sediment output at time %10.5f, step %d\n", tc,Iter);CHKERRQ(ierr);
-	ierr = VecView(sedMixedTracers,sedmixedfd);CHKERRQ(ierr);
-	ierr = VecView(sedBuriedTracers,sedburiedfd);CHKERRQ(ierr);
+	if (Iter0==sedWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+	  ierr = PetscFPrintf(PETSC_COMM_WORLD,sedfptime,"%d   %10.5f\n",Iter0,time0);CHKERRQ(ierr);     
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing sediment output at time %10.5f, step %d\n", tc,Iter);CHKERRQ(ierr);
+	  ierr = VecView(sedMixedTracers,sedmixedfd);CHKERRQ(ierr);
+	  ierr = VecView(sedBuriedTracers,sedburiedfd);CHKERRQ(ierr);
+	}  
   } else {
 	ierr = PetscFOpen(PETSC_COMM_WORLD,sedOutTimeFile,"a",&sedfptime);CHKERRQ(ierr);  
-	ierr = PetscPrintf(PETSC_COMM_WORLD,"Sediment model output will be appended. Initial condition will NOT be written\n");CHKERRQ(ierr);      
+	if (Iter0==sedWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */      		
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Sediment model output will be appended. Initial condition will NOT be written\n");CHKERRQ(ierr);      
+	}  
   }
 
 /* File name for final pickup */
@@ -960,8 +966,8 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = PetscOptionsHasName(NULL,NULL,"-calc_diagnostics",&calcDiagnostics);CHKERRQ(ierr);
   if (calcDiagnostics) {    
 /*Data for diagnostics */
-    ierr = iniStepTimer("diag_", Iter0, &diagTimer);CHKERRQ(ierr);
-	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed starting at (and including) time step: %d\n", diagTimer.startTimeStep);CHKERRQ(ierr);	
+    ierr = iniStepTimer("diag_", Iter0+1, &diagTimer);CHKERRQ(ierr);
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed starting at and including (absolute) time step: %d\n", diagTimer.startTimeStep);CHKERRQ(ierr);	
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Diagnostics will be computed over %d time steps\n", diagTimer.numTimeSteps);CHKERRQ(ierr);	
 
 	ierr = PetscOptionsHasName(NULL,NULL,"-diag_append",&diagAppendOutput);CHKERRQ(ierr);
@@ -1293,22 +1299,6 @@ PetscScalar totlocalweathflx;
 #if defined O_carbon_13_coupled
   MPI_Allreduce(&localF13ocean, &F13ocean, 1, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD);
 #endif  
-  if (Iter0+iLoop>=atmWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
-	if (atmWriteTimer.count<=atmWriteTimer.numTimeSteps) {
-	  atmWriteTimer.count++;
-	}
-	if (atmWriteTimer.count==atmWriteTimer.numTimeSteps) { /* time to write out */
-	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Focean: %d = %10.5f\n", Iter, Focean);CHKERRQ(ierr);
-	  ierr = PetscPrintf(PETSC_COMM_WORLD,"pCO2atm: %d = %10.5f\n", Iter, pCO2atm);CHKERRQ(ierr);
-#if defined O_carbon_13_coupled    
-	  ierr = PetscPrintf(PETSC_COMM_WORLD,"F13ocean: %d = %10.5f\n", Iter, F13ocean);CHKERRQ(ierr);
-	  ierr = PetscPrintf(PETSC_COMM_WORLD,"pC13O2atm: %d = %10.5f\n", Iter, pC13O2atm);CHKERRQ(ierr); 
-	  dc13atm=dc13Func(pC13O2atm,pCO2atm);
-	  ierr = PetscPrintf(PETSC_COMM_WORLD,"dc13atm: %d = %10.5f\n", Iter, dc13atm);CHKERRQ(ierr);        
-#endif    
-//    note: we update the StepTimer later in writeExternalForcing
-	}
-  }
     
   if (useLandModel) {
 /*	landsource_(&landState[0],&pCO2atm,&landUseEmission,&deltaTsg,&Fland,&landSource[0]); */ /* returns S and Fl in PgC/y */
@@ -1333,7 +1323,7 @@ PetscScalar totlocalweathflx;
 	MPI_Allreduce(&totlocalweathflx, &globalweathflx, 1, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD);
 	ierr = PetscPrintf(PETSC_COMM_WORLD,"Global weathering flux: %d = %g umol C/s\n", Iter, globalweathflx);CHKERRQ(ierr);  
   }	
-#endif  
+#endif
 #endif
 
   for (itr=0; itr<numTracers; itr++) {  
@@ -1371,15 +1361,30 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
 #if defined O_carbon
 #if defined O_TMM_interactive_atmosphere
 /* write instantaneous atmos model state */
+  if (Iter0+iLoop>atmWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+	if (atmWriteTimer.count<atmWriteTimer.numTimeSteps) {
+	  atmWriteTimer.count++;
+	}
+  }
+
   if (Iter0+iLoop>=atmWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
-	if (atmWriteTimer.count==atmWriteTimer.numTimeSteps) { /* time to write out */
-//    note: we've already incremented the count above	
+	if ((atmWriteTimer.count==atmWriteTimer.numTimeSteps) || (Iter0+iLoop==atmWriteTimer.startTimeStep)) { /* time to write out */
+//    NOTE: Focean and F13ocean were computed at the start of the current time step, whereas pCO2atm and pC13O2atm
+//    are the updated values at the end of the time step. Hence the offset of one time step below.
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Focean: %d = %10.5f\n", Iter0+iLoop-1, Focean);CHKERRQ(ierr);
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"pCO2atm: %d = %10.5f\n", Iter0+iLoop, pCO2atm);CHKERRQ(ierr);
+#if defined O_carbon_13_coupled
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"F13ocean: %d = %10.5f\n", Iter0+iLoop-1, F13ocean);CHKERRQ(ierr);
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"pC13O2atm: %d = %10.5f\n", Iter0+iLoop, pC13O2atm);CHKERRQ(ierr); 
+	  dc13atm=dc13Func(pC13O2atm,pCO2atm);	
+	  ierr = PetscPrintf(PETSC_COMM_WORLD,"dc13atm: %d = %10.5f\n", Iter0+iLoop, dc13atm);CHKERRQ(ierr);        
+#endif
+	  
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing atmospheric model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
 	  ierr = PetscFPrintf(PETSC_COMM_WORLD,atmfptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);           
 	  ierr = writeBinaryScalarData("pCO2atm_output.bin",&pCO2atm,1,PETSC_TRUE);
 #if defined O_carbon_13_coupled
 	  ierr = writeBinaryScalarData("pC13O2atm_output.bin",&pC13O2atm,1,PETSC_TRUE);
-	  dc13atm=dc13Func(pC13O2atm,pCO2atm);	
 	  ierr = writeBinaryScalarData("dc13atm_output.bin",&dc13atm,1,PETSC_TRUE);	
 #endif
 
@@ -1393,22 +1398,29 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
 		ierr = writeBinaryScalarData("land_state_output.bin",landState,3,PETSC_TRUE);
 	  }
 
+	}
+
+	if (atmWriteTimer.count==atmWriteTimer.numTimeSteps) {
 	  ierr = updateStepTimer("atm_write_", Iter0+iLoop, &atmWriteTimer);CHKERRQ(ierr);
-	  
 	}
   }
+
 #endif
 #endif /* O_carbon */
 
 #ifdef O_sed
 /*    write instantaneous sediment model state */
-  if (Iter0+iLoop>=sedWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
-	if (sedWriteTimer.count<=sedWriteTimer.numTimeSteps) {
+  if (Iter0+iLoop>sedWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+	if (sedWriteTimer.count<sedWriteTimer.numTimeSteps) {
 	  sedWriteTimer.count++;
 	}
-	if (sedWriteTimer.count==sedWriteTimer.numTimeSteps) { /* time to write out */
-      mobi_sed_copy_data_(&lNumProfiles,&localSedMixedTR[0],&localSedBuriedTR[0],&fromModel);
-  
+  }
+
+  if (Iter0+iLoop>=sedWriteTimer.startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
+	if ((sedWriteTimer.count==sedWriteTimer.numTimeSteps) || (Iter0+iLoop==sedWriteTimer.startTimeStep)) { /* time to write out */
+
+	  mobi_sed_copy_data_(&lNumProfiles,&localSedMixedTR[0],&localSedBuriedTR[0],&fromModel);
+
 	  ierr = VecSetValues(sedMixedTracers,lSedMixedSize,gSedMixedIndices,localSedMixedTR,INSERT_VALUES);CHKERRQ(ierr);
 	  ierr = VecAssemblyBegin(sedMixedTracers);CHKERRQ(ierr);
 	  ierr = VecAssemblyEnd(sedMixedTracers);CHKERRQ(ierr);    
@@ -1420,9 +1432,11 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt iLoop, PetscInt num
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing sediment model output at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
 	  ierr = VecView(sedMixedTracers,sedmixedfd);CHKERRQ(ierr);
 	  ierr = VecView(sedBuriedTracers,sedburiedfd);CHKERRQ(ierr);
+	  
+	}
 
+	if (sedWriteTimer.count==sedWriteTimer.numTimeSteps) {
 	  ierr = updateStepTimer("sed_write_", Iter0+iLoop, &sedWriteTimer);CHKERRQ(ierr);
-
 	}
   }
 #endif
@@ -1549,6 +1563,13 @@ PetscErrorCode finalizeExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt n
 
   if (calcDiagnostics) {      
     mobi_diags_finalize_(&debugFlag);
+
+	if (numDiags2d>0) {
+	  for (id2d=0; id2d<numDiags2d; id2d++) {
+		PetscFree(localDiag2davg[id2d]);
+	  }	
+    }
+    
 	if (numDiags3d>0) {    
 	  ierr = VecDestroyVecs(numDiags3d,&Diag3davg);CHKERRQ(ierr);  
 	  for (id3d=0; id3d<numDiags3d; id3d++) {
