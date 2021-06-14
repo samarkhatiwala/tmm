@@ -28,6 +28,7 @@ typedef struct {
 
 typedef struct {
   Vec utd[2];
+  PetscInt vecLength;
   PetscBool firstTime;
   PetscInt itcurr;
 } TimeDependentVec;
@@ -52,11 +53,13 @@ extern PetscErrorCode destroyPeriodicVec(PeriodicVec *user);
 extern PetscErrorCode destroyPeriodicMat(PeriodicMat *user);
 extern PetscErrorCode destroyPeriodicArray(PeriodicArray *user);
 
-extern PetscErrorCode interpTimeDependentVector(PetscScalar tc, Vec *u, PetscInt numTracers, PetscInt nt, PetscScalar *t, Vec **ut);
+extern PetscErrorCode interpTimeDependentVector(PetscScalar tc, Vec *u, PetscInt N, 
+                                                PetscScalar *tdp, TimeDependentVec *user, const char *fileName);
 
 extern PetscErrorCode interpTimeDependentMatrix(PetscScalar tc, Mat *A, PetscInt N, 
                                                 PetscScalar *tdp, TimeDependentMat *user, const char *fileName);
 extern PetscErrorCode destroyTimeDependentMat(TimeDependentMat *user);
+extern PetscErrorCode destroyTimeDependentVec(TimeDependentVec *user);
 extern PetscErrorCode destroyTimeDependentArray(TimeDependentArray *user);
 
 extern PetscErrorCode writeBinaryScalarData(const char *fileName, PetscScalar *arr, PetscInt N, PetscBool appendToFile);

@@ -322,28 +322,58 @@ PetscErrorCode destroyTimeDependentArray(TimeDependentArray *user)
 
 #undef __FUNCT__
 #define __FUNCT__ "interpTimeDependentVector"
-PetscErrorCode interpTimeDependentVector(PetscScalar tc, Vec *u, PetscInt numTracers, 
-                                      PetscInt nt, PetscScalar *t, Vec **ut)
+PetscErrorCode interpTimeDependentVector(PetscScalar tc, Vec *u, PetscInt numTimes, PetscScalar *tdt, 
+                                    TimeDependentVec *user, const char *fileName)
 {
+/* Function to interpolate a time-dependent vector. */
+/* tc is the current time and numTimes are the number of time slices (in tdt) at */
+/* at which data are available. */
+/* IMPORTANT: Vector *u MUST have been created and preallocated before  */
+/* calling this routine. All other vectors will be created using *u as a template.  */
 
-  PetscInt itf, itr;
   PetscErrorCode ierr;
-  PetscScalar alpha[2];  
-  PetscScalar zero=0.0;
+  PetscInt itc;
+  PetscViewer fd;    
+  PetscScalar alpha;
 
-  for (itr=0; itr<numTracers; itr++) {
-    ierr = VecSet(u[itr],zero); CHKERRQ(ierr);
+  if (user->firstTime) {
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Initializing TimeDependentVec object %s\n",fileName);CHKERRQ(ierr);
+	ierr = VecDuplicate(*u,&user->utd[0]);CHKERRQ(ierr);
+	ierr = VecDuplicate(*u,&user->utd[1]);CHKERRQ(ierr);
+    ierr = VecGetSize(*u,&user->vecLength);CHKERRQ(ierr);
+	user->itcurr=-1;
+    user->firstTime = PETSC_FALSE;
   }
-  if (tc>=t[0]) {
-    ierr = calcInterpFactor(nt,tc,t,&itf,&alpha[0]); CHKERRQ(ierr);
-    alpha[1]=1.0-alpha[0];
-    for (itr=0; itr<numTracers; itr++) {
-        VecMAXPY(u[itr],2,alpha,&ut[itr][itf]);
-    }
-  } else {
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"Warning: time < %10.5f. Assuming u=0\n", t[0]);CHKERRQ(ierr);
+
+  if ((tc<tdt[0]) || (tc>tdt[numTimes-1])) {
+    SETERRQ(PETSC_COMM_WORLD,1,"Error in interpTimeDependentVector: time out of bound");
   }
+
+  ierr = calcInterpFactor(numTimes,tc,tdt,&itc,&alpha); CHKERRQ(ierr);
+  if (itc != user->itcurr) { /* time to read new bracketing slices: itc uses 0-based, while VecLoadIntoVectorRandomAccess uses 1-based indexing */
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading new bracketing slices for vector %s at time = %g: %d and %d\n",fileName,tc,itc+1,itc+2);CHKERRQ(ierr);
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading vector from file %s\n", fileName);CHKERRQ(ierr);    
+	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,fileName,FILE_MODE_READ,&fd);CHKERRQ(ierr);
+    ierr = VecLoadIntoVectorRandomAccess(fd,user->utd[0], user->vecLength, itc+1);CHKERRQ(ierr);
+    ierr = VecLoadIntoVectorRandomAccess(fd,user->utd[1], user->vecLength, itc+2);CHKERRQ(ierr);
+	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+	user->itcurr=itc;
+  }
+/* interpolate to current time   */
+  ierr = VecAXPBYmy(alpha,1.0-alpha,user->utd[0],user->utd[1],u);CHKERRQ(ierr);  
     
+  return 0;
+}
+
+PetscErrorCode destroyTimeDependentVec(TimeDependentVec *user)
+{
+/* Function to destroy Vec's in a TimeDependentVector struct */
+
+  PetscErrorCode ierr;
+
+  ierr = VecDestroy(&user->utd[0]);CHKERRQ(ierr);
+  ierr = VecDestroy(&user->utd[1]);CHKERRQ(ierr);
+
   return 0;
 }
 

@@ -81,7 +81,23 @@ your desired time origin. You can also optionally specify the corresponding star
 number with -iter0 NN, where NN is an integer (by default 0). These options are useful if, for 
 example, you're restarting a run and want to record the correct output times.
 
-8) As mentioned above, the internal clock is used for interpolating transport matrices and 
+8) Transport matrices:
+ a) To specify the name or prefix of the explicit transport matrix: -me XX, where XX is a string.
+ b) To specify the name or prefix of the implicit transport matrix: -mi XX, where XX is a string.
+
+TMs can be constant, periodic or fully time-dependent. Periodic TMs can be specified with the 
+-periodic_matrix option, and time-dependent ones with -time_dependent_matrix. If neither is 
+specified then TMs are assumed constant and are read from PETSc-formatted sparse matrix files 
+XX and YY specified with -me XX and -mi YY.
+
+If TMs vary in time, the strings specified with -me XX and -mi YY are then interpreted as 
+prefixes for file names of the form XX_NN and YY_NN, where NN is a suffix generated from an 
+integer with the sprintf specifier "%02d". The first file will always be XX_00, etc. For example, 
+for monthly-mean TMs, NN = 00, 01, 02, ..., 11 and the driver will try to read files XX_00, XX_01, 
+..., XX_11 and YY_00, YY_01, ..., YY_11. See the next section for how to specify the times at which 
+the TMs are given.
+
+9) As mentioned above, the internal clock is used for interpolating transport matrices and 
 forcing fields to the current time step. The times at which these TMs and fields are given 
 must also be in the units of the internal clock and for periodic data this requires providing 
 additional information to the TMM driver via a set of extra options. For example, if the unit 
@@ -96,15 +112,6 @@ times via: -matrix_periodic_times_file XX, where XX is the name (string) of a bi
 the times at which the TMs are given (in units of the internal clock). This is useful, for instance, 
 if your year has 365 days with different days per month and you want to tell the driver that the TMs 
 are given at the middle of each month. (See below for how to create such a file.)
-
-Note: If your TMs are equally spaced there is an alternative option with which you can simply specify 
-the spacing: -matrix_cycle_step XX, where XX is a floating point number giving the spacing in units 
-of the internal clock. Thus, if your chosen unit of time is year and you're specifying monthly-mean TMs 
-then the spacing is simply 1/12, i.e.: -matrix_cycle_step 0.0833333333333333. This option is useful if, 
-for example, your year has 360 days and each month is 30 days. Note that you must use specify the value 
-in full double precision (16 decimal places). In Matlab this would be: sprintf('%17.16f',1/12). 
-Be aware though that this is only provided for backward compatibility with legacy run script and it will 
-be deprecated in future releases. You should instead use: -matrix_num_per_period NN as described above.
 
 The binary files with the time specification of periodic fields can be created in Matlab as follows:
 
@@ -136,14 +143,11 @@ end
 
 write_binary('periodic_times_6hourly.bin',t/dpy,'real*8')
 
-9) Transport matrices:
- a) To specify the name or prefix of the explicit transport matrix: -me XX, where XX is a string.
- b) To specify the name or prefix of the implicit transport matrix: -mi XX, where XX is a string.
+For fully time-dependent TMs, the options are -matrix_num_times NN, where NN is 
+the total number of TM files and -matrix_times_file time_file, the name of the 
+binary file with the corresponding times.
 
-If your TMs are periodic in time you must additionally give: -periodic_matrix. The strings specified 
-with -me XX and -mi YY will then be interpreted as prefixes for file names of the form XX_NN and YY_NN, 
-where NN an integer. For monthly-mean TMs, NN = 00, 01, 02, ..., 11 and the driver will try to read 
-PETSc formatted files XX_00, XX_01, ..., XX_11 and YY_00, YY_01, ..., YY_11.
+Note that all binary files must be in IEEE big endian format and 64 bit precision.
 
 10) Time averaging: The driver can optionally accumulate and write out time averages of tracer fields 
 if you specify: -time_avg. You must then also give the names of files to which time-averaged output 
@@ -247,7 +251,8 @@ the first time step.
 driver allows this to be specified in three ways, any combination of which can be turned on: 
  a) Forcing term read from file (can be periodic, constant, or time-dependent) with: -forcing_from_file
  b) External forcing computed in S/R calcExternalForcing: -external_forcing
- c) Prescribed boundary condition (can be periodic, constant, or time-dependent): -prescribed_bc
+ c) Boundary conditions switched on via -prescribed_bc and either calculated (with -calc_bc and calculated 
+ in S/R calcBC) or read from file (periodic, constant, or time-dependent).
 
 Forcing vectors are assumed discrete in time i.e., already multiplied by any physical time step before 
 being read from file or in calcExternalForcing. We consider each in turn below.
@@ -260,54 +265,61 @@ discrete in time i.e., already multiplied by any physical time step.
 There are now three possibilities: 
 i) Periodic forcing: -periodic_forcing
 In this case the file names specified with -forcing_files are interpreted as prefixes as described 
-above (#9) for TMs. Also, as described above (#8) for TMs, you must specify the times at which 
+above (#8) for TMs. Also, as described above (#9) for TMs, you must specify the times at which 
 the periodic forcing is given via the options: -forcing_cycle_period, -forcing_num_per_period 
 and -forcing_periodic_times_file. (These work identically to the corresponding matrix options.)
 
 ii) Time-dependent forcing: -time_dependent_forcing
-In this case you must specify the number of forcing vectors being provided: -number_forcing_vecs NN 
-and the starting time:
-        ierr = PetscOptionsGetReal(PETSC_NULL,"-tfini",&tf0,&flg2);CHKERRQ(ierr);
-        if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate first forcing time with the -tfini option");
-        ierr = PetscOptionsGetReal(PETSC_NULL,"-tfend",&tf1,&flg2);CHKERRQ(ierr);
-        if (!flg2) SETERRQ(PETSC_COMM_WORLD,1,"Must indicate last forcing time with the -tfend option");        
+In this case you must specify the number of forcing vectors being provided: 
+-forcing_num_times NN as well as a binary file (see #9) with their corresponding times via: 
+-forcing_times_file time_file
 
-Given forcing data are assumed to be spaced equally between the starting and ending times.
-Optional:
- ierr = PetscOptionsGetStringArray(PETSC_NULL,"-ouf",ufoutFile,&maxValsToRead,&doWriteUF);CHKERRQ(ierr);
- If -time_avg is specified then must also specify:
-	ierr = PetscOptionsGetStringArray(PETSC_NULL,"-ufavg_files",ufavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
-  
+In this case the file names specified with -forcing_files are interpreted as files that 
+contain ALL NN forcing vectors in each file.
+
 iii) Constant forcing: if neither -periodic_forcing or -time_dependent_forcing are given, the forcing 
 is assumed constant in time.
 
+You can specify a time step after which forcing read from file is switched off via the 
+-forcing_from_file_cutoff_step NN option.
+
+Lastly, if periodic or time dependent forcing is specified, you can write out the (interpolated) 
+forcing vectors via: -ouf file_list. Additionally, if -time_avg is specified, then you must also specify 
+a list of file names to which to write out the time-averaged forcing via -ufavg_files file_list.
+  
 b)  External forcing: If the option -external_forcing is given then the (time discrete) forcing is 
 computed by a user-provided function called calcExternalForcing.
 
-Optional:
- ierr = PetscOptionsGetStringArray(PETSC_NULL,"-ouef",uefoutFile,&maxValsToRead,&doWriteUEF);CHKERRQ(ierr);
- If -time_avg is specified then must also specify:
-	ierr = PetscOptionsGetStringArray(PETSC_NULL,"-uefavg_files",uefavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+You can specify a time step after which external forcing is switched off via the 
+-external_forcing_cutoff_step NN option.
+
+You can write out the calculated external forcing vectors via: -ouef file_list. Additionally, 
+if -time_avg is specified, then you must also specify a list of file names to which to write out the 
+time-averaged forcing via -uefavg_files file_list.
 
 c) Prescribed boundary condition: -prescribed_bc
-read from file (can be periodic, constant, or time-dependent) or computed 'on-the-fly'.
-    ierr = PetscOptionsHasName(PETSC_NULL,"-calc_bc",&doCalcBC);CHKERRQ(ierr);
-        ierr = PetscOptionsGetInt(PETSC_NULL,"-bc_vec_size",&gBCSize,&flg1);CHKERRQ(ierr);
-OR
-    ierr = PetscOptionsGetStringArray(PETSC_NULL,"-bc_files",bcFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
-      ierr = PetscOptionsHasName(PETSC_NULL,"-periodic_bc",&periodicBC);CHKERRQ(ierr);
-      ierr = PetscOptionsHasName(PETSC_NULL,"-time_dependent_bc",&timeDependentBC);CHKERRQ(ierr);
-          ierr = PetscOptionsGetInt(PETSC_NULL,"-number_bc_vecs",&numBC,&flg2);CHKERRQ(ierr);
-          ierr = PetscOptionsGetReal(PETSC_NULL,"-tbcini",&tbc0,&flg2);CHKERRQ(ierr);
-          ierr = PetscOptionsGetReal(PETSC_NULL,"-tbcend",&tbc1,&flg2);CHKERRQ(ierr);
-      constant      
+These can be either calculated (option switched on by -calc_bc and computed in S/R calcBC) or, if -calc_bc is 
+not specified, then read from file. If the BC is being calculated 'on-the-fly', you must specify the length 
+of the BC vector via -bc_vec_size NN. This length NN will be subsequently used to set correct sizes for the 
+boundary TMs (see below). For the second option, you must specify a list of file names via -bc_files.
 
-    ierr = PetscOptionsGetInt(PETSC_NULL,"-bc_cutoff_step",&bcCutOffStep,&flg1);CHKERRQ(ierr);
-	ierr = PetscOptionsGetStringArray(PETSC_NULL,"-obc",bcoutFile,&maxValsToRead,&doWriteBC);CHKERRQ(ierr);
-		ierr = PetscOptionsGetStringArray(PETSC_NULL,"-bcavg_files",bcavgOutFile,&maxValsToRead,&flg1);CHKERRQ(ierr);
+There are three possibilities for reading BCs from file:
+(i) Periodic BC: -periodic_bc
+In this case the file names specified with -bc_files are interpreted as prefixes as described 
+above (#8) for TMs. Also, as described above (#9) for TMs, you must specify the times at which 
+the periodic BCs are given via the options: -bc_cycle_period, -bc_num_per_period 
+and -bc_periodic_times_file. (These work identically to the corresponding matrix options.)
 
-	ierr = PetscOptionsGetString(PETSC_NULL,"-mbe",matbeFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
-	ierr = PetscOptionsGetString(PETSC_NULL,"-mbi",matbiFile,PETSC_MAX_PATH_LEN-1,&flg1);CHKERRQ(ierr);
+(ii) Time-dependent BC: -time_dependent_bc
+In this case you must specify the number of BC vectors being provided: 
+-bc_num_times NN as well as a binary file (see #9) with their corresponding times via: 
+-bc_times_file time_file. (These work identically to the corresponding matrix options.)
 
-    Time info is inherited from main TMs info.
+In this case the file names specified with -bc_files are interpreted as files that 
+contain ALL NN BC vectors in each file.
 
+(iii) Constant BC: if neither of the above options are given.
+
+If prescribed BCs are being used, then you must specify boundary TMs via -mbe and -mbi. These 
+options work similarly to those of the main TMs, i.e., boundary TMs can be constant, periodic 
+or time-dependent. Their characteristics along with any time info are inherited from the main TMs.
