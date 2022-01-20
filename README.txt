@@ -7,10 +7,10 @@ Simply skip to step (3) below. Otherwise keep reading and if you have any
 questions feel free to email: Samar Khatiwala <samar.khatiwala@earth.ox.ac.uk>
 
 How to cite: If you use the TMM, please cite Khatiwala et al. (2005; https://doi.org/10.1016/j.ocemod.2004.04.002) 
-and Khatiwala (2007; https://doi.org/10.1029/2007GB002923). Furthermore, if you use this code please also cite 
-Khatiwala (2018; https://doi.org/10.5281/zenodo.1246300). If you use any of my transport matrices please cite 
-Khatiwala (2007) and the relevant papers listed here: 
-http://kelvin.earth.ox.ac.uk/spk/Research/TMM/TransportMatrixConfigs/. Thank you!
+and Khatiwala (2007; https://doi.org/10.1029/2007GB002923). If you use any of my transport matrices or related 
+data please cite this GitHub page as the source, as well as Khatiwala (2007) and the relevant papers listed here: 
+http://kelvin.earth.ox.ac.uk/spk/Research/TMM/TransportMatrixConfigs/. Furthermore, if you use this code please 
+also cite Khatiwala (2018; https://doi.org/10.5281/zenodo.1246300). Thank you!
 
 IMPORTANT: Please do NOT post the TMM code or any data files downloaded from this or related 
 websites on your own github or other website. You do NOT have permission to do so.
