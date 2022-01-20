@@ -6,9 +6,14 @@ code and interface to models are written using the PETSc framework
 Simply skip to step (3) below. Otherwise keep reading and if you have any 
 questions feel free to email: Samar Khatiwala <samar.khatiwala@earth.ox.ac.uk>
 
+IMPORTANT: Please do NOT post the TMM code or any data files downloaded from this or related 
+websites on your own github or other website. You do NOT have permission to do so.
+
 If you use the TMM, please cite Khatiwala et al. (2005; https://doi.org/10.1016/j.ocemod.2004.04.002) 
 and Khatiwala (2007; https://doi.org/10.1029/2007GB002923). Furthermore, if you use this code 
-please also cite Khatiwala (2018; https://doi.org/10.5281/zenodo.1246300). Thank you!
+please also cite Khatiwala (2018; https://doi.org/10.5281/zenodo.1246300). If you use any of 
+my transport matrices please cite the relevant paper (see 
+http://kelvin.earth.ox.ac.uk/spk/Research/TMM/TransportMatrixConfigs/). Thank you!
 
 For a quick overview of the TMM and the PETSc driver also have a look at this excellent 
 presentation by Iris Kriest: https://ftp.geomar.de/users/ikriest/TMM/MOPS-TMM-2016-June.pdf
@@ -16,9 +21,9 @@ presentation by Iris Kriest: https://ftp.geomar.de/users/ikriest/TMM/MOPS-TMM-20
 Quick-start instructions:
 
 1) Install PETSc (http://www.mcs.anl.gov/petsc/) and set the PETSC_DIR and PETSC_ARCH 
-environment variables. The TMM driver code is compatible with PETSc version 3.13 
-(this is the latest version as of June 12, 2020). For the older version of the TMM 
-code compatible with PETSc 3.6.x, you can checkout branch petsc3.6.
+environment variables. The TMM driver code is compatible with PETSc version 3.16.x 
+(as of Jan 20, 2022). For the older version of the TMM code compatible with PETSc 3.6.x, 
+you can checkout branch petsc3.6.
 
 2) Download Matlab scripts and add to your Matlab path:
 http://kelvin.earth.ox.ac.uk/spk/Research/TMM/tmm_matlab_code.tar.gz
