@@ -18,6 +18,9 @@ for hosting or consulting/support services related to the Software), a
 product or service whose value derives, entirely or substantially, from the 
 functionality of the Software. 
 
+Redistributions of this Software as source code or in binary form must retain 
+the above copyright notice and list of conditions, and the following disclaimer.
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
