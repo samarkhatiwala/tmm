@@ -12,8 +12,10 @@ data please cite this GitHub page as the source, as well as Khatiwala (2007) and
 http://kelvin.earth.ox.ac.uk/spk/Research/TMM/TransportMatrixConfigs/. Furthermore, if you use this code please 
 also cite Khatiwala (2018; https://doi.org/10.5281/zenodo.1246300). Thank you!
 
+License:
+
 IMPORTANT: Please do NOT post the TMM code or any data files downloaded from this or related 
-websites on your own github or other website. You do NOT have permission to do so.
+websites on your own github or other website. See LICENSE.txt for licensing information.
 
 ------------------------------------------------------------------------------------------------
 
