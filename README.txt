@@ -4,12 +4,13 @@ biogeochemical models (under models/) adapted to the TMM framework. The driver
 code and interface to models are written using the PETSc framework 
 (http://www.mcs.anl.gov/petsc/) but you don't need this code to use the TMM. 
 Simply skip to step (3) below. Otherwise keep reading and if you have any 
-questions feel free to email: Samar Khatiwala <samar.khatiwala@earth.ox.ac.uk>
+questions feel free to email: Samar Khatiwala <samkat6@gmail.com>
 
 How to cite: If you use the TMM, please cite Khatiwala et al. (2005; https://doi.org/10.1016/j.ocemod.2004.04.002) 
 and Khatiwala (2007; https://doi.org/10.1029/2007GB002923). If you use any of my transport matrices or related 
-data please cite this GitHub page as the source, as well as Khatiwala (2007) and the relevant papers listed here: 
-http://kelvin.earth.ox.ac.uk/spk/Research/TMM/TransportMatrixConfigs/. Furthermore, if you use this code please 
+data please cite this GitHub page as the source, as well as Khatiwala (2007) and the papers for 
+the relevant transport matrix configurations listed here: 
+https://sites.google.com/view/samarkhatiwala-research-tmm. Furthermore, if you use this code please 
 also cite Khatiwala (2018; https://doi.org/10.5281/zenodo.1246300). Thank you!
 
 License:
@@ -24,23 +25,22 @@ presentation by Iris Kriest: https://ftp.geomar.de/users/ikriest/TMM/MOPS-TMM-20
 
 Quick-start instructions:
 
+The various files (scrips, transport matrices, etc) listed below can be downloaded from: https://sites.google.com/view/samarkhatiwala-research-tmm
+
 1) Install PETSc (http://www.mcs.anl.gov/petsc/) and set the PETSC_DIR and PETSC_ARCH 
 environment variables. The TMM driver code is compatible with PETSc version 3.16.x 
 (as of Jan 20, 2022). For the older version of the TMM code compatible with PETSc 3.6.x, 
 you can checkout branch petsc3.6.
 
-2) Download Matlab scripts and add to your Matlab path:
-http://kelvin.earth.ox.ac.uk/spk/Research/TMM/tmm_matlab_code.tar.gz
+2) Download the Matlab scripts and add to your Matlab path.
 
-3) Download transport matrices and related data for the ocean model of your 
-choice: http://kelvin.earth.ox.ac.uk/spk/Research/TMM/TransportMatrixConfigs/
+3) Download transport matrices and related data for the ocean model of your choice.  
 Currently, there are 3 configurations of MITgcm available online (and several 
-others based on the UVic Earth System Model that I am happy to make available). 
+others based on the UVic Earth System Model that I am happy to make available if you email me). 
 For each, download the TMs and other associated data (e.g., MITgcm_ECCO.tar). 
 Unpack. Make a note of the path to this directory (e.g., /mydisk/somewhere/MITgcm_ECCO). 
 We will need it later. For some experiments you may also find it useful to download 
-some miscellaneous data here (and adjust paths accordingly in the provided Matlab scripts): 
-http://kelvin.earth.ox.ac.uk/spk/Research/TMM/MiscData/
+some miscellaneous data (and adjust paths accordingly in the provided Matlab scripts). 
 
 4) Make a local directory and checkout the TMM driver and model codes:
 cd $HOME
