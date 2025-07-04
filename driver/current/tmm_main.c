@@ -75,7 +75,7 @@ int main(int argc,char **args)
   PeriodicVec Rfsp;
   TimeDependentVec Rfstd;
   
-/* BC's */
+/* BCs */
   Vec *bcc, *bcf;
   PeriodicVec bcp[MAXNUMTRACERS];
   char *bcFile[MAXNUMTRACERS];
@@ -602,7 +602,7 @@ int main(int argc,char **args)
 
 /* Prescribed BCs   */
   if (usePrescribedBC) {
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"Prescribed BC's specified\n");CHKERRQ(ierr);    
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"Prescribed BCs specified\n");CHKERRQ(ierr);    
 
 	ierr = VecCreate(PETSC_COMM_WORLD,&bcTemplateVec);CHKERRQ(ierr);
     
@@ -654,6 +654,11 @@ int main(int argc,char **args)
         ierr=PetscPrintf(PETSC_COMM_WORLD,"Periodic BC from file(s) specified\n");CHKERRQ(ierr);
 /*      read time data */
         ierr = iniPeriodicTimer("bc_", &bcTimer);CHKERRQ(ierr);
+        for (itr=0; itr<numTracers; itr++) {
+          ierr=PetscStrcat(bcFile[itr],"_");CHKERRQ(ierr);        
+          ierr = PetscPrintf(PETSC_COMM_WORLD,"Tracer %d: periodic BC basename is %s\n",itr,bcFile[itr]);CHKERRQ(ierr); 
+          bcp[itr].firstTime = PETSC_TRUE; /* initialize periodic vector */        	    
+        }        
 /*      Load one vector here as a template; BC is read in interpPeriodicVector */
         strcpy(tmpFile,"");
         sprintf(tmpFile,"%s%02d",bcFile[0],0);
@@ -662,25 +667,20 @@ int main(int argc,char **args)
         ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
         ierr = VecDuplicateVecs(bcTemplateVec,numTracers,&bcc);CHKERRQ(ierr);    
         ierr = VecDuplicateVecs(bcTemplateVec,numTracers,&bcf);CHKERRQ(ierr);    
-        for (itr=0; itr<numTracers; itr++) {
-          ierr=PetscStrcat(bcFile[itr],"_");CHKERRQ(ierr);        
-          ierr = PetscPrintf(PETSC_COMM_WORLD,"Tracer %d: periodic BC basename is %s\n",itr,bcFile[itr]);CHKERRQ(ierr); 
-          bcp[itr].firstTime = PETSC_TRUE; /* initialize periodic vector */        	    
-        }      
       } else if (timeDependentBC) {      
 		ierr=PetscPrintf(PETSC_COMM_WORLD,"Time dependent BC specified\n");CHKERRQ(ierr);
 /*      read time data */
 	    ierr = iniTimeDependentTimer("bc_", &bcTimeDependentTimer);CHKERRQ(ierr);
+		for (itr=0; itr<numTracers; itr++) {   
+          ierr = PetscPrintf(PETSC_COMM_WORLD,"Tracer %d: BC will be read from %s\n",itr,bcFile[itr]);CHKERRQ(ierr); 
+		  bctd[itr].firstTime = PETSC_TRUE;
+		}
 /*      Load one vector here as a template; BC is read in interpTimeDependentVector */
 		ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,bcFile[0],FILE_MODE_READ,&fd);CHKERRQ(ierr);
 		ierr = VecLoad(bcTemplateVec,fd);CHKERRQ(ierr);
 		ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
 		ierr = VecDuplicateVecs(bcTemplateVec,numTracers,&bcc);CHKERRQ(ierr);    
 		ierr = VecDuplicateVecs(bcTemplateVec,numTracers,&bcf);CHKERRQ(ierr);    
-		for (itr=0; itr<numTracers; itr++) {   
-          ierr = PetscPrintf(PETSC_COMM_WORLD,"Tracer %d: BC will be read from %s\n",itr,bcFile[itr]);CHKERRQ(ierr); 
-		  bctd[itr].firstTime = PETSC_TRUE;
-		}        
 	  } else { /* constant BC */
 		ierr=PetscPrintf(PETSC_COMM_WORLD,"Constant BC specified\n");CHKERRQ(ierr);      
 		constantBC = PETSC_TRUE;
@@ -826,7 +826,7 @@ int main(int argc,char **args)
 	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);      
 	}
   } else {  /* no BC */
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"No prescribed BC's specified\n");CHKERRQ(ierr);  
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"No prescribed BCs specified\n");CHKERRQ(ierr);  
   }  
 
   ierr = PetscOptionsGetString(NULL,NULL,"-rescale_forcing_file",rfsFile,PETSC_MAX_PATH_LEN-1,&rescaleForcing);CHKERRQ(ierr);
@@ -837,14 +837,25 @@ int main(int argc,char **args)
 	  ierr=PetscStrcat(rfsFile,"_");CHKERRQ(ierr);
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Rescale forcing factor file basename is %s\n", rfsFile);CHKERRQ(ierr); 	
 	  Rfsp.firstTime = PETSC_TRUE;
+	  if (constantForcing) {
+        SETERRQ(PETSC_COMM_WORLD,1,"Periodic rescaling not supported with constant forcing");
+	  }
 	} else if (timeDependentMatrix) {
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Rescale forcing factor file is %s\n", rfsFile);CHKERRQ(ierr);	
 	  Rfstd.firstTime = PETSC_TRUE;
+	  if (constantForcing) {
+        SETERRQ(PETSC_COMM_WORLD,1,"Time dependent rescaling not supported with constant forcing");
+	  }	  
 	} else {
 	  ierr = PetscPrintf(PETSC_COMM_WORLD,"Reading rescale forcing factor from file %s\n", rfsFile);CHKERRQ(ierr);  	
 	  ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,rfsFile,FILE_MODE_READ,&fd);CHKERRQ(ierr);
 	  ierr = VecLoad(Rfs,fd);CHKERRQ(ierr);  
-	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
+	  ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+	  if (constantForcing) {
+		for (itr=0; itr<numTracers; itr++) {
+		  ierr = VecPointwiseMult(uf[itr],Rfs,uf[itr]);CHKERRQ(ierr);
+        }
+	  }    
 	}  
   }
 
@@ -1040,16 +1051,17 @@ int main(int argc,char **args)
 		if (periodicForcing) {
 		  for (itr=0; itr<numTracers; itr++) {    
 			ierr = interpPeriodicVector(tc,&uf[itr],forcingTimer.cyclePeriod,forcingTimer.numPerPeriod,forcingTimer.tdp,&up[itr],forcingFile[itr]);
+			if (rescaleForcing) {
+				ierr = VecPointwiseMult(uf[itr],Rfs,uf[itr]);CHKERRQ(ierr);
+			}
 		  }    
 		} else if (timeDependentForcing) {
 		  for (itr=0; itr<numTracers; itr++) {    
 		    ierr = interpTimeDependentVector(tc,&uf[itr],forcingTimeDependentTimer.numTimes,forcingTimeDependentTimer.tdt,&utdf[itr],forcingFile[itr]);
+			if (rescaleForcing) {
+				ierr = VecPointwiseMult(uf[itr],Rfs,uf[itr]);CHKERRQ(ierr);
+			}
 		  }
-		}
-		if (rescaleForcing) {
-		  for (itr=0; itr<numTracers; itr++) {    
-			ierr = VecPointwiseMult(uf[itr],Rfs,uf[itr]);CHKERRQ(ierr);
-		  }  
 		}
 	  }	
 	}
