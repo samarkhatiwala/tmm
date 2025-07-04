@@ -168,7 +168,7 @@ PetscErrorCode readProfileSurfaceIntData(const char *fileName, PetscInt *arr, Pe
   off_t  off, offset;  
   PetscViewer fd;
   int fp;
-  PetscInt iShift;
+  off_t iShift;
 
 /*   m1 = totalNumProfiles*sizeof(PetscInt); */
 /*   m2 = lNumProfiles*sizeof(PetscInt); */
@@ -180,7 +180,7 @@ PetscErrorCode readProfileSurfaceIntData(const char *fileName, PetscInt *arr, Pe
 /*   ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr); */
 
 /* Shift file pointer to start of data owned by local process */
-  iShift = numValsPerProfile*numPrevProfiles;
+  iShift = (off_t)numValsPerProfile*(off_t)numPrevProfiles;
   off = PETSC_BINARY_INT_SIZE*iShift;
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,fileName,FILE_MODE_READ,&fd);CHKERRQ(ierr);
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
@@ -213,14 +213,14 @@ PetscErrorCode readProfileSurfaceScalarData(const char *fileName, PetscScalar *a
   off_t  off, offset;  
   PetscViewer fd;
   int fp;
-  PetscInt iShift;
+  off_t iShift;
   PetscMPIInt numProcessors, myId;
 
   ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&myId);CHKERRQ(ierr);  
   ierr = MPI_Comm_size(PETSC_COMM_WORLD,&numProcessors);CHKERRQ(ierr);
   
 /* Shift file pointer to start of data owned by local process */
-  iShift = numValsPerProfile*numPrevProfiles;
+  iShift = (off_t)numValsPerProfile*(off_t)numPrevProfiles;
 /*   printf("ipro=%d,iShift=%d\n",myId,iShift); */
   off = PETSC_BINARY_SCALAR_SIZE*iShift;
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,fileName,FILE_MODE_READ,&fd);CHKERRQ(ierr);
@@ -243,7 +243,7 @@ PetscErrorCode readProfileSurfaceScalarDataRecord(const char *fileName, PetscSca
   off_t  off, offset;  
   PetscViewer fd;
   int fp;
-  PetscInt iShift;
+  off_t iShift;
   PetscMPIInt numProcessors, myId;
 
   ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&myId);CHKERRQ(ierr);  
@@ -251,7 +251,7 @@ PetscErrorCode readProfileSurfaceScalarDataRecord(const char *fileName, PetscSca
   
 
 /* Shift file pointer to start of data owned by local process */
-  iShift = (iRec-1)*numValsPerProfile*totalNumProfiles + numValsPerProfile*numPrevProfiles;
+  iShift = ((off_t)iRec-1)*(off_t)numValsPerProfile*(off_t)totalNumProfiles + (off_t)numValsPerProfile*(off_t)numPrevProfiles;
   off = PETSC_BINARY_SCALAR_SIZE*iShift;
   ierr = PetscViewerBinaryOpen(PETSC_COMM_SELF,fileName,FILE_MODE_READ,&fd);CHKERRQ(ierr);
   ierr = PetscViewerBinaryGetDescriptor(fd,&fp);CHKERRQ(ierr);
@@ -404,5 +404,22 @@ PetscErrorCode writeProfileSurfaceScalarData(const char *fileName, PetscScalar *
   ierr = PetscFree(displs);CHKERRQ(ierr);
   ierr = PetscFree(rcounts);CHKERRQ(ierr);
     
+  return 0;
+}
+
+PetscErrorCode dotProdProfileSurfaceScalarData(PetscScalar *xarr, PetscScalar *yarr, PetscScalar *z)
+{
+/* Function to take a dot product of two profile surface arrays. */
+
+  PetscErrorCode ierr;
+  PetscInt ip;
+  PetscScalar localz = 0.0;
+  
+  *z = 0.0;
+  for (ip=0; ip<lNumProfiles; ip++) {
+	localz = localz + xarr[ip]*yarr[ip];
+  }
+  MPI_Allreduce(&localz, z, 1, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD);
+
   return 0;
 }

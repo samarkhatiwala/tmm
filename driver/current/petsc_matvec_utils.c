@@ -58,9 +58,11 @@ PetscErrorCode VecLoadIntoVectorRandomAccess(PetscViewer viewer,Vec vec, PetscIn
   PetscErrorCode ierr;
   int fp;
   off_t off,offset;
+  off_t iShift;
       
   PetscFunctionBegin;
-  off = PETSC_BINARY_SCALAR_SIZE*(length+1)*(iRec-1);  
+  iShift = ((off_t)length+1)*((off_t)iRec-1);
+  off = PETSC_BINARY_SCALAR_SIZE*iShift;  
   ierr = PetscViewerBinaryGetDescriptor(viewer,&fp);CHKERRQ(ierr);
   ierr = PetscBinarySeek(fp,off,PETSC_BINARY_SEEK_SET,&offset);CHKERRQ(ierr);
   ierr = VecLoad(vec,viewer);CHKERRQ(ierr); /* IntoVector */
