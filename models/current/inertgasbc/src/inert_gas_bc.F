@@ -1,10 +1,6 @@
-C !INTERFACE: ==========================================================
-      SUBROUTINE INERT_GAS_BC(N,myIter,myTime,
-     &                 thetaloc,saltloc,
-     &                 atmosploc,gasID,
-     &                 PTReqloc)
-
-C !DESCRIPTION:
+      SUBROUTINE INERT_GAS_BC(N, thetaloc, saltloc,
+     &                        atmosploc, gasID,
+     &                        PTReqloc)
 
 C !USES: ===============================================================
       IMPLICIT NONE
@@ -13,8 +9,6 @@ C #include "DIAGNOSTICS.h"
 
 C !INPUT PARAMETERS: ===================================================
       INTEGER N
-      INTEGER myIter
-      real*8 myTime
       real*8 PTRloc
       real*8 thetaloc(N),saltloc(N),atmosploc(N)
       integer gasID

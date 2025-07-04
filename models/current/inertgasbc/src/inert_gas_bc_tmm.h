@@ -1,9 +1,8 @@
-extern void inert_gas_diagnostics_(PetscInt *Nrloc, PetscInt *myIter, PetscScalar *myTime, 
-                                 PetscScalar localTR[], PetscScalar localTs[], PetscScalar localSs[], PetscInt *gasID, 
-                                 PetscScalar localTReq[], PetscScalar localTRsatanom[]);
+extern void inert_gas_diagnostics_(PetscInt *Nrloc, 
+                                   PetscScalar localTR[], PetscScalar localTs[], PetscScalar localSs[], PetscInt *gasID, 
+                                   PetscScalar localTReq[], PetscScalar localTRsatanom[]);
 
-extern void inert_gas_bc_(PetscInt *Nrloc, PetscInt *myIter, PetscScalar *myTime, 
-                                 PetscScalar localTs[], PetscScalar localSs[], 
+extern void inert_gas_bc_(PetscInt *Nrloc, PetscScalar localTs[], PetscScalar localSs[], 
                                  PetscScalar localatmosp[], PetscInt *gasID,                                  
                                  PetscScalar localTReq[]);
 

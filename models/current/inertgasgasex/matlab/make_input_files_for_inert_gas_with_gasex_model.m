@@ -3,10 +3,16 @@ base_path='/data2/spk/TransportMatrixConfigs/MITgcm_2.8deg';
 % base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO';
 % base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO_v4';
 
-periodicForcing=1
-periodicMatrix=1
+forcingType=1; % 0 (annual mean), 1 (periodic), 2 (time dependent)
+numForcingFields=12*1
+%
+matrixType=1; % 0 (annual mean), 1 (periodic), 2 (time dependent)
+numMatrices=12*335
+
+Ttd0=1765 % Time origin for time dependent matrices, forcing etc 
 
 dt=43200; % time step to use
+daysPerYear=360;
 
 rearrangeProfiles=1
 bigMat=0
@@ -41,6 +47,7 @@ bgcDataPath=fullfile(base_path,'BiogeochemData');
 freshWaterForcingFile=fullfile(gcmDataPath,'FreshWaterForcing_gcm');
 empFixFile=fullfile(gcmDataPath,empFixFile);
 
+% model specific data
 iceFile=fullfile(bgcDataPath,'ice_fraction');
 windFile=fullfile(bgcDataPath,'wind_speed');
 
@@ -72,12 +79,6 @@ if useCoarseGrainedMatrix
   error('NOT FULLY IMPLEMENTED YET!')
 end
 
-if periodicForcing
-  nm=12;
-else
-  nm=1;
-end
-
 % Use steady state T/S from GCM. Note we always load seasonal data here.
 load(fullfile(gcmDataPath,'Theta_gcm'),'Tgcm')
 load(fullfile(gcmDataPath,'Salt_gcm'),'Sgcm')
@@ -89,13 +90,13 @@ if rescaleForcing
 end
 
 % now take annual mean if necessary
-if ~periodicForcing
+if forcingType==0
   Theta=mean(Theta,2);
   Salt=mean(Salt,2);
 end
 
-if ~periodicMatrix
-  if rescaleForcing
+if rescaleForcing
+  if forcingType==0
 	Rfs=mean(Rfs,2);    
   end  
 end
@@ -106,13 +107,13 @@ dzb_surf=gridToMatrix(dz,Ib,boxFile,gridFile);
 % Surface forcing data
 load(iceFile,'Fice')
 Ficeb=gridToMatrix(Fice,Ib,boxFile,gridFile,1);
-if ~periodicForcing
-  Ficeb=mean(Ficeb,2);
+if forcingType==0
+  Ficeb=mean(ficeb,2);
 end
 
-if ~periodicForcing && useSeparateWinds==1
+if forcingType~=1 && useSeparateWinds==1
   useSeparateWinds=0;
-  disp('Warning: useSeparateWinds has been set to 0 because periodicForcing is 0')
+  disp('Warning: useSeparateWinds has been set to 0 because periodic forcing has not been enabled')
 end
 
 if useSeparateWinds
@@ -122,14 +123,16 @@ if useSeparateWinds
 else
   load(windFile,'windspeed')
   windb=gridToMatrix(windspeed,Ib,boxFile,gridFile,1);  
-  if ~periodicForcing
-	windb=mean(windb,2);  
+  if forcingType==0
+	windb=mean(windb,2);
   end
 end
 
 atmospb=load_ocmip_variable([],'P',Xboxnom(Ib),Yboxnom(Ib));  
-if ~periodicForcing
+if forcingType==0
   atmospb=mean(atmospb,2);
+elseif forcingType==2
+  atmospb=repmat(atmospb,[1 numForcingFields/size(atmospb,2)]);
 end
 
 % Initial condition: initialize with solubility equilibrium concentration if 
@@ -179,136 +182,88 @@ if useCoarseGrainedMatrix
 end
 
 if writeFiles
-  calc_periodic_times_for_tmm('monthly-365-day year','periodic_times_365d.bin');
-  calc_periodic_times_for_tmm('monthly-360-day year','periodic_times_360d.bin');  
-  calc_periodic_times_for_tmm('6-hourly','periodic_times_6hourly.bin');
+  calc_periodic_times_for_tmm(['monthly-' num2str(daysPerYear) '-day year'],['periodic_times_' num2str(daysPerYear) 'd.bin']);
+  if matrixType==2
+    calc_time_dependent_times_for_tmm(['monthly-' num2str(daysPerYear) '-day year'],numMatrices/12,Ttd0,['matrix_times_' num2str(daysPerYear) 'd_' num2str(numMatrices) 'months.bin']);
+  end
+  if forcingType==2
+    calc_time_dependent_times_for_tmm(['monthly-' num2str(daysPerYear) '-day year'],numForcingFields/12,Ttd0,['forcing_times_' num2str(daysPerYear) 'd_' num2str(numForcingFields) 'months.bin']);
+  end
+  
 % Transport matrices
   if writeTMs
-%   Explicit transport matrix
-	I=speye(nb,nb);
-	if ~periodicMatrix
-      disp('loading annual mean explicit TM')	
-      load(explicitAnnualMeanMatrixFile,'Aexpms')	
-	  if rearrangeProfiles
-		Aexpms=Aexpms(Ir_pre,Ir_pre); % rearrange
-	  end      
-	  % make discrete
-	  Aexpms=dt*Aexpms;
-	  Aexpms=I+Aexpms;
-	  if useCoarseGrainedMatrix
-		Aexpms=Beta*Aexpms*M; % coarse-grained explicit transport matrix
-	  end        
-	  writePetscBin('Ae.petsc',Aexpms,[],1)
-	else
-      % load each month from separate file
-      disp('loading monthly mean explicit TMs')	      
-	  for im=1:12 
-		fn=[explicitMatrixFileBase '_' sprintf('%02d',im)];
-		load(fn,'Aexp')
-		if rearrangeProfiles
-		  Aexp=Aexp(Ir_pre,Ir_pre); % rearrange
-		end
-		% make discrete
-		Aexp=dt*Aexp;
-		Aexp=I+Aexp;
-		if useCoarseGrainedMatrix
-%         Not sure if this is really kosher!		  
-		  Aexp=Beta*Aexp*M; % coarse-grained explicit transport matrix
-		end
-		writePetscBin(['Ae_' sprintf('%02d',im-1)],Aexp,[],1)
-		clear Aexp
-	  end
-	end
-%   Implicit transport matrix
-	if ~periodicMatrix
-      disp('loading annual mean implicit TM')		
-      load(implicitAnnualMeanMatrixFile,'Aimpms')
-      if dtMultiple~=1
-		if bigMat % big matrix. do it a block at a time.
-		  for is=1:nbb % change time step multiple
-			Aimpms(Ip_pre{is},Ip_pre{is})=Aimpms(Ip_pre{is},Ip_pre{is})^dtMultiple;
-		  end
-		else
-		  Aimpms=Aimpms^dtMultiple;
-		end  
-	  end	
-	  if rearrangeProfiles
-		Aimpms=Aimpms(Ir_pre,Ir_pre); % rearrange
-	  end
-	  if useCoarseGrainedMatrix
-		Aimpms=Beta*Aimpms*M; % coarse-grained implicit transport matrix
-	  end
-	  writePetscBin('Ai.petsc',Aimpms,[],1)
-	else
-	  % load each month from separate file
-      disp('loading monthly mean implicit TMs')	      	  
-	  for im=1:12
-		fn=[implicitMatrixFileBase '_' sprintf('%02d',im)];		
-		load(fn,'Aimp')
-		if dtMultiple~=1
-		  if bigMat % big matrix. do it a block at a time.		
-			for is=1:nbb % change time step multiple
-			  Aimp(Ip_pre{is},Ip_pre{is})=Aimp(Ip_pre{is},Ip_pre{is})^dtMultiple;
-			end
-		  else
-			Aimp=Aimp^dtMultiple;		
-		  end
-		end  
-		if rearrangeProfiles
-		  Aimp=Aimp(Ir_pre,Ir_pre); % rearrange
-		end
-		if useCoarseGrainedMatrix
-		  Aimp=Beta*Aimp*M; % coarse-grained implicit transport matrix		
-		end
-		writePetscBin(['Ai_' sprintf('%02d',im-1)],Aimp,[],1)
-		clear Aimp
-	  end
-	end
-  end	  	  
+	if matrixType==0
+	  numMatrices=[];
+    elseif matrixType==1
+	  numMatrices=12;
+	end  
+    write_transport_matrices(base_path,dt,rearrangeProfiles,bigMat,useCoarseGrainedMatrix,matrixType,numMatrices)
+  end
+
 % Initial conditions
   for itr=1:numTracers
     gasId=trNames{itr};
     fn=[gasId 'ini.petsc'];
     writePetscBin(fn,TRini(:,itr))
   end  
-% Surface forcing data
-  if ~periodicForcing
-	write_binary('fice.bin',Ficeb,'real*8')
-	write_binary('wind.bin',windb,'real*8')	
-	write_binary('atmosp.bin',atmospb,'real*8')	
-  else
-    for im=1:nm
-	  write_binary(['fice_' sprintf('%02d',im-1)],Ficeb(:,im),'real*8')
-	  write_binary(['atmosp_' sprintf('%02d',im-1)],atmospb(:,im),'real*8')	  
-	  if ~useSeparateWinds
-		write_binary(['wind_' sprintf('%02d',im-1)],windb(:,im),'real*8')	  
-      end	  
-	end
-	if useSeparateWinds
-	  for im=1:size(u10b,2)
-		write_binary(['uwind_' sprintf('%02d',im-1)],u10b(:,im),'real*8')
-		write_binary(['vwind_' sprintf('%02d',im-1)],v10b(:,im),'real*8')
+  
+% Forcing data
+  switch forcingType
+	case 0
+	  writePetscBin('Ts.petsc',Theta)
+	  writePetscBin('Ss.petsc',Salt)	
+	  write_binary('fice.bin',Ficeb,'real*8')
+	  write_binary('wind.bin',windb,'real*8')	
+	  write_binary('atmosp.bin',atmospb,'real*8')	
+	case 1
+	  for im=1:12
+		writePetscBin(['Ts_' sprintf('%02d',im-1)],Theta(:,im))
+		writePetscBin(['Ss_' sprintf('%02d',im-1)],Salt(:,im))	  
+		write_binary(['fice_' sprintf('%02d',im-1)],Ficeb(:,im),'real*8')
+		write_binary(['atmosp_' sprintf('%02d',im-1)],atmospb(:,im),'real*8')	  
+		if ~useSeparateWinds
+		  write_binary(['wind_' sprintf('%02d',im-1)],windb(:,im),'real*8')	  
+		end
 	  end
-    end	
+	  if useSeparateWinds
+		for im=1:size(u10b,2)
+		  write_binary(['uwind_' sprintf('%02d',im-1)],u10b(:,im),'real*8')
+		  write_binary(['vwind_' sprintf('%02d',im-1)],v10b(:,im),'real*8')
+		end
+	  end	
+	case 2
+%     use the first numForcingFields time slices of each field and bracket them with the first and last fields	
+	  tmp=Theta(:,[1 1:numForcingFields numForcingFields]);
+	  writePetscBin('Tstd.petsc',tmp,1)
+	  tmp=Salt(:,[1 1:numForcingFields numForcingFields]);
+	  writePetscBin('Sstd.petsc',tmp,1)
+	  tmp=Ficeb(:,[1 1:numForcingFields numForcingFields]);
+	  write_binary('ficetd.bin',tmp,'real*8')
+	  tmp=atmospb(:,[1 1:numForcingFields numForcingFields]);
+	  write_binary('atmosptd.bin',tmp,'real*8')
+	  tmp=windb(:,[1 1:numForcingFields numForcingFields]);
+	  write_binary('windtd.bin',tmp,'real*8')
+	otherwise
+	  error('ERROR!: Unknown forcing type')	  
   end
-  if ~periodicForcing
-	writePetscBin('Ts.petsc',Theta)
-	writePetscBin('Ss.petsc',Salt)
-  else
-    for im=1:nm
-	  writePetscBin(['Ts_' sprintf('%02d',im-1)],Theta(:,im))
-	  writePetscBin(['Ss_' sprintf('%02d',im-1)],Salt(:,im))
-    end    
-  end    
+
   if rescaleForcing
-	if ~periodicMatrix
-	  writePetscBin('Rfs.petsc',Rfs)
-	else
-	  for im=1:nm
-		writePetscBin(['Rfs_' sprintf('%02d',im-1)],Rfs(:,im))
-	  end    
+    switch matrixType
+	  case 0
+		writePetscBin('Rfs.petsc',Rfs)
+	  case 1
+		for im=1:numMatrices
+		  writePetscBin(['Rfs_' sprintf('%02d',im-1)],Rfs(:,im))
+		end    
+	  case 2
+%       use the first numForcingFields time slices of each field and bracket them with the first and last fields
+		tmp=Rfs(:,[1 1:numMatrices numMatrices]);
+		writePetscBin('Rfs.petsc',tmp,1)
+	  otherwise	
+	    error('ERROR!: Unknown forcing type')    
 	end    
   end  
+
 % Grid data
   write_binary('dzsurf.bin',dzb_surf,'real*8') 
 

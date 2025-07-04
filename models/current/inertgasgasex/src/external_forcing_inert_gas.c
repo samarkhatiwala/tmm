@@ -19,28 +19,33 @@
 #define TR v[0]
 #define JTR ut[0]
 
+PetscScalar *localTR, *localJTR;
+
+PetscScalar DeltaT, *localdzsurf;
+
+PetscBool periodicBiogeochemForcing = PETSC_FALSE;
+PetscBool timeDependentBiogeochemForcing = PETSC_FALSE;
+PeriodicTimer biogeochemTimer;
+TimeDependentTimer timeDependentBiogeochemTimer;
+
 Vec Ts,Ss;
 PetscScalar *localTs,*localSs;
-PetscScalar *localTR;
-PetscScalar *localJTR;
+PeriodicVec Tsp, Ssp;
+TimeDependentVec Tstd, Sstd;
+
 PetscScalar *localfice,*localwind, *localatmosp;
+PeriodicArray localficep, localwindp, localatmospp;
+TimeDependentArray localficetd, localwindtd, localatmosptd;
 Vec TReq;
 PetscScalar *localVgas,*localFgas,*localFinj,*localFex,*localTReq,*localTReqsurf;
-PetscScalar DeltaT, *localdzsurf;
 PetscInt gasID = 0;
 PetscScalar fluxScaling[3];
 PetscScalar pistonVelocityCoeff=0.27; /* default piston velocity coefficient [cm/hr]*[s^2/m^2] */
-
-PeriodicVec Tsp, Ssp;
-PeriodicArray localficep, localwindp, localatmospp;
 
 PetscBool useSeparateWinds = PETSC_FALSE;
 PeriodicTimer windsTimer;
 PetscScalar *localuwind,*localvwind;
 PeriodicArray localuwindp, localvwindp;
-
-PetscBool periodicBiogeochemForcing = PETSC_FALSE;
-PeriodicTimer biogeochemTimer;
 
 PetscBool calcDiagnostics = PETSC_FALSE;
 StepTimer diagTimer;
@@ -62,12 +67,11 @@ PetscBool relaxTracer = PETSC_FALSE;
 PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTracers, Vec *v, Vec *ut)
 {
   PetscErrorCode ierr;
-  PetscInt ip, kl, nzloc;
+  PetscInt ip, kl;
   PetscInt itr;
   PetscViewer fd;
   PetscBool flg;
   PetscInt it;
-  PetscScalar myTime;
   PetscScalar zero = 0.0;
   PetscInt maxValsToRead;
     
@@ -132,42 +136,51 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   }
 
   ierr = PetscOptionsHasName(NULL,NULL,"-periodic_biogeochem_forcing",&periodicBiogeochemForcing);CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-time_dependent_biogeochem_forcing",&timeDependentBiogeochemForcing);CHKERRQ(ierr);
 
+  if ((periodicBiogeochemForcing) && (timeDependentBiogeochemForcing)) {
+	SETERRQ(PETSC_COMM_WORLD,1,"Cannot specify both -periodic_biogeochem_forcing and -time_dependent_biogeochem_forcing");
+  }
+  
   if (periodicBiogeochemForcing) {    
     ierr=PetscPrintf(PETSC_COMM_WORLD,"Periodic biogeochemical forcing specified\n");CHKERRQ(ierr);
     ierr = iniPeriodicTimer("periodic_biogeochem_", &biogeochemTimer);CHKERRQ(ierr);
+  }
+
+  if (timeDependentBiogeochemForcing) {    
+    ierr=PetscPrintf(PETSC_COMM_WORLD,"Time-dependent biogeochemical forcing specified\n");CHKERRQ(ierr);
+    ierr = iniTimeDependentTimer("time_dependent_biogeochem_", &timeDependentBiogeochemTimer);CHKERRQ(ierr);
   }
   
 /*   Read T and S */
   ierr = VecDuplicate(TR,&Ts);CHKERRQ(ierr);
   ierr = VecDuplicate(TR,&Ss);CHKERRQ(ierr);  
-  if (periodicBiogeochemForcing) {    
+  if (timeDependentBiogeochemForcing) {
+    Tstd.firstTime = PETSC_TRUE;
+    Sstd.firstTime = PETSC_TRUE;  
+  } else if (periodicBiogeochemForcing) {
     Tsp.firstTime = PETSC_TRUE;
     Ssp.firstTime = PETSC_TRUE;
   } else {
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Ts.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-	ierr = VecLoad(Ts,fd);CHKERRQ(ierr); /* IntoVector */
+	ierr = VecLoad(Ts,fd);CHKERRQ(ierr);  
 	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Ss.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
-	ierr = VecLoad(Ss,fd);CHKERRQ(ierr); /* IntoVector */
-	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
+	ierr = VecLoad(Ss,fd);CHKERRQ(ierr);    
+	ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"Done reading T/S\n");CHKERRQ(ierr);	
   }  
   ierr = VecGetArray(Ts,&localTs);CHKERRQ(ierr);
   ierr = VecGetArray(Ss,&localSs);CHKERRQ(ierr);
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Done reading T/S\n");CHKERRQ(ierr);
 
-/* Grid arrays */
-  ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localdzsurf);CHKERRQ(ierr);
-  ierr = readProfileSurfaceScalarData("dzsurf.bin",localdzsurf,1);  
-
 /* Forcing fields */  
+  ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localwind);CHKERRQ(ierr);
   ierr = PetscOptionsHasName(NULL,NULL,"-use_separate_winds",&useSeparateWinds);CHKERRQ(ierr);
   if (useSeparateWinds) {
-	ierr = PetscPrintf(PETSC_COMM_WORLD,"Separate winds specified: gas transfer velocity will be computed using winds\n");CHKERRQ(ierr);        
-	if (!periodicBiogeochemForcing) SETERRQ(PETSC_COMM_WORLD,1,"Separate winds can only be used with periodic biogeochemical forcing!");          
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"Separate winds specified: gas transfer velocity will be computed using winds\n");CHKERRQ(ierr);
+	if (!periodicBiogeochemForcing) SETERRQ(PETSC_COMM_WORLD,1,"Separate winds can only be used with periodic biogeochemical forcing!");
 
-	ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localwind);CHKERRQ(ierr);  
-	
 	ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localuwind);CHKERRQ(ierr);    
 	localuwindp.firstTime = PETSC_TRUE;
 	localuwindp.arrayLength = lNumProfiles;    
@@ -183,8 +196,10 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
 	}
 	
   } else {
-	ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localwind);CHKERRQ(ierr);  
-	if (periodicBiogeochemForcing) {    
+	if (timeDependentBiogeochemForcing) {    
+	  localwindtd.firstTime = PETSC_TRUE;
+	  localwindtd.arrayLength = lNumProfiles;
+	} else if (periodicBiogeochemForcing) {    
 	  localwindp.firstTime = PETSC_TRUE;
 	  localwindp.arrayLength = lNumProfiles;
 	} else {  
@@ -196,12 +211,30 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = PetscPrintf(PETSC_COMM_WORLD,"Piston velocity coefficient of %10.5f [cm/hr]*[s^2/m^2] will be used\n", pistonVelocityCoeff);CHKERRQ(ierr);      
   
   ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localfice);CHKERRQ(ierr);  
-  if (periodicBiogeochemForcing) {    
+  if (timeDependentBiogeochemForcing) {    
+    localficetd.firstTime = PETSC_TRUE;
+    localficetd.arrayLength = lNumProfiles;
+  } else if (periodicBiogeochemForcing) {    
     localficep.firstTime = PETSC_TRUE;
     localficep.arrayLength = lNumProfiles;
   } else {  
     ierr = readProfileSurfaceScalarData("fice.bin",localfice,1);  
   }
+
+  ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localatmosp);CHKERRQ(ierr);  
+  if (timeDependentBiogeochemForcing) {    
+    localatmosptd.firstTime = PETSC_TRUE;
+    localatmosptd.arrayLength = lNumProfiles;
+  } else if (periodicBiogeochemForcing) {    
+    localatmospp.firstTime = PETSC_TRUE;
+    localatmospp.arrayLength = lNumProfiles;
+  } else {  
+    ierr = readProfileSurfaceScalarData("atmosp.bin",localatmosp,1);  
+  }
+
+/* Grid arrays */
+  ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localdzsurf);CHKERRQ(ierr);
+  ierr = readProfileSurfaceScalarData("dzsurf.bin",localdzsurf,1);  
 
   ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localVgas);CHKERRQ(ierr);  
   ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localFgas);CHKERRQ(ierr);  
@@ -213,40 +246,37 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt numTra
   ierr = VecSet(TReq,zero);CHKERRQ(ierr);
   ierr = VecGetArray(TReq,&localTReq);CHKERRQ(ierr);
 
-  ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localatmosp);CHKERRQ(ierr);  
-  if (periodicBiogeochemForcing) {    
-    localatmospp.firstTime = PETSC_TRUE;
-    localatmospp.arrayLength = lNumProfiles;
-  } else {  
-    ierr = readProfileSurfaceScalarData("atmosp.bin",localatmosp,1);  
-  }
-
-  
-  if (periodicBiogeochemForcing) {   
+  if (timeDependentBiogeochemForcing) {
+	ierr = interpTimeDependentVector(tc,&Ts,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&Tstd,"Tstd.petsc");
+	ierr = interpTimeDependentVector(tc,&Ss,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&Sstd,"Sstd.petsc");
+    ierr = interpTimeDependentProfileSurfaceScalarData(tc,localwind,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&localwindtd,"windtd.bin");
+    ierr = interpTimeDependentProfileSurfaceScalarData(tc,localfice,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&localficetd,"ficetd.bin");
+    ierr = interpTimeDependentProfileSurfaceScalarData(tc,localatmosp,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&localatmosptd,"atmosptd.bin");
+  } else if (periodicBiogeochemForcing) {   
 	ierr = interpPeriodicVector(tc,&Ts,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&Tsp,"Ts_");
-	ierr = interpPeriodicVector(tc,&Ss,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&Ssp,"Ss_");	
-    ierr = interpPeriodicProfileSurfaceScalarData(tc,localfice,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&localficep,"fice_");
+	ierr = interpPeriodicVector(tc,&Ss,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&Ssp,"Ss_");
     if (useSeparateWinds) {
       ierr = interpPeriodicProfileSurfaceScalarData(tc,localuwind,windsTimer.cyclePeriod,windsTimer.numPerPeriod,windsTimer.tdp,&localuwindp,"uwind_");                                                    
       ierr = interpPeriodicProfileSurfaceScalarData(tc,localvwind,windsTimer.cyclePeriod,windsTimer.numPerPeriod,windsTimer.tdp,&localvwindp,"vwind_");                                                        
     } else {                                                  
 	  ierr = interpPeriodicProfileSurfaceScalarData(tc,localwind,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&localwindp,"wind_");
 	}												
+    ierr = interpPeriodicProfileSurfaceScalarData(tc,localfice,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&localficep,"fice_");
     ierr = interpPeriodicProfileSurfaceScalarData(tc,localatmosp,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&localatmospp,"atmosp_");
-  }  
+  }
 
-/* Initialize model: if not using periodicBiogeochemForcing then fluxes and equilibrium */
+/* Initialize model: if not using periodicBiogeochemForcing or timeDependentBiogeochemForcing then fluxes and equilibrium */
 /* surface concentrations computed here will be subsequently used */
-  myTime = DeltaT*Iter; /* Iter should start at 0 */
   for (ip=0; ip<lNumProfiles; ip++) {
 	kl=lStartIndices[ip];  
 
     if (useSeparateWinds) localwind[ip] = sqrt(pow(localuwind[ip],2) + pow(localvwind[ip],2));      
    
-    inert_gas_fluxes_(&Iter,&myTime,&localTR[kl],&localTs[kl],&localSs[kl],
-                          &localwind[ip],&localfice[ip],&localatmosp[ip],
-                          &gasID,&pistonVelocityCoeff,&localVgas[ip],&localFinj[ip],&localFex[ip],
-                          &localTReq[kl]);
+    inert_gas_fluxes_(&localTR[kl],&localTs[kl],&localSs[kl],
+                      &localwind[ip],&localfice[ip],&localatmosp[ip],
+                      &gasID,&pistonVelocityCoeff,&localVgas[ip],
+                      &localFinj[ip],&localFex[ip],
+                      &localTReq[kl]);
 
     localFinj[ip]=fluxScaling[0]*localFinj[ip];
     localFex[ip]=fluxScaling[1]*localFex[ip];
@@ -293,35 +323,40 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
 
   PetscErrorCode ierr;
   PetscInt itr, ip, nzloc, kl;
-  PetscScalar myTime;
   PetscScalar Fas;  
   PetscScalar zero = 0.0, one = 1.0;
 
-  myTime = DeltaT*Iter; /* Iter should start at 0 */
-
-  if (periodicBiogeochemForcing) {   
+  if (timeDependentBiogeochemForcing) {
+	ierr = interpTimeDependentVector(tc,&Ts,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&Tstd,"Tstd.petsc");
+	ierr = interpTimeDependentVector(tc,&Ss,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&Sstd,"Sstd.petsc");
+    ierr = interpTimeDependentProfileSurfaceScalarData(tc,localwind,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&localwindtd,"windtd.bin");
+    ierr = interpTimeDependentProfileSurfaceScalarData(tc,localfice,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&localficetd,"ficetd.bin");
+    ierr = interpTimeDependentProfileSurfaceScalarData(tc,localatmosp,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&localatmosptd,"atmosptd.bin");
+  } else if (periodicBiogeochemForcing) {   
 	ierr = interpPeriodicVector(tc,&Ts,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&Tsp,"Ts_");
-	ierr = interpPeriodicVector(tc,&Ss,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&Ssp,"Ss_");	
-    ierr = interpPeriodicProfileSurfaceScalarData(tc,localfice,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&localficep,"fice_");
+	ierr = interpPeriodicVector(tc,&Ss,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&Ssp,"Ss_");
     if (useSeparateWinds) {
       ierr = interpPeriodicProfileSurfaceScalarData(tc,localuwind,windsTimer.cyclePeriod,windsTimer.numPerPeriod,windsTimer.tdp,&localuwindp,"uwind_");                                                    
       ierr = interpPeriodicProfileSurfaceScalarData(tc,localvwind,windsTimer.cyclePeriod,windsTimer.numPerPeriod,windsTimer.tdp,&localvwindp,"vwind_");                                                        
-    } else {                                                                                                    
+    } else {                                                  
 	  ierr = interpPeriodicProfileSurfaceScalarData(tc,localwind,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&localwindp,"wind_");
-	}
+	}												
+    ierr = interpPeriodicProfileSurfaceScalarData(tc,localfice,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&localficep,"fice_");
     ierr = interpPeriodicProfileSurfaceScalarData(tc,localatmosp,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&localatmospp,"atmosp_");
+  }
 
-/*  Recompute fluxes and surface equilibrium concentration */
+/* Recompute fluxes and surface equilibrium concentration */
+  if ((periodicBiogeochemForcing) || (timeDependentBiogeochemForcing)) {
     for (ip=0; ip<lNumProfiles; ip++) {
-      nzloc=lProfileLength[ip];    
       kl=lStartIndices[ip];  
-  
+
       if (useSeparateWinds) localwind[ip] = sqrt(pow(localuwind[ip],2) + pow(localvwind[ip],2));      
 
-      inert_gas_fluxes_(&Iter,&myTime,&localTR[kl],&localTs[kl],&localSs[kl],
-                            &localwind[ip],&localfice[ip],&localatmosp[ip],
-                            &gasID,&pistonVelocityCoeff,&localVgas[ip],&localFinj[ip],&localFex[ip],
-                            &localTReq[kl]);
+      inert_gas_fluxes_(&localTR[kl],&localTs[kl],&localSs[kl],
+                        &localwind[ip],&localfice[ip],&localatmosp[ip],
+                        &gasID,&pistonVelocityCoeff,&localVgas[ip],
+                        &localFinj[ip],&localFex[ip],
+                        &localTReq[kl]);
 
       localFinj[ip]=fluxScaling[0]*localFinj[ip];
       localFex[ip]=fluxScaling[1]*localFex[ip];
@@ -344,8 +379,8 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
 /*      Note: this will recompute localTReq with an atmospheric pressure of 1 because now we  */
 /*            are computing localTReq for the full 3-d grid and not just the surface points as  */
 /*            done in S/R inert_gas_fluxes. */
-        inert_gas_diagnostics_(&nzloc,&Iter,&myTime,&localTR[kl],&localTs[kl],&localSs[kl],&gasID,
-        &localTReq[kl],&localTRsatanomdiag[kl]);
+        inert_gas_diagnostics_(&nzloc,&localTR[kl],&localTs[kl],&localSs[kl],
+                               &gasID,&localTReq[kl],&localTRsatanomdiag[kl]);
       }
 	}
                              
@@ -497,37 +532,43 @@ PetscErrorCode reInitializeExternalForcing(PetscScalar tc, PetscInt Iter, PetscI
 {
   PetscErrorCode ierr;
   PetscInt ip, kl;
-  PetscScalar myTime;
 
-  if (periodicBiogeochemForcing) {   
+  if (timeDependentBiogeochemForcing) {
+	ierr = interpTimeDependentVector(tc,&Ts,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&Tstd,"Tstd.petsc");
+	ierr = interpTimeDependentVector(tc,&Ss,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&Sstd,"Sstd.petsc");
+    ierr = interpTimeDependentProfileSurfaceScalarData(tc,localwind,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&localwindtd,"windtd.bin");
+    ierr = interpTimeDependentProfileSurfaceScalarData(tc,localfice,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&localficetd,"ficetd.bin");
+    ierr = interpTimeDependentProfileSurfaceScalarData(tc,localatmosp,timeDependentBiogeochemTimer.numTimes,timeDependentBiogeochemTimer.tdt,&localatmosptd,"atmosptd.bin");
+  } else if (periodicBiogeochemForcing) {   
 	ierr = interpPeriodicVector(tc,&Ts,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&Tsp,"Ts_");
-	ierr = interpPeriodicVector(tc,&Ss,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&Ssp,"Ss_");	
-    ierr = interpPeriodicProfileSurfaceScalarData(tc,localfice,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&localficep,"fice_");
+	ierr = interpPeriodicVector(tc,&Ss,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&Ssp,"Ss_");
     if (useSeparateWinds) {
       ierr = interpPeriodicProfileSurfaceScalarData(tc,localuwind,windsTimer.cyclePeriod,windsTimer.numPerPeriod,windsTimer.tdp,&localuwindp,"uwind_");                                                    
       ierr = interpPeriodicProfileSurfaceScalarData(tc,localvwind,windsTimer.cyclePeriod,windsTimer.numPerPeriod,windsTimer.tdp,&localvwindp,"vwind_");                                                        
     } else {                                                  
 	  ierr = interpPeriodicProfileSurfaceScalarData(tc,localwind,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&localwindp,"wind_");
-	}												                                                  
+	}												
+    ierr = interpPeriodicProfileSurfaceScalarData(tc,localfice,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&localficep,"fice_");
     ierr = interpPeriodicProfileSurfaceScalarData(tc,localatmosp,biogeochemTimer.cyclePeriod,biogeochemTimer.numPerPeriod,biogeochemTimer.tdp,&localatmospp,"atmosp_");
-  }  
+  }
 
-/* Initialize model: if not using periodicBiogeochemForcing then fluxes and equilibrium */
-/* surface concentrations computed here will be subsequently used */
-  myTime = DeltaT*Iter; /* Iter should start at 0 */
-  for (ip=0; ip<lNumProfiles; ip++) {
-	kl=lStartIndices[ip];  
+/* Recompute fluxes and surface equilibrium concentration */
+  if ((periodicBiogeochemForcing) || (timeDependentBiogeochemForcing)) {
+    for (ip=0; ip<lNumProfiles; ip++) {
+      kl=lStartIndices[ip];  
 
-    if (useSeparateWinds) localwind[ip] = sqrt(pow(localuwind[ip],2) + pow(localvwind[ip],2));      
+      if (useSeparateWinds) localwind[ip] = sqrt(pow(localuwind[ip],2) + pow(localvwind[ip],2));      
 
-    inert_gas_fluxes_(&Iter,&myTime,&localTR[kl],&localTs[kl],&localSs[kl],
-                          &localwind[ip],&localfice[ip],&localatmosp[ip],
-                          &gasID,&pistonVelocityCoeff,&localVgas[ip],&localFinj[ip],&localFex[ip],
-                          &localTReq[kl]);
+      inert_gas_fluxes_(&localTR[kl],&localTs[kl],&localSs[kl],
+                        &localwind[ip],&localfice[ip],&localatmosp[ip],
+                        &gasID,&pistonVelocityCoeff,&localVgas[ip],
+                        &localFinj[ip],&localFex[ip],
+                        &localTReq[kl]);
 
-    localFinj[ip]=fluxScaling[0]*localFinj[ip];
-    localFex[ip]=fluxScaling[1]*localFex[ip];
-    localTReqsurf[ip]=localTReq[kl];                            
+      localFinj[ip]=fluxScaling[0]*localFinj[ip];
+      localFex[ip]=fluxScaling[1]*localFex[ip];
+      localTReqsurf[ip]=localTReq[kl];
+    }
   }
     
   return 0;

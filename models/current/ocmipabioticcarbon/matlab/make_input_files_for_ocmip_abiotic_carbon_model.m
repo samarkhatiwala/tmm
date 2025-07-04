@@ -177,12 +177,6 @@ if useCoarseGrainedMatrix
   error('NOT FULLY IMPLEMENTED YET!')
 end
 
-if periodicForcing
-  nm=12;
-else
-  nm=1;
-end
-
 % Use steady state T/S from GCM. Note we always load seasonal data here.
 load(fullfile(gcmDataPath,'Theta_gcm'),'Tgcm')
 load(fullfile(gcmDataPath,'Salt_gcm'),'Sgcm')

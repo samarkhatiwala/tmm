@@ -33,28 +33,26 @@ profilesFile=fullfile(matrixPath,'Data','profile_data');
 
 load(gridFile,'nx','ny','nz','x','y','z','deltaT','gridType')
 
+load(boxFile,'izBox','nb')
+
+if rearrangeProfiles
+  error('ERROR: rearrangeProfiles must be set to 0!')
+end  
+
+if useCoarseGrainedMatrix
+  error('NOT FULLY IMPLEMENTED YET!')
+end
+
+Ib=find(izBox==1);
+Ii=find(izBox~=1);
+nbb=length(Ib);
+nbi=length(Ii);
+
 dtMultiple=dt/deltaT;
 if rem(dt,deltaT)
   error('ERROR: Incorrect time step specified! dt must be divisible by deltaT.')
 end
 disp(['dtMultiple is set to ' num2str(dtMultiple)])
-
-load(boxFile,'izBox','nb')
-
-Ib=find(izBox==1);
-Ii=find(~ismember([1:nb]',Ib));
-nbb=length(Ib);
-nbi=length(Ii);
-
-if rearrangeProfiles || bigMat
-  load(profilesFile,'Ip_pre','Ir_pre','Ip_post','Ir_post','Irr')
-  Ip=Ip_pre;
-  Ir=Ir_pre;
-end
-
-if useCoarseGrainedMatrix
-  error('NOT FULLY IMPLEMENTED YET!')
-end
 
 % Use T/S from GCM as boundary conditions.
 numTracers=2;
@@ -73,10 +71,6 @@ Cbc{2}=Ssteady(Ib,:);
 % Initial condition
 Cini{1}=Tsteady(Ii,1);
 Cini{2}=Ssteady(Ii,1);
-
-if rearrangeProfiles
-  error('ERROR: rearrangeProfiles must be set to 0!')
-end  
 
 if writeFiles
   calc_periodic_times_for_tmm('monthly-365-day year','periodic_times_365d.bin');

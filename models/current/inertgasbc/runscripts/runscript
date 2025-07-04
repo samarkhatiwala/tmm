@@ -1,4 +1,4 @@
-## 365 days per year with a time step of 2 steps per day:
+## 365 days per year with a time step of 2 steps per day, periodic TMs and forcing:
 mpiexec -np 2 ./tmminertgasbc -numtracers 1 \
   -i Arini.petsc \
   -me Ae1 -mi Ai1 \
@@ -21,7 +21,7 @@ mpiexec -np 2 ./tmminertgasbc -numtracers 1 \
   -calc_diagnostics -diag_start_time_step 1 -diag_time_steps 62,56,62,60,62,60,62,62,60,62,60,62 \
   > log
 
-## 360 days per year with a time step of 2 steps per day:
+## 360 days per year with a time step of 2 steps per day, periodic TMs and forcing:
 mpiexec -np 2 ./tmminertgasbc -numtracers 1 \
   -i Arini.petsc \
   -me Ae1 -mi Ai1 \
@@ -43,12 +43,26 @@ mpiexec -np 2 ./tmminertgasbc -numtracers 1 \
   -avg_files Ar_avg.petsc -bcavg_files Arbc_avg.petsc \
   -calc_diagnostics -diag_start_time_step 1 -diag_time_steps 60 \
   > log
-  
-# driver options:
-#  I/O:
-#   -pickup_out pickup.petsc \
-#   -time_file output_time.txt \
-#  circulation-specific options:
-#   add this option for configurations in which the forcing is rescaled because of a time-varying free surface:
-#    -rescale_forcing_file Rfs \
-# model-specific options:
+
+## 360 days per year with a time step of 2 steps per day, periodic TMs and time dependent forcing:
+mpiexec -np 2 ./tmminertgasbc -numtracers 1 \
+  -i Arini.petsc \
+  -me Ae1 -mi Ai1 \
+  -mbe Be -mbi Bi \
+  -t0 1765.0 -iter0 0 \
+  -deltat_clock 0.0013888888888889 \
+  -max_steps 720 \
+  -write_time_steps 720 \
+  -o Ar.petsc \
+  -obc Arbc.petsc \
+  -prescribed_bc -calc_bc -bc_vec_size 4448 \
+  -biogeochem_deltat 43200.0 \
+  -inert_gas_id 2 \
+  -periodic_matrix \
+  -matrix_cycle_period 1.0 -matrix_num_per_period 12 \
+  -time_dependent_biogeochem_forcing \
+  -time_dependent_biogeochem_num_times 14 -time_dependent_biogeochem_times_file forcing_times_360d_12months.bin \
+  -time_avg -avg_start_time_step 1 -avg_time_steps 60 \
+  -avg_files Ar_avg.petsc -bcavg_files Arbc_avg.petsc \
+  -calc_diagnostics -diag_start_time_step 1 -diag_time_steps 60 \
+  > log

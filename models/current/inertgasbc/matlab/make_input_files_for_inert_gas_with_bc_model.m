@@ -3,10 +3,16 @@ base_path='/data2/spk/TransportMatrixConfigs/MITgcm_2.8deg';
 % base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO';
 % base_path='/data2/spk/TransportMatrixConfigs/MITgcm_ECCO_v4';
 
-periodicForcing=1
-periodicMatrix=1
+forcingType=1; % 0 (annual mean), 1 (periodic), 2 (time dependent)
+numForcingFields=12*1
+%
+matrixType=1; % 0 (annual mean), 1 (periodic), 2 (time dependent)
+numMatrices=12*335
+
+Ttd0=1765 % Time origin for time dependent matrices, forcing etc 
 
 dt=43200; % time step to use
+daysPerYear=360;
 
 rearrangeProfiles=0 % DON'T CHANGE!!
 bigMat=0
@@ -53,20 +59,12 @@ Ii=find(~ismember([1:nb]',Ib));
 nbb=length(Ib);
 nbi=length(Ii);
 
-if rearrangeProfiles || bigMat
-  load(profilesFile,'Ip_pre','Ir_pre','Ip_post','Ir_post','Irr')
-  Ip=Ip_pre;
-  Ir=Ir_pre;
-end
+if rearrangeProfiles
+  error('ERROR: rearrangeProfiles must be set to 0!')
+end  
 
 if useCoarseGrainedMatrix
   error('NOT FULLY IMPLEMENTED YET!')
-end
-
-if periodicForcing
-  nm=12;
-else
-  nm=1;
 end
 
 % Use steady state T/S from GCM. Note we always load seasonal data here.
@@ -75,8 +73,7 @@ load(fullfile(gcmDataPath,'Salt_gcm'),'Sgcm')
 Theta=gridToMatrix(Tgcm,[],boxFile,gridFile);
 Salt=gridToMatrix(Sgcm,[],boxFile,gridFile);
 
-% now take annual mean if necessary
-if ~periodicForcing
+if forcingType==0
   Theta=mean(Theta,2);
   Salt=mean(Salt,2);
 end
@@ -88,8 +85,10 @@ Ts=Theta(Ii,:);
 Ss=Salt(Ii,:);
 
 atmospb=load_ocmip_variable([],'P',Xboxnom(Ib),Yboxnom(Ib));  
-if ~periodicForcing
+if forcingType==0
   atmospb=mean(atmospb,2);
+elseif forcingType==2
+  atmospb=repmat(atmospb,[1 numForcingFields/size(atmospb,2)]);
 end
 
 % Initial condition: initialize with solubility equilibrium concentration if 
@@ -117,118 +116,63 @@ else
   disp('http://web.uvic.ca/~rhamme/download.html')  
 end
 
-if rearrangeProfiles
-  error('ERROR: rearrangeProfiles must be set to 0!')
-end  
-
 if writeFiles
-  calc_periodic_times_for_tmm('monthly-365-day year','periodic_times_365d.bin');
-  calc_periodic_times_for_tmm('monthly-360-day year','periodic_times_360d.bin');  
+  calc_periodic_times_for_tmm(['monthly-' num2str(daysPerYear) '-day year'],['periodic_times_' num2str(daysPerYear) 'd.bin']);
+  if matrixType==2
+    calc_time_dependent_times_for_tmm(['monthly-' num2str(daysPerYear) '-day year'],numMatrices/12,Ttd0,['matrix_times_' num2str(daysPerYear) 'd_' num2str(numMatrices) 'months.bin']);
+  end
+  if forcingType==2
+    calc_time_dependent_times_for_tmm(['monthly-' num2str(daysPerYear) '-day year'],numForcingFields/12,Ttd0,['forcing_times_' num2str(daysPerYear) 'd_' num2str(numForcingFields) 'months.bin']);
+  end
+  
 % Transport matrices
   if writeTMs
-%   Explicit transport matrix
-	I=speye(nb,nb);
-	if ~periodicMatrix
-      disp('loading annual mean explicit TM')	
-      load(explicitAnnualMeanMatrixFile,'Aexpms')	
-	  if rearrangeProfiles
-		Aexpms=Aexpms(Ir_pre,Ir_pre); % rearrange
-	  end      
-	  % make discrete
-	  Aexpms=dt*Aexpms;
-	  Aexpms=I+Aexpms;
-	  [Ae1,Be,Ii]=split_transport_matrix(Aexpms,Ib);
-	  writePetscBin('Ae1.petsc',Ae1,[],1)
-	  writePetscBin('Be.petsc',Be,[],1)
-	else
-      % load each month from separate file
-      disp('loading monthly mean explicit TMs')	      
-	  for im=1:12 
-		fn=[explicitMatrixFileBase '_' sprintf('%02d',im)];
-		load(fn,'Aexp')
-		if rearrangeProfiles
-		  Aexp=Aexp(Ir_pre,Ir_pre); % rearrange
-		end
-		% make discrete
-		Aexp=dt*Aexp;
-		Aexp=I+Aexp;
-		[Ae1,Be,Ii]=split_transport_matrix(Aexp,Ib);
-		writePetscBin(['Ae1_' sprintf('%02d',im-1)],Ae1,[],1)
-		writePetscBin(['Be_' sprintf('%02d',im-1)],Be,[],1)		
-		clear Aexp Ae1 Be
-	  end
-	end
-%   Implicit transport matrix
-	if ~periodicMatrix
-      disp('loading annual mean implicit TM')		
-      load(implicitAnnualMeanMatrixFile,'Aimpms')
-      if dtMultiple~=1
-		if bigMat % big matrix. do it a block at a time.
-		  for is=1:nbb % change time step multiple
-			Aimpms(Ip_pre{is},Ip_pre{is})=Aimpms(Ip_pre{is},Ip_pre{is})^dtMultiple;
-		  end
-		else
-		  Aimpms=Aimpms^dtMultiple;
-		end  
-	  end	
-	  if rearrangeProfiles
-		Aimpms=Aimpms(Ir_pre,Ir_pre); % rearrange
-	  end
-	  [Ai1,Bi,Ii]=split_transport_matrix(Aimpms,Ib);	  
-	  writePetscBin('Ai1.petsc',Ai1,[],1)
-	  writePetscBin('Bi.petsc',Bi,[],1)      
-	else
-	  % load each month from separate file
-      disp('loading monthly mean implicit TMs')	      	  
-	  for im=1:12
-		fn=[implicitMatrixFileBase '_' sprintf('%02d',im)];		
-		load(fn,'Aimp')
-		if dtMultiple~=1
-		  if bigMat % big matrix. do it a block at a time.		
-			for is=1:nbb % change time step multiple
-			  Aimp(Ip_pre{is},Ip_pre{is})=Aimp(Ip_pre{is},Ip_pre{is})^dtMultiple;
-			end
-		  else
-			Aimp=Aimp^dtMultiple;		
-		  end
-		end  
-		if rearrangeProfiles
-		  Aimp=Aimp(Ir_pre,Ir_pre); % rearrange
-		end
-		[Ai1,Bi,Ii]=split_transport_matrix(Aimp,Ib);
-		writePetscBin(['Ai1_' sprintf('%02d',im-1)],Ai1,[],1)
-		writePetscBin(['Bi_' sprintf('%02d',im-1)],Bi,[],1)		  
-		clear Aimp Ai1 Bi
-	  end
-	end
-  end	  	  
+	if matrixType==0
+	  numMatrices=[];
+    elseif matrixType==1
+	  numMatrices=12;
+	end  
+    write_transport_matrices(base_path,dt,rearrangeProfiles,bigMat,useCoarseGrainedMatrix,matrixType,numMatrices,Ib)
+  end
+
 % Initial conditions  
   for itr=1:numTracers
     gasId=trNames{itr};
     fn=[gasId 'ini.petsc'];
     writePetscBin(fn,TRini(:,itr))
   end  
-% Surface forcing data
-  if ~periodicForcing
-	writePetscBin('atmosp.bin',atmospb)	
-  else
-    for im=1:nm
-	  writePetscBin(['atmosp_' sprintf('%02d',im-1)],atmospb(:,im))	  
-	end
-  end
-  if ~periodicForcing
-	writePetscBin('Tss.petsc',Tss)
-	writePetscBin('Sss.petsc',Sss)
-	writePetscBin('Ts.petsc',Ts)
-	writePetscBin('Ss.petsc',Ss)
-  else
-    for im=1:nm
-	  writePetscBin(['Tss_' sprintf('%02d',im-1)],Tss(:,im))
-	  writePetscBin(['Sss_' sprintf('%02d',im-1)],Sss(:,im))
-	  writePetscBin(['Ts_' sprintf('%02d',im-1)],Ts(:,im))
-	  writePetscBin(['Ss_' sprintf('%02d',im-1)],Ss(:,im))
-    end    
+% Forcing data
+  switch forcingType
+    case 0
+	  writePetscBin('Tss.petsc',Tss)
+	  writePetscBin('Sss.petsc',Sss)
+	  writePetscBin('atmosp.petsc',atmospb)
+	  writePetscBin('Ts.petsc',Ts)
+	  writePetscBin('Ss.petsc',Ss)
+    case 1
+	  for im=1:12
+		writePetscBin(['Tss_' sprintf('%02d',im-1)],Tss(:,im))
+		writePetscBin(['Sss_' sprintf('%02d',im-1)],Sss(:,im))
+	    writePetscBin(['atmosp_' sprintf('%02d',im-1)],atmospb(:,im))
+		writePetscBin(['Ts_' sprintf('%02d',im-1)],Ts(:,im))
+		writePetscBin(['Ss_' sprintf('%02d',im-1)],Ss(:,im))
+	  end    
+    case 2	  
+%     use the first numForcingFields time slices of each field and bracket them with the first and last fields
+	  tmp=Tss(:,[1 1:numForcingFields numForcingFields]);
+	  writePetscBin('Tsstd.petsc',tmp,1)
+	  tmp=Sss(:,[1 1:numForcingFields numForcingFields]);
+	  writePetscBin('Ssstd.petsc',tmp,1)
+	  tmp=atmospb(:,[1 1:numForcingFields numForcingFields]);
+	  writePetscBin('atmosptd.petsc',tmp,1)
+	  tmp=Ts(:,[1 1:numForcingFields numForcingFields]);
+	  writePetscBin('Tstd.petsc',tmp,1)
+	  tmp=Ss(:,[1 1:numForcingFields numForcingFields]);
+	  writePetscBin('Sstd.petsc',tmp,1)
+	otherwise
+	  error('ERROR!: Unknown forcing type')    
   end    
+
 % Grid data
 
 % Profile data

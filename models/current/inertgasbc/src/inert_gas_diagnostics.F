@@ -1,21 +1,13 @@
-
-CBOP
-C !ROUTINE: MODEL
-
-C !INTERFACE: ==========================================================
-      SUBROUTINE INERT_GAS_DIAGNOSTICS(Nrloc,myIter,myTime,
+      SUBROUTINE INERT_GAS_DIAGNOSTICS(Nrloc, 
      &                 PTRloc,thetaloc,saltloc,gasID,
      &                 PTReqloc,PTRsatanomloc)
 
-C !DESCRIPTION:
 
 C !USES: ===============================================================
       IMPLICIT NONE
 
 C !INPUT PARAMETERS: ===================================================
       INTEGER Nrloc
-      INTEGER myIter
-      real*8 myTime   
       real*8 PTRloc(Nrloc),thetaloc(Nrloc),saltloc(Nrloc)
       integer gasID
 C     Output variables

@@ -679,7 +679,7 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
 {
 
   PetscErrorCode ierr;
-  static PetscScalar DICemp = 0.0, DIC14emp = 0.0;
+  PetscScalar DICemp = 0.0, DIC14emp = 0.0;
   PetscScalar Vgas660, Sc;
   PetscInt itr, ip, nzloc, kl;
   PetscScalar myTime;

@@ -1,9 +1,9 @@
 C !INTERFACE: ==========================================================
-      SUBROUTINE INERT_GAS_FLUXES(myIter,myTime,
-     &                 PTRloc,
-     &                 thetaloc,saltloc,u10loc,ficeloc,
-     &                 atmosploc,gasID,
-     &                 pistonVelocityCoeff,Vgas,Finj,Fex,PTReq)
+      SUBROUTINE INERT_GAS_FLUXES(PTRloc,thetaloc,saltloc,
+     &                 u10loc,ficeloc,atmosploc,
+     &                 gasID,pistonVelocityCoeff,Vgas,
+     &                 Finj,Fex,
+     &                 PTReq)
 
 C !DESCRIPTION:
 
@@ -13,8 +13,6 @@ C !USES: ===============================================================
 C #include "DIAGNOSTICS.h"
 
 C !INPUT PARAMETERS: ===================================================
-      INTEGER myIter
-      real*8 myTime
       real*8 PTRloc
       real*8 thetaloc,saltloc,u10loc,ficeloc,atmosploc
       integer gasID
