@@ -1,14 +1,20 @@
 The TMM driver code is implemented in PETSc, which provides a flexible set of 
-routines for setting run-time options via command line arguments. (These options 
-can also be read from a file but the preferred way is to simply specify them on 
-the command line.) The easiest way to see what arguments are supported by the 
-driver code grep for "PetscOptions" in tmm_main.c (see below for the full list 
-in the current version). In addition to these options, each model may require 
-its own set of model-specific options and these can be found in the appropriate 
-external_forcing*.c or similar file.
+routines for setting run-time options via command line arguments. These options 
+can also be read from a file or given in an environment variable. Options fall 
+into two categories: those for the TMM library and model-specific options. The 
+most important ones for the former are listed below (some are required, others 
+are optional and take on default values).
 
-Here I list some key options for performing any simulation with the TMM. Some are 
-required and some are optional and will take on default values.
+The TMM library allows one to simultaneously simulate multiple instances of a model. 
+To do this we make use of the fact that PETSc options also take a "prefix"; this allows 
+one to set the same option (with different values) for different model instances by 
+prefacing it with the prefix. Prefixes can be specified at runtime with the -prefix 
+option. Thus, to run two model instances with prefixes m1_ and m2_ we do: 
+-prefixes m1_,m2_. Many of the options listed below can then be prefaced with these 
+prefixes to specify options for the corresponding instance. (Exceptions are options 
+such as -max_steps that apply to all model instances.) For example, input and output 
+file names, respectively, for the first instance can be specified via: 
+-m1_i f1in,f2in ... -m1_o f1out,f2out ...
 
 1) To specify number of tracers: -numtracers NN, where NN is an integer. By default this is 1.
 

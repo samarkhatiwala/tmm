@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+
+# This script is based on the petscversion script in PETSc. It parses ${TMM_DIR}/include/tmmversion.h 
+# to return the version number
+
+file=${TMM_DIR}/include/tmmversion.h
+
+if [ ! -f $file ]; then
+    echo "Unable to find tmmversion.h; ensure the environmental variable TMM_DIR is set correctly"
+    exit 1
+fi
+
+major=`grep "#define TMM_VERSION_MAJOR" $file | tr -s ' ' | cut -d" " -f 3`
+minor=`grep "#define TMM_VERSION_MINOR" $file | tr -s ' ' | cut -d" " -f 3`
+subminor=`grep "#define TMM_VERSION_SUBMINOR" $file | tr -s ' ' | cut -d" " -f 3`
+
+echo ${major} ${minor} ${subminor}
+exit 0

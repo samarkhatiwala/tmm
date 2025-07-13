@@ -1,0 +1,78 @@
+# Note: If you don't have/did not install PETSc with MPI then delete the "mpiexec -np 4" 
+# from the start of each command below.
+
+# Python version of Pa/Th model (depends on tmm4py and libtmm.so)
+
+mpiexec -np 4 python3 -m tmm -module PaTh -class PaTh \
+-me Ae \
+-mi Ai \
+-t0 0.0 -iter0 0 \
+-deltat_clock 0.0009132420091324 \
+-max_steps 1095 \
+-use_profiles \
+-periodic_matrix \
+-matrix_cycle_period 1.0 -matrix_num_per_period 12 -matrix_periodic_times_file periodic_times_365d.bin \
+-biogeochem_deltat 28800.0 \
+-numtracers 2 \
+-i `./get_tracer_names.sh ini` \
+-pickup_out pickup.petsc \
+-time_file output_time.txt \
+-write_time_steps 1095 \
+-o `./get_tracer_names.sh` \
+-external_forcing \
+-periodic_biogeochem_forcing \
+-periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_num_per_period 12 -periodic_biogeochem_periodic_times_file periodic_times_365d.bin \
+-calc_diagnostics -diag_start_time_step 1 -diag_time_steps 1095 \
+> log
+
+# Fortran version of MOBI run via the Python driver (depends on tmm4py, libtmm.so, libmobi.so and mobi.cpython...so)
+
+mpiexec -np 4 python3 -m tmm -module mobi \
+-numtracers `wc -l MOBI_tracer_names.txt` \
+-i `./get_tracer_names.sh ini` \
+-me Ae -mi Ai \
+-t0 0.0 -iter0 0 \
+-deltat_clock 0.0009132420091324 \
+-max_steps 1095 \
+-write_time_steps 1095 \
+-o `./get_tracer_names.sh` \
+-pickup_out pickup.petsc \
+-time_file output_time.txt \
+-external_forcing \
+-use_profiles \
+-biogeochem_deltat 28800.0 \
+-days_per_year 365.0 \
+-periodic_matrix -matrix_cycle_period 1.0 -matrix_num_per_period 12 \
+-matrix_periodic_times_file periodic_times_365d.bin \
+-periodic_biogeochem_forcing -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_num_per_period 12 \
+-periodic_biogeochem_periodic_times_file periodic_times_365d.bin \
+-time_avg -avg_start_time_step 1 -avg_time_steps 93,84,93,90,93,90,93,93,90,93,90,93 \
+-avg_files `./get_tracer_names.sh mmavg` \
+-calc_diagnostics -diag_start_time_step 1 -diag_time_steps 93,84,93,90,93,90,93,93,90,93,90,93 \
+> log 
+
+# Fortran version of MOBI run via the C driver and built as a standalone executable (depends on libtmm.so and libmobi.so)
+
+mpiexec -np 4 ./tmmmobi \
+-numtracers `wc -l MOBI_tracer_names.txt` \
+-i `./get_tracer_names.sh ini` \
+-me Ae -mi Ai \
+-t0 0.0 -iter0 0 \
+-deltat_clock 0.0009132420091324 \
+-max_steps 1095 \
+-write_time_steps 1095 \
+-o `./get_tracer_names.sh` \
+-pickup_out pickup.petsc \
+-time_file output_time.txt \
+-external_forcing \
+-use_profiles \
+-biogeochem_deltat 28800.0 \
+-days_per_year 365.0 \
+-periodic_matrix -matrix_cycle_period 1.0 -matrix_num_per_period 12 \
+-matrix_periodic_times_file periodic_times_365d.bin \
+-periodic_biogeochem_forcing -periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_num_per_period 12 \
+-periodic_biogeochem_periodic_times_file periodic_times_365d.bin \
+-time_avg -avg_start_time_step 1 -avg_time_steps 93,84,93,90,93,90,93,93,90,93,90,93 \
+-avg_files `./get_tracer_names.sh mmavg` \
+-calc_diagnostics -diag_start_time_step 1 -diag_time_steps 93,84,93,90,93,90,93,93,90,93,90,93 \
+> log 

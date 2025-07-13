@@ -1,0 +1,175 @@
+#define O_TMM
+#define O_co2ccn_user
+#undef O_TMM_interactive_atmosphere
+#define O_embm_annual
+#undef O_time_averages
+#undef O_time_step_monitor
+#undef O_save_carbon_totals
+
+#undef O_time_averages_monthly
+C options common to all models (need source_common)
+#define O_even_fluxes
+#define O_read_my_kmt 
+#define O_read_my_grid 
+#define O_cyclic
+#define O_sbc_in_memory
+#define O_fourfil
+#define O_constant_flux_reference
+#undef O_global_sums
+#undef O_idealized_ic 
+#undef O_replacst
+#undef O_restorst
+#undef O_min_window
+#undef O_restart_2
+
+C atmosphere model options (need source_embm)
+#define O_embm
+#define O_embm_mgrid
+#undef O_embm_awind
+#undef O_embm_adiff
+#undef O_embm_vcs
+#undef O_save_embm_diff
+#undef O_save_embm_wind
+#undef O_embm_slap
+
+C sea-ice model options (need source_ice and source_embm)
+#define O_ice
+#define O_ice_evp  
+#define O_ice_fourfil
+#undef O_ice_cpts
+#undef O_ice_cpts3
+#undef O_ice_cpts5
+#undef O_ice_cpts10
+
+C land and vegetation model options (need source_mtlm and source_embm)
+#define O_mtlm
+#define O_mtlm_segday
+#undef O_mtlm_carbon_13
+#undef O_mtlm_carbon_14
+
+C ocean model options (need source_mom)
+#undef O_gthflx
+#define O_mom
+#define O_ramdrive 
+#define O_conjugate_gradient 
+#define O_sf_5_point
+#define O_stream_function
+#define O_consthmix 
+#define O_constvmix 
+#define O_fullconvect
+#define O_save_convection
+#define O_stability_tests
+#define O_gyre_components 
+#define O_term_balances
+#define O_energy_analysis 
+#define O_meridional_overturning
+#define O_tracer_averages
+#undef O_bryan_lewis_vertical 
+#define O_gent_mcwilliams
+#define O_isopycmix 
+#define O_fct
+#undef O_quicker
+#undef O_ncar_upwind3
+#define O_mobi
+#define O_mobi_alk
+#define O_mobi_caco3
+#define O_mobi_o2
+#define O_mobi_nitrogen
+#define O_mobi_nitrogen_15
+#define O_mobi_silicon
+#define O_mobi_iron
+#undef O_mobi_no_vflux
+#define O_save_mobi_fluxes
+#define O_save_mobi_diagnostics
+#undef O_save_kv
+#define O_tidal_kv
+#define O_anisotropic_viscosity
+#undef O_save_anisotropic_viscosity
+#define O_anisotropic_zonal_mixing
+
+C SPKKK
+#undef O_kk_ballast
+#undef O_kk_si_compensating_sources
+#undef O_kk_variable_sipr
+
+C Climate engineering options
+
+#undef O_pipe_co2
+#undef O_green_australia
+#undef O_green_africa
+
+C sediment model options (need source_sed and source_mom)
+#undef O_sed
+#undef O_sed_weath_diag
+#undef O_sed_uncoupled
+#undef O_sed_constrain_rainr
+
+C carbon options (need source_data)
+#define O_carbon
+#undef O_carbon_co2_2d
+#undef O_carbon_uncoupled
+#define O_carbon_13
+#undef O_carbon_13_coupled
+#define O_carbon_14
+#undef O_carbon_14_coupled
+#define O_save_carbon_carbonate_chem
+#undef O_co2emit_diag
+#undef O_co2emit_track_sat
+#undef O_co2emit_track_co2
+
+C forcing data options (need source_data)
+#undef O_co2ccn_data
+#undef O_co2emit_data
+#undef O_co2emit_data_land
+#undef O_co2emit_data_fuel
+#define O_agric_data
+#define O_landice_data
+#undef O_solar_data
+#undef O_volcano_data
+#undef O_sulphate_data
+#undef O_sulphate_data_direct
+#undef O_sulphate_data_indirect
+#undef O_aggfor_data
+#undef O_cfcs_data
+#undef O_c14ccn_data
+#undef O_orbit_user
+
+C transient forcing data options (need source_data)
+#undef O_co2ccn_data_transient
+#undef O_co2emit_data_transient
+#undef O_agric_data_transient
+#undef O_landice_data_transient
+#undef O_solar_data_transient
+#undef O_volcano_data_transient
+#undef O_sulphate_data_transient
+#undef O_aggfor_data_transient
+#undef O_cfcs_data_transient
+#undef O_c14ccn_data_transient
+#undef O_orbit_transient
+
+C freshwater anomaly options
+#undef O_fwa
+#undef O_fwa_compevap
+#undef O_fwa_precip
+
+C sea level options
+#undef O_sealev
+#undef O_sealev_data
+#undef O_sealev_data_transient
+#undef O_sealev_salinity
+
+C time step integral file options
+#define O_tai_otsf
+#define O_tai_ns
+#define O_tai_lo
+#define O_tai_slh
+#define O_tai_rad
+#undef O_tai_slh_from_averages
+#undef O_tai_otsf_from_averages
+
+C units
+#define O_units_temperature_Celsius
+#define O_units_time_years
+#define O_save_time_relyear0
+#undef O_save_time_startper
+#undef O_save_time_endper

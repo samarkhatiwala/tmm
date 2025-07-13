@@ -1,0 +1,97 @@
+# (1) Set the environment variables TMM_DIR and UVICESCMROOT to point to the top level 
+# of the TMM and UVic ECSM 2.9 code, respectively.
+# (2) Set UVICUPDATESLEVEL below to the updates 'level' of the UVic ESCM compatible with MOBI.
+#
+
+default: all
+
+UVICUPDATESLEVEL = 10
+#
+MODEL_DIR ?= $(shell pwd)
+UVICBASE1 = ${UVICESCMROOT}/updates/${UVICUPDATESLEVEL}/source
+UVICBASE2 = ${UVICESCMROOT}/source
+
+include ${PETSC_DIR}/lib/petsc/conf/variables
+include ${PETSC_DIR}/lib/petsc/conf/rules
+
+SRF90MODEL = mobi_diags_mod.F90
+
+SRFMODELWRITE = mobi_write_ic.F mobi_ini.F iomngr.F mobi.F set_sbc.F \
+               co2calc.F file_names.F mobi_stubs.F UVic_ESCM.F setmom.F \
+               sed.F setsed.F sediment.F io.F protac_thor.F
+
+BUILDDIR := build
+
+EXEWRITE = tmmmobiwrite
+
+#
+SRF90PPMODEL = $(addprefix $(BUILDDIR)/,$(SRF90MODEL:.F90=.f90))
+SRFPPMODELWRITE = $(addprefix $(BUILDDIR)/,$(SRFMODELWRITE:.F=.f))
+OBJFMODELWRITE = $(SRF90PPMODEL:.f90=.o) $(SRFPPMODELWRITE:.f=.o)
+
+INCLUDEPATHS = $(addprefix -I,$(MODEL_DIR)/src $(UVICBASE1)/common $(UVICBASE1)/mom $(UVICBASE1)/embm $(UVICBASE1)/sed $(UVICBASE2)/common $(UVICBASE2)/mom $(UVICBASE2)/embm $(UVICBASE2)/sed)
+
+VPATH = $(MODEL_DIR)/src:$(UVICBASE1)/common:$(UVICBASE1)/mom:$(UVICBASE1)/embm:$(UVICBASE1)/sed:$(UVICBASE2)/common:$(UVICBASE2)/mom:$(UVICBASE2)/embm:$(UVICBASE2)/sed
+
+# Set compiler-dependent flags
+FPPFLAG=
+ifeq ($(strip $(MPIFC_SHOW)),)
+	COMPILER=$(FC)
+else
+	COMPILER=$(word 1,$(MPIFC_SHOW))
+endif
+
+ifneq (,$(findstring ifort,$(COMPILER)))
+	FC_FLAGS+=-convert big_endian -assume byterecl -r8
+endif
+ifneq (,$(findstring gfortran,$(COMPILER)))
+	FC_FLAGS+=-fconvert=big-endian -fdefault-real-8
+endif
+ifneq (,$(findstring xlf,$(COMPILER)))
+	FPPFLAG+=-WF,
+	FC_FLAGS+=-qrealsize=8 -qzerosize
+endif
+ifneq (,$(findstring ftn,$(COMPILER)))
+	FC_FLAGS+=-h byteswapio -s real64
+endif
+
+OPTFILE = MOBI_TMM_OPTIONS.h
+
+ifneq ($(strip $(OPTFILE)),)
+# Make sure OPTFILE is present in the current directory
+  ifeq (,$(wildcard $(OPTFILE)))
+    $(error $(OPTFILE) does not exist in the local directory!)
+  endif
+  CPPKEYS=$(shell awk '/^\#define/ {print "-D"$$2}' $(OPTFILE))
+  CPPFLAGS+=$(CPPKEYS)
+endif
+
+all: $(EXEWRITE)
+
+$(SRF90PPMODEL) $(SRFPPMODELWRITE): $(OPTFILE)
+
+smallf: $(SRF90PPMODEL) $(SRFPPMODELWRITE)
+CPPCMD = cat $< |  cpp  -traditional -P $(INCLUDEPATHS) $(CPPKEYS)
+
+$(BUILDDIR)/%.f: %.F
+	$(CPPCMD)  > $@
+
+$(BUILDDIR)/%.f90: %.F90
+	$(CPPCMD)  > $@
+
+$(BUILDDIR)/%.o $(BUILDDIR)/%.mod: $(BUILDDIR)/%.f90 | $(BUILDDIR)
+	$(FC) $(INCLUDEPATHS) -I$(BUILDDIR) $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) -fPIC -c -o $$(echo $@ | sed -e 's/mod$$/o/') $(FC_MODULE_OUTPUT_FLAG) $(dir $@) $<
+
+$(BUILDDIR)/%.o: $(BUILDDIR)/%.f | $(BUILDDIR)
+	$(FC) $(INCLUDEPATHS) -I$(BUILDDIR) $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) -fPIC -c -o $@ $<
+
+$(BUILDDIR):
+	mkdir -p $(BUILDDIR)
+
+$(EXEWRITE): $(OBJFMODELWRITE)
+	-$(FLINKER) -o $@ $(OBJFMODELWRITE)
+
+cleanall:
+	rm -f $(OBJFMODELWRITE) $(SRF90PPMODEL) $(SRFPPMODELWRITE)
+	rm -f $(BUILDDIR)/*.mod $(BUILDDIR)/*.i $(BUILDDIR)/*.i90
+

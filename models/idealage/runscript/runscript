@@ -1,0 +1,35 @@
+# This example shows how to set options for and run multiple instances of a model
+
+# Note: If you don't have/did not install PETSc with MPI then delete the "mpiexec -np 4" 
+# from the start of each command below.
+
+# Python version of Age model (depends on tmm4py and libtmm.so). The runtime options 
+# are directly entered within the driver script.
+
+mpiexec -np 4 python3 run_model_age_py.py
+
+# C driver built as a standalone executable (depends on libtmm.so). The external forcing 
+# term is read from file (q.petsc).
+
+mpiexec -np 4 ./tmm \
+  -me Ae1 -mi Ai1 \
+  -t0 0.0 -iter0 0 \
+  -deltat_clock 0.0009132420091324 \
+  -max_steps 10950 \
+  -periodic_matrix \
+  -matrix_cycle_period 1.0 -matrix_num_per_period 12 -matrix_periodic_times_file periodic_times_365d.bin \
+  -prefixes state1_,state2_ \
+  -state1_numtracers 1 \
+  -state1_forcing_from_file -state1_forcing_files q.petsc \
+  -state1_i ageini.petsc \
+  -state1_write_time_steps 1095 \
+  -state1_o age_1.petsc \
+  -state1_pickup_out pickup_1.petsc \
+  -state1_time_file output_time_1.txt \
+  -state2_numtracers 1 \
+  -state2_forcing_from_file -state2_forcing_files q.petsc \
+  -state2_i ageini.petsc \
+  -state2_write_time_steps 1095 \
+  -state2_o age_2.petsc \
+  -state2_pickup_out pickup_2.petsc \
+  -state2_time_file output_time_2.txt

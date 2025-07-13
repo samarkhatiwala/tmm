@@ -1,0 +1,17 @@
+mpiexec -np 2 python3 -m tmm -module BC -class BC -numtracers 2 \
+  -i Cini_01.petsc,Cini_02.petsc \
+  -me Ae1 -mi Ai1 -mbe Be -mbi Bi \
+  -t0 0.0 -iter0 0 \
+  -deltat_clock 0.0009132420091324 \
+  -max_steps 2190 \
+  -write_time_steps 1095 \
+  -o C_01.petsc,C_02.petsc \
+  -obc Cbc_out_01.petsc,Cbc_out_02.petsc \
+  -periodic_matrix \
+  -matrix_cycle_period 1.0 -matrix_num_per_period 12 -matrix_periodic_times_file periodic_times_365d.bin \
+  -prescribed_bc -calc_bc \
+  -bc_vec_size 6386 \
+  -bc_cycle_period 1.0 -bc_num_per_period 12 -bc_periodic_times_file periodic_times_365d.bin \
+  -time_avg -avg_start_time_step 1 -avg_time_steps 93,84,93,90,93,90,93,93,90,93,90,93 \
+  -avg_files C_01_avg.petsc,C_02_avg.petsc \
+  -bcavg_files Cbc_01_avg.petsc,Cbc_02_avg.petsc

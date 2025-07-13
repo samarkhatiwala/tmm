@@ -1,0 +1,156 @@
+# Note: If you don't have/did not install PETSc with MPI then delete the "mpiexec -np 4" 
+# from the start of each command below.
+
+# Python version of (refactored) MOPS (depends on tmm4py and libtmm.so)
+
+mpiexec -np 4 python3 -m tmm -module MOPS -class MOPS \
+-use_carbon -use_runoff -ascii_params \
+-me Ae \
+-mi Ai \
+-t0 0.0 -iter0 0 \
+-deltat_clock 0.0013888888888889 \
+-max_steps 720 \
+-use_profiles \
+-periodic_matrix \
+-matrix_cycle_period 1.0 \
+-matrix_num_per_period 12 \
+-separate_biogeochem_time_stepping \
+-nzeuph 2 \
+-num_biogeochem_steps_per_ocean_step 8 \
+-biogeochem_deltat 43200.0 \
+-numtracers 11 \
+-i po4ini.petsc,dopini.petsc,oxyini.petsc,phyini.petsc,zooini.petsc,detini.petsc,no3ini.petsc,dfeini.petsc,pfeini.petsc,dicini.petsc,alkini.petsc \
+-pickup_out pickup.petsc \
+-pickup_runoff_out pickup_runoff.bin \
+-time_file output_time.txt \
+-write_time_steps 720 \
+-o po4.petsc,dop.petsc,oxy.petsc,phy.petsc,zoo.petsc,det.petsc,no3.petsc,dfe.petsc,pfe.petsc,dic.petsc,alk.petsc \
+-external_forcing \
+-periodic_biogeochem_forcing \
+-periodic_biogeochem_cycle_period 1.0 \
+-periodic_biogeochem_num_per_period 12 \
+-burial_sum_steps 720 \
+-bgc_params_file parameters_252_1.txt \
+-num_bgc_params 8 \
+-time_avg \
+-avg_time_steps 60 \
+-avg_files po4avg.petsc,dopavg.petsc,oxyavg.petsc,phyavg.petsc,zooavg.petsc,detavg.petsc,no3avg.petsc,dfeavg.petsc,pfeavg.petsc,dicavg.petsc,alkavg.petsc \
+-calc_diagnostics -diag_start_time_step 1 -diag_time_steps 720 \
+-diag_files fbgc1.petsc,fbgc2.petsc,fbgc3.petsc,fbgc4.petsc,fbgc5.petsc,fbgc6.petsc,fbgc7.petsc,fbgc8.petsc,fbgc9.petsc,fbgc10.petsc,fbgc11.petsc,fbgc12.petsc \
+-co2airseaflux_file co2airseaflux_surf.bin \
+> log
+
+# Python version of (original) MOPS (depends on tmm4py and libtmm.so)
+
+mpiexec -np 4 python3 -m tmm -module MOPS_original -class MOPS \
+-use_carbon -use_runoff -ascii_params \
+-me Ae \
+-mi Ai \
+-t0 0.0 -iter0 0 \
+-deltat_clock 0.0013888888888889 \
+-max_steps 720 \
+-use_profiles \
+-periodic_matrix \
+-matrix_cycle_period 1.0 \
+-matrix_num_per_period 12 \
+-separate_biogeochem_time_stepping \
+-nzeuph 2 \
+-num_biogeochem_steps_per_ocean_step 8 \
+-biogeochem_deltat 43200.0 \
+-numtracers 11 \
+-i po4ini.petsc,dopini.petsc,oxyini.petsc,phyini.petsc,zooini.petsc,detini.petsc,no3ini.petsc,dfeini.petsc,pfeini.petsc,dicini.petsc,alkini.petsc \
+-pickup_out pickup.petsc \
+-pickup_runoff_out pickup_runoff.bin \
+-time_file output_time.txt \
+-write_time_steps 720 \
+-o po4.petsc,dop.petsc,oxy.petsc,phy.petsc,zoo.petsc,det.petsc,no3.petsc,dfe.petsc,pfe.petsc,dic.petsc,alk.petsc \
+-external_forcing \
+-periodic_biogeochem_forcing \
+-periodic_biogeochem_cycle_period 1.0 \
+-periodic_biogeochem_num_per_period 12 \
+-burial_sum_steps 720 \
+-bgc_params_file parameters_252_1.txt \
+-num_bgc_params 8 \
+-time_avg \
+-avg_time_steps 60 \
+-avg_files po4avg.petsc,dopavg.petsc,oxyavg.petsc,phyavg.petsc,zooavg.petsc,detavg.petsc,no3avg.petsc,dfeavg.petsc,pfeavg.petsc,dicavg.petsc,alkavg.petsc \
+-calc_diagnostics -diag_start_time_step 1 -diag_time_steps 720 \
+-diag_files fbgc1.petsc,fbgc2.petsc,fbgc3.petsc,fbgc4.petsc,fbgc5.petsc,fbgc6.petsc,fbgc7.petsc,fbgc8.petsc,fbgc9.petsc,fbgc10.petsc,fbgc11.petsc,fbgc12.petsc \
+-co2airseaflux_file co2airseaflux_surf.bin \
+> log
+
+# Fortran version of MOPS run via the Python driver (depends on tmm4py, libtmm.so, libmops.so and mops.cpython...so)
+
+mpiexec -np 4 python3 -m tmm -module mops \
+-me Ae \
+-mi Ai \
+-t0 0.0 -iter0 0 \
+-deltat_clock 0.0013888888888889 \
+-max_steps 720 \
+-use_profiles \
+-periodic_matrix \
+-matrix_cycle_period 1.0 \
+-matrix_num_per_period 12 \
+-separate_biogeochem_time_stepping \
+-nzeuph 2 \
+-num_biogeochem_steps_per_ocean_step 8 \
+-biogeochem_deltat 43200.0 \
+-numtracers 11 \
+-i po4ini.petsc,dopini.petsc,oxyini.petsc,phyini.petsc,zooini.petsc,detini.petsc,no3ini.petsc,dfeini.petsc,pfeini.petsc,dicini.petsc,alkini.petsc \
+-pickup_out pickup.petsc \
+-pickup_runoff_out pickup_runoff.bin \
+-time_file output_time.txt \
+-write_time_steps 720 \
+-o po4.petsc,dop.petsc,oxy.petsc,phy.petsc,zoo.petsc,det.petsc,no3.petsc,dfe.petsc,pfe.petsc,dic.petsc,alk.petsc \
+-external_forcing \
+-periodic_biogeochem_forcing \
+-periodic_biogeochem_cycle_period 1.0 \
+-periodic_biogeochem_num_per_period 12 \
+-burial_sum_steps 720 \
+-bgc_params_file parameters_252_1.txt \
+-num_bgc_params 8 \
+-time_avg \
+-avg_time_steps 60 \
+-avg_files po4avg.petsc,dopavg.petsc,oxyavg.petsc,phyavg.petsc,zooavg.petsc,detavg.petsc,no3avg.petsc,dfeavg.petsc,pfeavg.petsc,dicavg.petsc,alkavg.petsc \
+-calc_diagnostics -diag_start_time_step 1 -diag_time_steps 720 \
+-diag_files fbgc1.petsc,fbgc2.petsc,fbgc3.petsc,fbgc4.petsc,fbgc5.petsc,fbgc6.petsc,fbgc7.petsc,fbgc8.petsc,fbgc9.petsc,fbgc10.petsc,fbgc11.petsc,fbgc12.petsc \
+-co2airseaflux_file co2airseaflux_surf.bin \
+> log
+
+# Fortran version of MOPS run via the C driver and built as a standalone executable (depends on libtmm.so and libmops.so)
+
+mpiexec -np 4 ./tmmmops \
+-me Ae \
+-mi Ai \
+-t0 0.0 -iter0 0 \
+-deltat_clock 0.0013888888888889 \
+-max_steps 720 \
+-use_profiles \
+-periodic_matrix \
+-matrix_cycle_period 1.0 \
+-matrix_num_per_period 12 \
+-separate_biogeochem_time_stepping \
+-nzeuph 2 \
+-num_biogeochem_steps_per_ocean_step 8 \
+-biogeochem_deltat 43200.0 \
+-numtracers 11 \
+-i po4ini.petsc,dopini.petsc,oxyini.petsc,phyini.petsc,zooini.petsc,detini.petsc,no3ini.petsc,dfeini.petsc,pfeini.petsc,dicini.petsc,alkini.petsc \
+-pickup_out pickup.petsc \
+-pickup_runoff_out pickup_runoff.bin \
+-time_file output_time.txt \
+-write_time_steps 720 \
+-o po4.petsc,dop.petsc,oxy.petsc,phy.petsc,zoo.petsc,det.petsc,no3.petsc,dfe.petsc,pfe.petsc,dic.petsc,alk.petsc \
+-external_forcing \
+-periodic_biogeochem_forcing \
+-periodic_biogeochem_cycle_period 1.0 \
+-periodic_biogeochem_num_per_period 12 \
+-burial_sum_steps 720 \
+-bgc_params_file parameters_252_1.txt \
+-num_bgc_params 8 \
+-time_avg \
+-avg_time_steps 60 \
+-avg_files po4avg.petsc,dopavg.petsc,oxyavg.petsc,phyavg.petsc,zooavg.petsc,detavg.petsc,no3avg.petsc,dfeavg.petsc,pfeavg.petsc,dicavg.petsc,alkavg.petsc \
+-calc_diagnostics -diag_start_time_step 1 -diag_time_steps 720 \
+-diag_files fbgc1.petsc,fbgc2.petsc,fbgc3.petsc,fbgc4.petsc,fbgc5.petsc,fbgc6.petsc,fbgc7.petsc,fbgc8.petsc,fbgc9.petsc,fbgc10.petsc,fbgc11.petsc,fbgc12.petsc \
+-co2airseaflux_file co2airseaflux_surf.bin \
+> log

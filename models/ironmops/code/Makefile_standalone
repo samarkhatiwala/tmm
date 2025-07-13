@@ -1,0 +1,61 @@
+# Set the environment variable TMM_DIR to point to the top level of the TMM code
+#
+
+default: all
+
+MODEL_DIR ?= $(shell pwd)
+
+include ${PETSC_DIR}/lib/petsc/conf/variables
+include ${PETSC_DIR}/lib/petsc/conf/rules
+
+SRCTMM = tmm_main.c
+
+BUILDDIR := build
+MODEL := mops
+EXE := tmm${MODEL}
+LIBMODEL := lib$(MODEL).so
+LIBTMM := ${TMM_DIR}/lib/libtmm.so
+
+#
+OBJTMM = $(addprefix $(BUILDDIR)/,$(SRCTMM:.c=.o))
+
+INCLUDEPATHS = $(addprefix -I,$(TMM_DIR)/include)
+
+VPATH = $(TMM_DIR)/src
+
+# Set compiler-dependent flags
+FPPFLAG=
+ifeq ($(strip $(MPIFC_SHOW)),)
+	COMPILER=$(FC)
+else
+	COMPILER=$(word 1,$(MPIFC_SHOW))
+endif
+
+ifneq (,$(findstring ifort,$(COMPILER)))
+	FC_FLAGS+=
+endif
+ifneq (,$(findstring gfortran,$(COMPILER)))
+	FC_FLAGS+=
+endif
+ifneq (,$(findstring xlf,$(COMPILER)))
+	FPPFLAG+=-WF,
+	FC_FLAGS+=-qzerosize
+endif
+ifneq (,$(findstring ftn,$(COMPILER)))
+	FC_FLAGS+=
+endif
+
+all: $(EXE)
+
+$(BUILDDIR)/%.o: %.c | $(BUILDDIR)
+	$(CC) $(INCLUDEPATHS) $(PCC_FLAGS) $(CFLAGS) $(CCPPFLAGS) -c -o $@ $<
+
+$(BUILDDIR):
+	mkdir -p $(BUILDDIR)
+
+$(EXE): $(OBJTMM) $(LIBMODEL) $(LIBTMM)
+	-$(CLINKER) -o $@ $(OBJTMM) $(PETSC_MAT_LIB) -L$(TMM_DIR)/lib -ltmm -L$(MODEL_DIR) -l${MODEL} -Wl,-rpath,$(TMM_DIR)/lib -Wl,-rpath,$(MODEL_DIR)
+
+cleanall:
+	rm -f $(OBJTMM)
+	rm -f $(BUILDDIR)/*.mod $(BUILDDIR)/*.i $(BUILDDIR)/*.i90

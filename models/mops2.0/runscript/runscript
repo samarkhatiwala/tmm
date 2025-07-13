@@ -1,0 +1,51 @@
+mpiexec -np 4 ./tmmmops \
+-numtracers 9 \
+-i po4ini.petsc,dopini.petsc,oxyini.petsc,phyini.petsc,zooini.petsc,detini.petsc,no3ini.petsc,dicini.petsc,alkini.petsc \
+-me Ae \
+-mi Ai \
+-t0 0.0 -iter0 0 \
+-deltat_clock 0.0013888888888889 \
+-max_steps 720 \
+-write_time_steps 720 \
+-o po4.petsc,dop.petsc,oxy.petsc,phy.petsc,zoo.petsc,det.petsc,no3.petsc,dic.petsc,alk.petsc \
+-external_forcing \
+-use_profiles \
+-nzeuph 2 \
+-biogeochem_deltat 43200.0 -days_per_year 360.0 \
+-burial_sum_steps 720 \
+-periodic_matrix \
+-matrix_cycle_period 1.0 -matrix_num_per_period 12 \
+-periodic_biogeochem_forcing \
+-periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_num_per_period 12 \
+-separate_biogeochem_time_stepping \
+-num_biogeochem_steps_per_ocean_step 8 \
+-bgc_params_file parameters_input.txt -bgc_paramnames_file parameters_names.txt \
+-num_bgc_params_file num_bgc_params.txt \
+-pickup_runoff_out runoffend.bin \
+> log
+
+mpiexec -np 4 python3 -m tmm -module mops \
+-numtracers 9 \
+-i po4ini.petsc,dopini.petsc,oxyini.petsc,phyini.petsc,zooini.petsc,detini.petsc,no3ini.petsc,dicini.petsc,alkini.petsc \
+-me Ae \
+-mi Ai \
+-t0 0.0 -iter0 0 \
+-deltat_clock 0.0013888888888889 \
+-max_steps 720 \
+-write_time_steps 720 \
+-o po4.petsc,dop.petsc,oxy.petsc,phy.petsc,zoo.petsc,det.petsc,no3.petsc,dic.petsc,alk.petsc \
+-external_forcing \
+-use_profiles \
+-nzeuph 2 \
+-biogeochem_deltat 43200.0 -days_per_year 360.0 \
+-burial_sum_steps 720 \
+-periodic_matrix \
+-matrix_cycle_period 1.0 -matrix_num_per_period 12 \
+-periodic_biogeochem_forcing \
+-periodic_biogeochem_cycle_period 1.0 -periodic_biogeochem_num_per_period 12 \
+-separate_biogeochem_time_stepping \
+-num_biogeochem_steps_per_ocean_step 8 \
+-bgc_params_file parameters_input.txt -bgc_paramnames_file parameters_names.txt \
+-num_bgc_params_file num_bgc_params.txt \
+-pickup_runoff_out runoffend.bin \
+> log

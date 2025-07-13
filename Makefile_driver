@@ -1,0 +1,61 @@
+# Set the environment variable TMM_DIR to point to the top level of the TMM code
+#
+
+default: all
+
+TMMBASE = ${TMM_DIR}
+
+include ${PETSC_DIR}/lib/petsc/conf/variables
+include ${PETSC_DIR}/lib/petsc/conf/rules
+
+SSTUBS = tmm_external_forcing.c tmm_external_bc.c tmm_monitor.c tmm_misfit.c
+STMM = tmm_main.c $(SSTUBS)
+
+SRCDIR   := ${TMMBASE}/src
+BUILDDIR := build
+EXE := tmm
+LIBTMM := $(TMMBASE)/lib/libtmm.so
+
+#
+SRCTMM = $(addprefix $(SRCDIR)/,$(STMM))
+
+OBJTMM := $(subst $(SRCDIR), $(BUILDDIR), $(SRCTMM:.c=.o))
+
+INCLUDEPATHS = $(addprefix -I,$(TMMBASE)/include)
+
+# Set compiler-dependent flags
+FPPFLAG=
+ifeq ($(strip $(MPIFC_SHOW)),)
+	COMPILER=$(FC)
+else
+	COMPILER=$(word 1,$(MPIFC_SHOW))
+endif
+
+ifneq (,$(findstring ifort,$(COMPILER)))
+	FC_FLAGS+=
+endif
+ifneq (,$(findstring gfortran,$(COMPILER)))
+	FC_FLAGS+=
+endif
+ifneq (,$(findstring xlf,$(COMPILER)))
+	FPPFLAG+=-WF,
+	FC_FLAGS+=-qzerosize
+endif
+ifneq (,$(findstring ftn,$(COMPILER)))
+	FC_FLAGS+=
+endif
+
+all: $(EXE)
+
+$(BUILDDIR)/%.o: $(SRCDIR)/%.c | $(BUILDDIR)
+	$(CC) $(INCLUDEPATHS) $(PCC_FLAGS) $(CFLAGS) $(CCPPFLAGS) -c -o $@ $<
+
+$(BUILDDIR):
+	mkdir -p $(BUILDDIR)
+
+$(EXE): $(OBJTMM) $(LIBTMM)
+	-$(CLINKER) -o $@ $(OBJTMM) $(PETSC_MAT_LIB) -L$(TMMBASE)/lib -ltmm -Wl,-rpath,$(TMMBASE)/lib
+
+cleanall:
+	rm -f $(OBJTMM)
+	rm -f $(BUILDDIR)/*.mod $(BUILDDIR)/*.i $(BUILDDIR)/*.i90

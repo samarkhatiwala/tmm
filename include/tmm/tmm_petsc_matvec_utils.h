@@ -1,0 +1,14 @@
+extern PetscErrorCode VecAXPBYmy(PetscScalar a,PetscScalar b,Vec x,Vec y,Vec *z);
+extern PetscErrorCode MatAXPBYmy(PetscScalar a,PetscScalar b,Mat X,Mat Y,Mat *Z);
+extern PetscErrorCode VecLoadIntoVectorRandomAccess(PetscViewer viewer,Vec vec, PetscInt length, PetscInt iRec);
+extern PetscErrorCode VecLoadIntoVectorRandomAccessFromFile(const char filename[],Vec vec, PetscInt length, PetscInt iRec);
+extern PetscErrorCode VecLoadVecIntoArray(Vec c, const char filename[], PetscScalar *arr);
+extern PetscErrorCode MatGetSizeFromFile(const char filename[], PetscInt *M, PetscInt *N, PetscInt *nnz);
+extern PetscErrorCode VecLoadIntoArray(PetscInt lDim, const char filename[], PetscScalar *arr);
+extern PetscErrorCode VecCreateFromLocalSize(PetscInt lDim, Vec *c);
+extern PetscErrorCode VecCreateWithArrayFromLocalSize(PetscInt lDim, PetscScalar *arr, Vec *c);
+extern PetscErrorCode VecWriteLocalArrayToVec(PetscInt lDim, PetscScalar *arr, const char filename[], PetscFileMode mode);
+extern PetscErrorCode dotProdArrays(PetscScalar *xarr, PetscScalar *yarr, PetscInt n, PetscScalar *z);
+extern PetscErrorCode sumArray(PetscScalar *xarr, PetscInt n, PetscScalar *z);
+extern PetscErrorCode sumScalar(PetscScalar x, PetscScalar *tot);
+extern PetscErrorCode Barrier(void);
