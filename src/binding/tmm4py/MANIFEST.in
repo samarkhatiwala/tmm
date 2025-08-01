@@ -1,0 +1,6 @@
+include README.md
+include pyproject.toml
+include *.pyx
+include *.pxd
+include *.py
+recursive-include tmm4py *.py 

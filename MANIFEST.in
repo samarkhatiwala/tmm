@@ -1,0 +1,9 @@
+include Makefile
+include Makefile_driver
+include Readme
+
+recursive-include src *
+recursive-include include *
+recursive-include lib *
+recursive-include examples *
+recursive-include models *
