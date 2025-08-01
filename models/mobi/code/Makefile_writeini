@@ -34,24 +34,19 @@ INCLUDEPATHS = $(addprefix -I,$(MODEL_DIR)/src $(UVICBASE1)/common $(UVICBASE1)/
 VPATH = $(MODEL_DIR)/src:$(UVICBASE1)/common:$(UVICBASE1)/mom:$(UVICBASE1)/embm:$(UVICBASE1)/sed:$(UVICBASE2)/common:$(UVICBASE2)/mom:$(UVICBASE2)/embm:$(UVICBASE2)/sed
 
 # Set compiler-dependent flags
+findany = $(if $1,$(or $(findstring $(firstword $1),$2),$(call findany,$(wordlist 2,$(words $1),$1),$2)))
 FPPFLAG=
-ifeq ($(strip $(MPIFC_SHOW)),)
-	COMPILER=$(FC)
-else
-	COMPILER=$(word 1,$(MPIFC_SHOW))
-endif
-
-ifneq (,$(findstring ifort,$(COMPILER)))
+ifneq (,$(call findany,ifort intel Intel,$(FC_VERSION)))
 	FC_FLAGS+=-convert big_endian -assume byterecl -r8
 endif
-ifneq (,$(findstring gfortran,$(COMPILER)))
+ifneq (,$(call findany,gfortran gcc GCC,$(FC_VERSION)))
 	FC_FLAGS+=-fconvert=big-endian -fdefault-real-8
 endif
-ifneq (,$(findstring xlf,$(COMPILER)))
+ifneq (,$(call findany,xlf IBM,$(FC_VERSION)))
 	FPPFLAG+=-WF,
 	FC_FLAGS+=-qrealsize=8 -qzerosize
 endif
-ifneq (,$(findstring ftn,$(COMPILER)))
+ifneq (,$(call findany,ftn cray Cray CRAY,$(FC_VERSION)))
 	FC_FLAGS+=-h byteswapio -s real64
 endif
 

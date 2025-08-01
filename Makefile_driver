@@ -23,28 +23,6 @@ OBJTMM := $(subst $(SRCDIR), $(BUILDDIR), $(SRCTMM:.c=.o))
 
 INCLUDEPATHS = $(addprefix -I,$(TMMBASE)/include)
 
-# Set compiler-dependent flags
-FPPFLAG=
-ifeq ($(strip $(MPIFC_SHOW)),)
-	COMPILER=$(FC)
-else
-	COMPILER=$(word 1,$(MPIFC_SHOW))
-endif
-
-ifneq (,$(findstring ifort,$(COMPILER)))
-	FC_FLAGS+=
-endif
-ifneq (,$(findstring gfortran,$(COMPILER)))
-	FC_FLAGS+=
-endif
-ifneq (,$(findstring xlf,$(COMPILER)))
-	FPPFLAG+=-WF,
-	FC_FLAGS+=-qzerosize
-endif
-ifneq (,$(findstring ftn,$(COMPILER)))
-	FC_FLAGS+=
-endif
-
 all: $(EXE)
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c | $(BUILDDIR)

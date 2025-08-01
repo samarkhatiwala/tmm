@@ -29,13 +29,7 @@ CFLAGS += -fvisibility=default
 
 # Set extra linker flag for clang (MacOS)
 EXTRALINKERFLAG=
-ifeq ($(strip $(MPICC_SHOW)),)
-	CCOMPILER=$(CC)
-else
-	CCOMPILER=$(word 1,$(MPICC_SHOW))
-endif
-
-ifneq (,$(findstring clang,$(CCOMPILER)))
+ifneq (,$(findstring clang,$(C_VERSION)))
 	EXTRALINKERFLAG+=-install_name @rpath/$(LIB)
 endif
 

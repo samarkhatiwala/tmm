@@ -34,28 +34,6 @@ INCLUDEPATHS = $(addprefix -I,$(MODEL_DIR)/src $(TMM_DIR)/include)
 
 VPATH = $(MODEL_DIR)/src:$(TMM_DIR)/src
 
-# Set compiler-dependent flags
-FPPFLAG=
-ifeq ($(strip $(MPIFC_SHOW)),)
-	COMPILER=$(FC)
-else
-	COMPILER=$(word 1,$(MPIFC_SHOW))
-endif
-
-ifneq (,$(findstring ifort,$(COMPILER)))
-	FC_FLAGS+=
-endif
-ifneq (,$(findstring gfortran,$(COMPILER)))
-	FC_FLAGS+=
-endif
-ifneq (,$(findstring xlf,$(COMPILER)))
-	FPPFLAG+=-WF,
-	FC_FLAGS+=-qzerosize
-endif
-ifneq (,$(findstring ftn,$(COMPILER)))
-	FC_FLAGS+=
-endif
-
 PROGRAM = mops
 RPROGRAM = rmops
 IPROGRAM = imops
@@ -74,13 +52,7 @@ endif
 
 # Set extra linker flag for clang (MacOS)
 EXTRALINKERFLAG=
-ifeq ($(strip $(MPICC_SHOW)),)
-	CCOMPILER=$(CC)
-else
-	CCOMPILER=$(word 1,$(MPICC_SHOW))
-endif
-
-ifneq (,$(findstring clang,$(CCOMPILER)))
+ifneq (,$(findstring clang,$(C_VERSION)))
 	EXTRALINKERFLAG+=-install_name @rpath/$(LIB)
 endif
 

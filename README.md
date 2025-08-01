@@ -65,13 +65,7 @@ When installation is complete, the path to the installation location will be pri
 
 export TMM_DIR=$TOPDIR/TMM
 
-###### Notes:
-
-(i) It is recommended that you delete the object files created above and in any of the subsequent examples with 'make cleanall'
-
-(ii) The way libraries are internally named and installed on MacOS by the native clang C compiler is different from gcc or on Linux. (Essentially, you will get a 'library not found' error when running the code.) To account for this, the Makefiles in the TMM add an extra flag when compiling with clang but they need to be able to detect that you're using clang. This usually works but occasionally fails. If this happens to you then specify the compiler explicitly here and elsewhere in this guide: 
-
-make CCOMPILER=clang ...
+Note: You can delete the object files created above and in any of the subsequent examples with 'make cleanall'
 
 (5) Lastly, build the tmm4py extension module (replace python3 with python if necessary):
 
