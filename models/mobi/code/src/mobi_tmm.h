@@ -1,3 +1,17 @@
+#if !defined(PETSC_HAVE_FORTRAN_UNDERSCORE) 
+#define mobi_copy_data_ mobi_copy_data
+#define mobi_sed_copy_data_ mobi_sed_copy_data
+#define mobi_ini_ mobi_ini
+#define mobi_start_ mobi_start
+#define mobi_stop_ mobi_stop
+#define mobi_calc_ mobi_calc
+#define mobi_diags_ini_ mobi_diags_ini
+#define mobi_diags_accumulate_ mobi_diags_accumulate
+#define mobi_diags2d_copy_ mobi_diags2d_copy
+#define mobi_diags3d_copy_ mobi_diags3d_copy
+#define mobi_diags_finalize_ mobi_diags_finalize
+#endif 
+
 extern void mobi_copy_data_(PetscInt *lSize, PetscInt *numLocProfiles, PetscInt *itr, PetscScalar localTR[], PetscInt *direction);
 
 extern void mobi_sed_copy_data_(PetscInt *numLocProfiles, PetscScalar localSedMixTR[], PetscScalar localSedBurTR[], PetscInt *direction);
@@ -99,18 +113,4 @@ extern void mobi_diags2d_copy_(PetscInt *id, PetscScalar diagArr[], char *fname,
 extern void mobi_diags3d_copy_(PetscInt *id, PetscScalar diagArr[], char *fname, PetscInt *debugFlag);
 
 extern void mobi_diags_finalize_(PetscInt *debugFlag);
-
-#if !defined(PETSC_HAVE_FORTRAN_UNDERSCORE) 
-#define mobi_copy_data_ mobi_copy_data
-#define mobi_sed_copy_data_ mobi_sed_copy_data
-#define mobi_ini_ mobi_ini
-#define mobi_start_ mobi_start
-#define mobi_stop_ mobi_stop
-#define mobi_calc_ mobi_calc
-#define mobi_diags_ini_ mobi_diags_ini
-#define mobi_diags_accumulate_ mobi_diags_accumulate
-#define mobi_diags2d_copy_ mobi_diags2d_copy
-#define mobi_diags3d_copy_ mobi_diags3d_copy
-#define mobi_diags_finalize_ mobi_diags_finalize
-#endif 
 

@@ -3,25 +3,23 @@
 
 default: all
 
-TMMBASE = ${TMM_DIR}
-
 include ${PETSC_DIR}/lib/petsc/conf/variables
 include ${PETSC_DIR}/lib/petsc/conf/rules
 
 SSTUBS = tmm_external_forcing.c tmm_external_bc.c tmm_monitor.c tmm_misfit.c
 STMM = tmm_main.c $(SSTUBS)
 
-SRCDIR   := ${TMMBASE}/src
+SRCDIR   := ${TMM_DIR}/src
 BUILDDIR := build
 EXE := tmm
-LIBTMM := $(TMMBASE)/lib/libtmm.so
+LIBTMM := $(TMM_DIR)/lib/libtmm.so
 
 #
 SRCTMM = $(addprefix $(SRCDIR)/,$(STMM))
 
 OBJTMM := $(subst $(SRCDIR), $(BUILDDIR), $(SRCTMM:.c=.o))
 
-INCLUDEPATHS = $(addprefix -I,$(TMMBASE)/include)
+INCLUDEPATHS = $(addprefix -I,$(TMM_DIR)/include)
 
 all: $(EXE)
 
@@ -32,7 +30,7 @@ $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
 $(EXE): $(OBJTMM) $(LIBTMM)
-	-$(CLINKER) -o $@ $(OBJTMM) $(PETSC_MAT_LIB) -L$(TMMBASE)/lib -ltmm -Wl,-rpath,$(TMMBASE)/lib
+	-$(CLINKER) -o $@ $(OBJTMM) $(PETSC_MAT_LIB) -L$(TMM_DIR)/lib -ltmm -Wl,-rpath,$(TMM_DIR)/lib
 
 cleanall:
 	rm -f $(OBJTMM)

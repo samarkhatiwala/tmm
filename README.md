@@ -1,14 +1,16 @@
 **ANNOUNCEMENT**: I'm pleased to announce the release of version 3 of the Transport Matrix Method (TMM) software. Included in this release is **tmm4py**, a full-featured wrapper exposing all of the TMM's functionality in Python. tmm4py enables one to write biogeochemical models in Python, Fortran and/or C and run them entirely from Python. To make this possible, the TMM software has been redesigned from the ground up along object oriented principles as a library callable from other languages.
 
-A paper describing tmm4py and the new TMM library is under review at *J. Adv. Model. Earth Sys.* I will post a link here if and when it is published. In the meantime feel free to email if you have any questions:  <samkat6@gmail.com>
+You can read a description of tmm4py and the new TMM library in this *J. Adv. Model. Earth Sys.* article: http://dx.doi.org/10.1029/2025MS005028.
 
 ------------------------------------------------------------------------------------------------
 
 This is the Transport Matrix Method (TMM) code repository. It includes the core TMM software library, a Python wrapper tmm4py, and various biogeochemical models adapted to the TMM framework. The TMM software is written using the PETSc framework (http://www.mcs.anl.gov/petsc/). 
 
-**How to cite**: If you use the TMM, please cite Khatiwala et al. (2005; https://doi.org/10.1016/j.ocemod.2004.04.002) and Khatiwala (2007; https://doi.org/10.1029/2007GB002923). If you use any of my transport matrices or related data please cite this GitHub page as the source, as well as Khatiwala (2007) and the papers for the relevant transport matrix configurations listed here: https://sites.google.com/view/samarkhatiwala-research-tmm. Furthermore, if you use this code please also cite Khatiwala (2018; https://doi.org/10.5281/zenodo.1246300). Thank you!
+**How to cite**: If you use the TMM, please cite Khatiwala et al. (2005; https://doi.org/10.1016/j.ocemod.2004.04.002) and Khatiwala (2007; https://doi.org/10.1029/2007GB002923). If you use tmm4py, please cite Khatiwala (2025; http://dx.doi.org/10.1029/2025MS005028). If you use any of my transport matrices or related data please cite this GitHub page as the source, as well as Khatiwala (2007) and the papers for the relevant transport matrix configurations listed here: https://sites.google.com/view/samarkhatiwala-research-tmm. Thank you!
 
 **IMPORTANT**: Please do NOT post the TMM code or any data files downloaded from this or related websites on your own github or other website. See LICENSE.txt for licensing information.
+
+Feel free to email if you have any questions: <samkat6@gmail.com>
 
 ------------------------------------------------------------------------------------------------
 
