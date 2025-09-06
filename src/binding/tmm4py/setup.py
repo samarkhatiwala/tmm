@@ -9,15 +9,17 @@ enabling efficient numerical methods for ocean circulation modeling and
 biogeochemical simulations through a Python interface.
 """
 
-import re
 import os
 import sys
 import numpy
 import warnings
+from pathlib import Path
 from setuptools import setup, Extension
 from Cython.Build import cythonize
 import site
 import logging
+import sys
+import subprocess
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -44,63 +46,84 @@ Topic :: Software Development :: Libraries
 """
 
 
-def version():
-    # Read version from include/tmm/tmmversion.h
-    version_re = {
-        "major": re.compile(r"#define\s+TMM_VERSION_MAJOR\s+(\d+)"),
-        "minor": re.compile(r"#define\s+TMM_VERSION_MINOR\s+(\d+)"),
-        "subminor": re.compile(r"#define\s+TMM_VERSION_SUBMINOR\s+(\d+)"),
-    }
-    tmmversion_h = os.path.join("..", "..", "..", "include", "tmm", "tmmversion.h")
-    if os.path.exists(tmmversion_h):
-        try:
-            with open(tmmversion_h, "r") as f:
-                data = f.read()
-            major = int(version_re["major"].search(data).groups()[0])
-            minor = int(version_re["minor"].search(data).groups()[0])
-            subminor = int(version_re["subminor"].search(data).groups()[0])
-            return "%d.%d.%d" % (major, minor, subminor)
-        except:
-            pass
-
-    # default version if header file doesn't exist or can't be read
-    return "1.0.0"
-
-
 def get_site_package_dir(package_name):
     """Find out where the final package will be installed in site-packages"""
     return os.path.join(site.getsitepackages()[0], package_name)
 
 
-# Get PETSc and TMM paths from environment variables
-if "PETSC_DIR" in os.environ and os.environ["PETSC_DIR"] != "":
-    petsc_dir = os.environ["PETSC_DIR"]
+# we should fail to build if the build info file is not found
+build_info_file = Path(__file__).parent / "_build_info.txt"
+build_info = build_info_file.read_text().strip()
+print("Reading build info from file: ", build_info)
+
+petsc_setup, petsc_ver, numpy_ver = [x.split(":")[1] for x in build_info.split("|")]
+if petsc_ver == "LATEST":
+    required_petsc = "petsc4py"
 else:
+    required_petsc = f"petsc4py=={petsc_ver}"
+if numpy_ver == "LATEST":
+    required_numpy = "numpy"
+else:
+    required_numpy = f"numpy=={numpy_ver}"
+
+
+log.info(f"PETSc setup type: {petsc_setup}")
+
+if petsc_setup == "PIP_PETSC_NO_PETSC4PY":
+    log.info("Using pip PETSc installation")
     import petsc
 
     petsc_dir = petsc.get_petsc_dir()
     os.environ["PETSC_DIR"] = petsc_dir
-
-log.info("Using PETSC_DIR: " + petsc_dir)
-
-if "PETSC_ARCH" in os.environ:
-    petsc_arch = os.environ["PETSC_ARCH"]
-else:
-    log.error("PETSC_ARCH not set. Using default PETSC_ARCH")
     petsc_arch = ""
+    extra_install_requires = [required_petsc]
+elif petsc_setup == "USER_PETSC_WITH_PETSC4PY":
+    log.info("Using user PETSc installation with petsc4py")
+    petsc_dir = os.environ["PETSC_DIR"]
+    petsc_arch = os.environ.get("PETSC_ARCH", "")
+    # must be appended to sys.path so that the petsc4py library can be found by Cython during the build
+    sys.path.append(os.path.join(petsc_dir, petsc_arch, "lib"))
+    # The user is respoinsible for ensuring the correct numpy version is installed and adding the petc4py to PYTHONPATH.
+    # We will try and install latest numpy version but they may have to specify their own and use --no-build-isolation
+    extra_install_requires = [required_numpy]
+elif petsc_setup == "USER_PETSC_NO_PETSC4PY":
+    log.info("Using user PETSc installation without petsc4py")
+    petsc_dir = os.environ["PETSC_DIR"]
+    petsc_arch = os.environ.get("PETSC_ARCH", "")
+    extra_install_requires = [required_petsc]
+else:
+    raise RuntimeError(f"Unknown PETSc setup type: {petsc_setup}")
 
-if "TMM_DIR" in os.environ and os.environ["TMM_DIR"] != "":
+log.info("Using PETSC_DIR: " + petsc_dir + " and PETSC_ARCH: " + petsc_arch)
+
+if os.environ.get("TMM_DIR", "") != "":
     tmm_root = os.environ["TMM_DIR"]
+    pip_tmm = False
 else:
     import tmmlib
 
+    pip_tmm = True
     tmm_root = tmmlib.get_tmm_dir()
     os.environ["TMM_DIR"] = tmm_root
+    extra_install_requires = ["tmmlib"] + extra_install_requires
 
 log.info("Using TMM_DIR: " + tmm_root)
 
+log.info(f"Extra install requires: {extra_install_requires}")
+
 tmm_lib_path = os.path.join(tmm_root, "lib")
 tmm_include_path = os.path.join(tmm_root, "include")
+# If we are installing from pip we have to link the tmm library to the site packages directory
+# because tmm_lib_path is pointed towards the tmm version built in the temporary build enviroment.
+tmm_extra_link_path = (
+    os.path.join(get_site_package_dir("tmmlib"), "lib") if pip_tmm else tmm_lib_path
+)
+
+log.info("Getting TMM version")
+verscript = os.path.join(tmm_root, "lib", "tmmversion")
+tmm_ver = subprocess.run(
+    [f"{verscript}"], capture_output=True, text=True
+).stdout.strip()
 
 petscvariables = os.path.join(
     petsc_dir, petsc_arch, "lib", "petsc", "conf", "petscvariables"
@@ -115,7 +138,7 @@ if os.path.isfile(petscvariables):
         CC = CC.replace("${PETSC_DIR}", petsc_dir)
 else:
     warnings.warn(
-        f"File {petscvariables} not found. Trying tp determing C compiler from CC environment variable"
+        f"File {petscvariables} not found. Trying to determine C compiler from CC environment variable"
     )
     if "CC" in os.environ:
         CC = os.environ["CC"]
@@ -125,6 +148,9 @@ else:
         )
 
 os.environ["CC"] = CC
+
+# Deal with MacOS/clang
+os.environ["ARCHFLAGS"] = ""
 
 include_paths = [
     os.path.join(petsc_dir, "include"),
@@ -152,7 +178,7 @@ extensions = [
         extra_compile_args=["-fPIC"],
         extra_link_args=[
             "-Wl,-rpath," + os.path.join(get_site_package_dir("petsc"), "lib"),
-            "-Wl,-rpath," + os.path.join(get_site_package_dir("tmmlib"), "lib"),
+            "-Wl,-rpath," + tmm_extra_link_path,
         ],
     )
 ]
@@ -160,7 +186,7 @@ extensions = [
 
 setup(
     name="tmm4py",
-    version=version(),
+    version=tmm_ver.split(".dev")[0] + ".dev7",
     description=description.pop(0),
     long_description="\n".join(description),
     long_description_content_type="text/x-rst",
@@ -176,10 +202,7 @@ setup(
     maintainer_email="tmm-maint@example.com",
     ext_modules=cythonize(extensions, language_level="3", include_path=include_paths),
     **metadata,
-    install_requires=[
-        "petsc4py",
-        "tmmlib @ file:///home/jamie/repos/tmm_repo/tmm",
-        "mpich",
-    ],
+    py_modules=["tmm"],
+    install_requires=extra_install_requires,
     setup_requires=[],
 )

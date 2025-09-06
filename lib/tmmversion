@@ -14,5 +14,5 @@ major=`grep "#define TMM_VERSION_MAJOR" $file | tr -s ' ' | cut -d" " -f 3`
 minor=`grep "#define TMM_VERSION_MINOR" $file | tr -s ' ' | cut -d" " -f 3`
 subminor=`grep "#define TMM_VERSION_SUBMINOR" $file | tr -s ' ' | cut -d" " -f 3`
 
-echo ${major} ${minor} ${subminor}
+echo ${major}.${minor}.${subminor}
 exit 0

@@ -2,10 +2,7 @@
 requires = [
   "setuptools", 
   "wheel",
-  "Cython",
-  "numpy",
-  "petsc4py",
-  "tmmlib @ file:///home/jamie/repos/tmm_repo/tmm"
 ]
-build-backend = "setuptools.build_meta"
+build-backend = "backend"
+backend-path = ["."]
 

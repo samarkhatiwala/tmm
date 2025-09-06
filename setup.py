@@ -11,7 +11,6 @@ for ocean circulation modeling and biogeochemical simulations.
 import re
 import os
 import sys
-import shlex
 import shutil
 from setuptools import setup
 from setuptools.command.install import install as _install
@@ -69,25 +68,25 @@ def bootstrap():
             fh.write(contents)
 
 
-def has_existing_petsc_dir():
-    if "PETSC_DIR" in os.environ:
+def get_petsc_dir():
+    if "PETSC_DIR" in os.environ and os.environ["PETSC_DIR"] != "":
         petsc_dir = os.environ["PETSC_DIR"]
-        return os.path.exists(petsc_dir)
-    return False
+        log.info(f"DEBUG: PETSC_DIR found in environment: {petsc_dir}")
+    else:
+        import petsc
+
+        petsc_dir = petsc.get_petsc_dir()
+        log.info(
+            f"DEBUG: Using built-in PETSC_DIR found in pip petsc package: {petsc_dir}"
+        )
+
+    return petsc_dir
 
 
 def build(dry_run=False):
     print("DEBUG: Starting TMM build")
     log.info("TMM: build")
 
-    import petsc
-
-    petsc_dir = petsc.get_petsc_dir()
-    os.environ["PETSC_DIR"] = petsc_dir
-    print(f"DEBUG: PETSC_DIR set to: {petsc_dir}")
-    log.info("PETSC_DIR set to: %s" % petsc_dir)
-
-    # Run TMM build
     if dry_run:
         return
     make = shutil.which("make")
@@ -117,10 +116,13 @@ class context(object):
     def enter(self):
         del sys.argv[1:]
         tdir = os.environ["TMM_DIR"]
+        os.environ["PETSC_DIR"] = get_petsc_dir()
         os.chdir(tdir)
         return self
 
     def exit(self):
+        # explicitly unset PETSC_DIR incase we re-use build enviroment with --no-build-isolation
+        os.environ.pop("PETSC_DIR", None)
         sys.argv[:] = self.sys_argv
         os.chdir(self.wdir)
 
@@ -142,13 +144,8 @@ class cmd_install(_install):
 
         ctx = context().enter()
         try:
-            if has_existing_petsc_dir():
-                log.info(
-                    "DEBUG: PETSC_DIR already found in environment. Skipping build and install of TMM"
-                )
-            else:
-                build(self.dry_run)
-                install(prefix, self.dry_run)
+            build(self.dry_run)
+            install(prefix, self.dry_run)
         finally:
             ctx.exit()
 
@@ -193,7 +190,7 @@ def version():
             major = int(version_re["major"].search(data).groups()[0])
             minor = int(version_re["minor"].search(data).groups()[0])
             subminor = int(version_re["subminor"].search(data).groups()[0])
-            return "%d.%d.%d" % (major, minor, subminor)
+            return f"{major}.{minor}.{subminor}"
         except:
             pass
 
@@ -219,7 +216,7 @@ Topic :: Software Development :: Libraries
 bootstrap()
 setup(
     name="tmmlib",
-    version=version(),
+    version=version() + ".dev3",
     description=description.pop(0),
     long_description="\n".join(description),
     long_description_content_type="text/x-rst",

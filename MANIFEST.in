@@ -1,9 +1,8 @@
 include Makefile
 include Makefile_driver
 include Readme
+include *.py
 
 recursive-include src *
 recursive-include include *
 recursive-include lib *
-recursive-include examples *
-recursive-include models *
