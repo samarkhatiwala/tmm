@@ -362,11 +362,14 @@ PetscErrorCode TMMOutput(PetscScalar tc, PetscInt Iter, PetscInt iLoop, TMMState
 
 /* write output */
 // Note: templateVec and bcTemplateVec should have been set to zero elsewhere
+// The ">" in the if below ensures that the counter is not incremented until the field is 
+// written the first time at startTimeStep (caught by the second "==" conditional below)
 	if (Iter0+iLoop>state->writeTimer->startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
 /*    We do this here in case writeExternalForcing etc want to use writeTimer */	
-	  if (state->writeTimer->count<state->writeTimer->numTimeSteps) {
+//????? I don't think the if is needed here as the condition will always be met
+// 	  if (state->writeTimer->count<state->writeTimer->numTimeSteps) {
 	    state->writeTimer->count++;
-	  }
+// 	  }
  }
  if (state->useExternalForcing) { // xxxx should this be applyExternalForcing?
    ierr = TMMComputeExtForcFunction(tc,Iter,iLoop,state,TMM_WRI_FUNC);
@@ -435,10 +438,11 @@ PetscErrorCode TMMOutput(PetscScalar tc, PetscInt Iter, PetscInt iLoop, TMMState
 
  if (state->writePickup) {
    if (Iter0+iLoop>state->pickupTimer->startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
-     if (state->pickupTimer->count<state->pickupTimer->numTimeSteps) {
+//???? I don't think the if is needed here as the condition will always be met
+//      if (state->pickupTimer->count<state->pickupTimer->numTimeSteps) {
       state->pickupTimer->count++;
-     }
-   }		
+//      }
+   }	
 
 	  if (Iter0+iLoop>=state->pickupTimer->startTimeStep) { /* note: startTimeStep is ABSOLUTE time step */
      if ((state->pickupTimer->count==state->pickupTimer->numTimeSteps) || (Iter0+iLoop==state->pickupTimer->startTimeStep)) { /* time to write out */
@@ -460,39 +464,40 @@ PetscErrorCode TMMOutput(PetscScalar tc, PetscInt Iter, PetscInt iLoop, TMMState
 
  if (state->doTimeAverage) {
    if (Iter0+iLoop>=state->avgTimer->startTimeStep) { /* start time averaging (note: startTimeStep is ABSOLUTE time step) */
-     if (state->avgTimer->count<state->avgTimer->numTimeSteps) { /* still within same averaging block so accumulate */
+//????? I don't think the if is needed here as the condition will always be met
+//      if (state->avgTimer->count<state->avgTimer->numTimeSteps) { /* still within same averaging block so accumulate */
+     for (itr=0; itr<numTracers; itr++) {
+       ierr = VecAXPY(state->cavg[itr],one,state->c[itr]);CHKERRQ(ierr);
+     }   
+     if (state->doWriteQF) {
        for (itr=0; itr<numTracers; itr++) {
-         ierr = VecAXPY(state->cavg[itr],one,state->c[itr]);CHKERRQ(ierr);
-       }   
-		     if (state->doWriteQF) {
-      			for (itr=0; itr<numTracers; itr++) {
-		         if (state->applyForcingFromFile) {
-				         ierr = VecAXPY(state->qfavg[itr],one,state->qf[itr]);CHKERRQ(ierr);
-			        } else {
-         				ierr = VecAXPY(state->qfavg[itr],one,templateVec);CHKERRQ(ierr);			  
-      			  }
-      			}
-		     }
-		     if (state->doWriteQEF) {
-      			for (itr=0; itr<numTracers; itr++) {
-			        if (state->applyExternalForcing) {
-         				ierr = VecAXPY(state->qefavg[itr],one,state->qef[itr]);CHKERRQ(ierr);
-      			  } else {
-         				ierr = VecAXPY(state->qefavg[itr],one,templateVec);CHKERRQ(ierr);			  
-      			  }
-			      }
-		     }
-   		  if (state->doWriteBC) {
-			      for (itr=0; itr<numTracers; itr++) {
-      			  if (state->applyBC) {
-         				ierr = VecAXPY(state->cbavg[itr],one,state->cbf[itr]);CHKERRQ(ierr);
-      			  } else {
-         				ierr = VecAXPY(state->cbavg[itr],one,bcTemplateVec);CHKERRQ(ierr);
-      			  }
-    			  }
-   		  }	
-		     state->avgTimer->count++;
+         if (state->applyForcingFromFile) {
+           ierr = VecAXPY(state->qfavg[itr],one,state->qf[itr]);CHKERRQ(ierr);
+         } else {
+           ierr = VecAXPY(state->qfavg[itr],one,templateVec);CHKERRQ(ierr);			  
+         }
+       }
      }
+     if (state->doWriteQEF) {
+       for (itr=0; itr<numTracers; itr++) {
+         if (state->applyExternalForcing) {
+           ierr = VecAXPY(state->qefavg[itr],one,state->qef[itr]);CHKERRQ(ierr);
+         } else {
+           ierr = VecAXPY(state->qefavg[itr],one,templateVec);CHKERRQ(ierr);			  
+         }
+       }
+     }
+     if (state->doWriteBC) {
+       for (itr=0; itr<numTracers; itr++) {
+         if (state->applyBC) {
+           ierr = VecAXPY(state->cbavg[itr],one,state->cbf[itr]);CHKERRQ(ierr);
+         } else {
+           ierr = VecAXPY(state->cbavg[itr],one,bcTemplateVec);CHKERRQ(ierr);
+         }
+       }
+     }	
+     state->avgTimer->count++;
+//      }
      if (state->avgTimer->count==state->avgTimer->numTimeSteps) { /* time to write averages to file */        
        ierr = PetscPrintf(PETSC_COMM_WORLD,"Writing time average at time %10.5f, step %d\n", tc, Iter0+iLoop);CHKERRQ(ierr);
    		  ierr = PetscFPrintf(PETSC_COMM_WORLD,state->avgfptime,"%d   %10.5f\n",Iter0+iLoop,tc);CHKERRQ(ierr);

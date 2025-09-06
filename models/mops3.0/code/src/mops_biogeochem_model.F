@@ -9,9 +9,8 @@ C !INTERFACE: ==========================================================
 #ifdef CARBON
      &                 DICglobalavg,ALKglobalavg,localEmP,localpCO2atm,
 #endif     
-     &                 thetaloc,saltloc,fedeploc,
-     &                 FIceloc,SWRADloc,TAUloc,WINDloc,ATMOSPloc,
-     &                 dzloc,
+     &                 thetaloc,saltloc,FIceloc,SWRADloc,TAUloc,
+     &                 WINDloc,ATMOSPloc,dzloc,
 #ifdef CARBON
      &                 localph,localco2flux,
 #endif     
@@ -35,9 +34,8 @@ C !INPUT PARAMETERS: ===================================================
 #ifdef CARBON
       real*8 DICglobalavg,ALKglobalavg,localEmP,localpCO2atm
 #endif      
-      real*8 thetaloc(Nrloc),saltloc(Nrloc),fedeploc(Nrloc)
-      real*8 FIceloc,SWRADloc,TAUloc,WINDloc,ATMOSPloc
-      real*8 dzloc(Nrloc)
+      real*8 thetaloc(Nrloc),saltloc(Nrloc)
+      real*8 FIceloc,SWRADloc,TAUloc,WINDloc,ATMOSPloc,dzloc(Nrloc)
       logical useSeparateBiogeochemTS
 C     Output variables
 #ifdef CARBON
@@ -51,7 +49,6 @@ C !LOCAL VARIABLES: ====================================================
       REAL*8 bgc_dz(bgc_ktotal)
       REAL*8 bgc_swr,bgc_tau,bgc_seaice,bgc_wind,bgc_atmosp
       REAL*8 bgc_theta(bgc_ktotal),bgc_salt(bgc_ktotal)
-      REAL*8 bgc_fedep(bgc_ktotal)
 
       REAL*8 bgc_runoffvol(bgc_ktotal),bgc_globalrunoff
       
@@ -68,7 +65,6 @@ C     Copy physics and geometry
         bgc_dz(k)=dzloc(k)
         bgc_theta(k)=thetaloc(k)
         bgc_salt(k)=saltloc(k)
-        bgc_fedep(k)=fedeploc(k)
         bgc_runoffvol(k) = localrunoffloc(k)
       ENDDO
 
@@ -84,7 +80,7 @@ C Assign the tracers in "wet" grid boxes
       CALL BGC_MODEL(bgc_kloc,bgc_dz,
      &               bgc_runoffvol,bgc_globalrunoff,
      &               bgc_swr,bgc_tau,bgc_seaice,bgc_wind,bgc_atmosp,
-     &               bgc_theta,bgc_salt,bgc_fedep)
+     &               bgc_theta,bgc_salt)
       
 C     Send data back
 #ifdef CARBON

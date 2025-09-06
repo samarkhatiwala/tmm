@@ -22,9 +22,9 @@ ialk=10
 # ! Stoichiometry
 rcp=117.0 #redfield ratio C:P
 rnp=16.0 #redfield ratio N:P
-ro2ut = 169.2545586809128568828164418391679646447301  # L4-SO of Kriest et al. (2023) 
-subox = 1.0 #no oxic degradation below this level
-subdin = 16.0 #no denitrification below this level
+ro2ut = 194.7075436894855925140657149086109711788595  # from optimisation  O3
+subox = 1.0 #no oxic degradation below this level; default value of Kriest et al. (2020)
+subdin = 15.77129497301908116636132151100468945514876 # no denitrification below this level, optimal value of MIT28* of Kriest et al. (2020) 
 
 # N2-Fixatioon
 # Factors tf2, tf1 and tf0 are a polynomial (2nd order) 
@@ -40,16 +40,12 @@ tf2 = -0.0042
 tf1 = 0.2253
 tf0 = -2.7819
 tff = 0.2395  
-nfix = 0.002272073044 #[mmol N/m3/d]; if PO4>0 and DIN = 0 and T=26.82 this corresponds 
-# 	                  !to an integral over 100 m of ~ 200 umol N/m2/d, a 
-# 		              !rather high value acc. to Mahaffey et al., 2005
-# 		              !alternatively, 2 umol/m3/d = 0.08 nmol/L/hr,
-# 		              !a rather high value acc. to Mulholland (2007)
-# 
+nfix = 0.001194890759152962841758761653333104080232374 #[mmol N/m3/d]; optimal value of MIT28* of Kriest et al. (2020)
+
 # Phytoplankton parameters
 TempB = 15.65 #ref. temperature for T-dependent growth
 ACmuphy = 0.6 #max. growth rate [1/day]
-ACik = 22.13898097109098993262588095376486307941377 # L4-SO of Kriest et al. (2023) 
+ACik = 11.70844406776519093082294942220755729067605 # Light half-saturation constant [W/m2]; from optimisation O3
 ACkpo4 = 0.4995 #half-saturation constant for PO4 uptake [mmol P/m3]
 ACkchl  = 0.03*rnp #att. of Phy [1/(m*mmol P/m3)]
 ACkw = 0.04 #attenuation of water [1/m]
@@ -58,7 +54,7 @@ AComni = 0.0      #density dep. loss rate [m3/(mmol P * day)]
 plambda = 0.01 #phytoplankton mortality
 
 # Zooplankton parameters
-ACmuzoo=2.384719471821353179189981186247848654602421 # L4-SO of Kriest et al. (2023) 
+ACmuzoo= 3.000 # max. grazing rate [1/d]; from optimisation O3
 ACkphy=np.sqrt(ACmuzoo/1.0)/rnp #zoo half-saturation constant [mmol P]
 AClambdaz=0.03 #zooplankton excretion [1/d]
 AComniz=4.548 #zooplankton mortality [m3/(mmol P * day)]
@@ -66,31 +62,34 @@ ACeff=0.75 #assimilation efficiency
 zlambda=0.01 #zooplankton mortality
 
 # DOPparameters
-graztodop = 0.00 # fraction grazing that goes into DOP
-dlambda  = 0.0005133333049196715389730860613828195004870736 # base value of L4-SO in Kriest et al. (2023) 
+graztodop = 0.0003079415719245463227006268081518969292886823 # fraction grazing that goes into DOP; from optimisation O3
+dlambda  = 0.000662827652140595182064180623891097576816378 #DOP remineralization rate [1/day]  (SLOW recycling); from optimisation O3
 
 # A minimum value for the degradation of PHY and DOP
 alimit = 1.0e-3
 
 # Detritus parameters
 detlambda = 0.05 #detritus remineralisation rate [1/d]    
-detmartin = 1.022589344764692176467310580356695481896168 # L4-SO of Kriest et al. (2023)
+detmartin = 1.0 # from optimisation O3
 
 # Parameters specific to MOPS: (Kriest and Oschlies 2013, 2015)
 burdige_fac = 1.6828 # factor for sediment burial (see Kriest and Oschlies, 2013)
 burdige_exp = 0.799  # exponent for sediment burial (see Kriest and Oschlies, 2013)
-ACkbaco2 = 1.145532  #Half sat.-constant for oxic degradation (see Kriest and Oschlies, 2015)
-ACkbacdin = 23.083559 #Half sat.-constant for suboxic degradation (see Kriest and Oschlies, 2015)
+ACkbaco2 = 1.0  #Half sat.-constant for oxic degradation, optimal value of MIT28* of Kriest et al. (2020)
+ACkbacdin = 31.95521294352302090965856073978557105874643 #Half sat.-constant for suboxic degradation, optimal value of MIT28* of Kriest et al. (2020)
 
-# Parameters for the Fe cycle: all have been converted to deal with Fe in umol/m3 and P in mmol/m3
-rfep = 1.06           # Fe:P uptake ratio and internal ratio in organics [umol Fe/mmol P], Nickelsen et al. (2015), conversion: 66.25 [umol Fe/mol N]*16/1000 
-kfe  = 0.04           # half-saturation constant for dFe uptake by phytoplankton [umol Fe/m3], Nickelsen et al. (2015) 
-kfeorg = 2.3806      # scavenging rate dependent on organic matter [1/((mmol P/m3)**0.58) 1/d], Somes et al. (2021), , Atm+SedHigh_LigVar, conversion: 2.9 [1/(gC/m3)^0.58 1/d] / [1000/(117*12.011)]^0.58
-kfeleq = 10.0**2.5  # Fe-ligand stability constant [1/(umol ligand/m3)], Nickelsen et al. (2015), conversion: 10^11.5 [1/(mol lig/L)] * 1e-9 [mol/umol]
-kfepre = 0.85         # inorganic scavenging rate [1/(umol Fe/m3) 1/d], Somes et al. (2021), Atm+SedHigh_LigVar, conversion: 850 [1/(mmol Fe/m3) 1/d] / 1000 
-fealpha = 0.015       # factor for AOU dependence of ligands [(umol ligand/m3)/(mmol O2/m3)], Somes et al. (2021)
-febeta  = 1.92981     # factor for DOP dependence of ligands [(umol ligand/m3)/(mmol DOP/m3)], Somes et al. (2021), conversion: 0.21 [(umol ligand/m3)/(mmol DON/m3)^0.8] * [16 mmol DON / mmol DOP]^0.8
-fesedmax = 100.0      # maximum Fe release from sediment [umol Fe/m2/d], Somes et al. (2021)
+# For Fe: Parameters all parameters converted to deal with Fe in umol/m3 and P in mmol/m3
+rfep = 1.06              # Fe:P uptake ratio and internal ratio in organics [umol Fe/mmol P], Nickelsen et al. (2015), conversion: 66.25 [umol Fe/mol N]*16/1000 
+kfemin  = 0.04           # minimum half-saturation constant for dFe uptake by phytoplankton [umol Fe/m3] at low phytoplankton concentrations, Nickelsen et al. (2015) 
+kfemax  = 0.40           # maximim half-saturation constant for dFe uptake by phytoplankton [umol Fe/m3] at high phytoplankton concentrations, Nickelsen et al. (2015) 
+pmax   = 0.01            # phytoplankton concentration at which kfe starts to increase [mmol P/m3], 0.15 [mmol N/m3] in Nickelsen et al. (2015) 
+kfeleq = 10.0**2.5     # Fe-ligand stability constant [1/(umol ligand/m3)], Nickelsen et al. (2015), conversion: 10^11.5 [1/(mol lig/L)] * 1e-9 [mol/umol]
+fdoclig = 10.0           # DOC-dependent concentration of ligands as in as in Tagliabue & Voelker (2011; 0.09 1/(mmol C/m3) 1/d) and Aumont et al. (2015) 
+flig = 0.60              # constant concentration of total ligands, as in Tagliabue & Voelker (2011; they have 0.4) and Aumont et al. (2015; they have 0.6) 
+lambdafemin = 0.00010    # independent dFe scavenging rate [1/d], loosely following Aumont et al. (2015; they have 3e-5)
+lambdafeorg = 0.50       # POC-dependent dFe scavenging rate [1/(mmol P/m3) 1/d], loosely following Aumont et al. (2015; they have 0.005 1/d 1/umol/L but also a large aggregation rate of Fecoll (half of Fe-Fe'))
+lambdafepre = 0.0002       # quadratic inorganic scavenging rate [1/(umol Fe'/m3) 1/d], Somes et al. (2021), Atm+SedHigh_LigVar, conversion: 850 [1/(mmol Fe/m3) 1/d] / 1000 
+fesedmax = 0.0          # maximum Fe release from sediment [umol Fe/m2/d], Somes et al. (2021; have 100)
 
 # ifdef CARBON
 frac_caco3 = 0.032 
@@ -126,12 +125,18 @@ ocmip_silfac = 7.7
       
 #endif
 
-ACik=16.14490902507452672366705659356966862105764
-ACmuzoo=2.854995027239606325769952221982350692996988
-graztodop=0.
-dlambda=0.000626466572010149868724405503505811565467809
-kfe=0.2489925986042371879654756111621694003588345
-rfep=0.7655590068661256620847349596559183737554122
-kfeorg=0.6675512738731916035760799443821156273770612
-kfepre=0.04130206314545665129210182814345486690399412
+# Third version for Volkmar's optimization tests, 16 October 2015
+# rfep      = parvec(1)
+# fdoclig   = parvec(2)
+# lambdafeorg = parvec(3)
+# lambdafepre = parvec(4)
+
+# ACik=16.14490902507452672366705659356966862105764
+# ACmuzoo=2.854995027239606325769952221982350692996988
+# graztodop=0.
+# dlambda=0.000626466572010149868724405503505811565467809
+# kfe=0.2489925986042371879654756111621694003588345
+# rfep=0.7655590068661256620847349596559183737554122
+# kfeorg=0.6675512738731916035760799443821156273770612
+# kfepre=0.04130206314545665129210182814345486690399412
 

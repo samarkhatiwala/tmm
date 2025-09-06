@@ -28,7 +28,7 @@ extern void mops_biogeochem_model_(PetscInt *Nrloc, PetscScalar *DeltaT,
 #ifdef CARBON                      
 				   PetscScalar *DICglobavg, PetscScalar *ALKglobavg, PetscScalar *localEmP, PetscScalar *localpCO2atm,
 #endif
-                                   PetscScalar localTs[],PetscScalar localSs[],PetscScalar localFes[], 
+                                   PetscScalar localTs[],PetscScalar localSs[], 
                                    PetscScalar *localfice, PetscScalar *localswrad, PetscScalar *localstau,
                                    PetscScalar *localwind, PetscScalar *localatmosp, PetscScalar localdz[], 
 #ifdef CARBON                      
@@ -40,8 +40,9 @@ extern void mops_biogeochem_model_(PetscInt *Nrloc, PetscScalar *DeltaT,
 
 extern void mops_biogeochem_diagnostics_(PetscInt *Nrloc, 
                                          PetscScalar localfbgc1[], PetscScalar localfbgc2[], PetscScalar localfbgc3[], 
-					 PetscScalar localfbgc4[], PetscScalar localfbgc5[], PetscScalar localfbgc6[], 
-					 PetscScalar localfbgc7[], PetscScalar localfbgc8[], PetscScalar localfbgc9[], 
-					 PetscScalar localfbgc10[], PetscScalar localfbgc11[], PetscScalar localfbgc12[]);
+					 PetscScalar localfbgc4[], PetscScalar localfbgc5[], PetscScalar localfbgc6[], PetscScalar localfbgc7[], PetscScalar localfbgc8[], PetscScalar localfbgc9[]);
 
 extern void mops_biogeochem_set_params_(PetscInt *numbgcparams, PetscScalar bgcparams[]);
+
+extern void mops_biogeochem_misfit_(PetscInt *Nrloc,
+                                         PetscScalar localmbgc1[], PetscScalar localmbgc2[], PetscScalar localmbgc3[]);

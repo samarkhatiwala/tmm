@@ -11,9 +11,10 @@ C$Name: mops-2_0 $
       real*8 parvec(npar)
 
 ! Third version for Volkmar's optimization tests, 16 October 2015
-         rfep      = parvec(1)
-         fdoclig   = parvec(2)
-         lambdafeorg = parvec(3)
-         lambdafepre = parvec(4)
+         ACik      = parvec(1)
+         ACmuzoo   = parvec(2)
+         ro2ut     = parvec(3)
+         detmartin = parvec(4)
+        
       RETURN
       END

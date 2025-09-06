@@ -7,22 +7,6 @@ C Iris Kriest added sediment+river runoff option #ifdef SEDIMENT (Dec. 2010)
 C Iris Kriest skipped option #ifdef SEDIMENT and added N-cycle with N-fixation and denitrification (Apr 2011)
 C Iris Kriest modified and extended some comments (Jan 2015)
 
-C Iris Kriest added the Fe cycle with dissolved (idfe) and particulate (ipfe) iron
-C The Fe cycle is largely based on Nickelsen et al. (2015) and Somes et al. (2021)
-C Basic features:
-C	External source of dFe by dust deposition
-C   Internal source of dFe (=sink of pFe) by remineralisation of detritus and parameterised sedimentary release
-C   Internal sink of dFe (= source of pFe) by detritus production, scavenging and precipitation
-C   External sink of pFe through burial at the sea floor
-C   Hence, internal changes in pFe relate / are proportional to changes in detritus; additionally there are the changes related to scavenging and precipitation
-C   Hence, detritus has a variable Fe:P ratio while the ratio in all other organic components is constant.
-C   Units of pFe and dFe are umol Fe/m3. This is also the unit for ligands.
-C Changes with respect to Nickelsen et al. (2015) and Somes et al. (2021) relate to:
-C 	- Constant half-saturation constant of dFe uptake by phytoplankton
-C   - Fe limitation affects max. growth rate and light affinity (ACik), hence leaving initial slope of the PI-curve untouched
-C   - Total phytoplankton limitation is the minimum of light, nutrient and Fe limitation
-C   - Otherwise, particulate Fe consists basically of two fraction: one bound to detritus, and an additional part created through scavenging
-
 C Basis for air-sea gas exchange of O2: MIT source code, 
 C modified by Samar Khatiwala, then by Iris Kriest (Aug-Nov. 2010)
 
@@ -77,9 +61,7 @@ C flux_bury	burial in sediment in this call to BGC_MODEL [mmol P/m2]
       SUBROUTINE BGC_MODEL(bgc_kloc,bgc_dz,     
      &            bgc_runoffvol,bgc_globalrunoff,
      &            bgc_swr,bgc_tau,bgc_seaice,bgc_wind,bgc_atmosp,
-     &            bgc_theta,bgc_salt,
-! For Fe
-     &            bgc_fedep)
+     &            bgc_theta,bgc_salt)
 
       implicit none
 
@@ -88,20 +70,13 @@ C flux_bury	burial in sediment in this call to BGC_MODEL [mmol P/m2]
 #include "BGC_DIAGNOSTICS.h"
 #include "CAR_PARAMS.h"
 
-#ifdef BUDGET
-#include "BGC_BUDGET.h"
-#endif
-
-! arrays related to physics and boundary conditions
+! arrays related to physics
       integer bgc_kloc
       real*8 bgc_dz(bgc_ktotal)
       real*8 bgc_swr,bgc_tau,bgc_seaice
       real*8 bgc_theta(bgc_ktotal),bgc_salt(bgc_ktotal)
       real*8 ciz(bgc_keuph)
       real*8 bgc_wind,bgc_atmosp,bgc_pco2atm
-
-! For Fe: boundary conditions
-      real*8 bgc_fedep(bgc_ktotal)
 
 ! arrays to store the sms and other fluxes
       real*8 topo4(bgc_ktotal)
@@ -114,22 +89,16 @@ C flux_bury	burial in sediment in this call to BGC_MODEL [mmol P/m2]
       real*8 flux(bgc_ktotal)
       real*8 fdiv(bgc_ktotal)
 
-! For Fe: arrays to store sms
-      real*8 todfe(bgc_ktotal)
-      real*8 topfe(bgc_ktotal)
-      real*8 feflux(bgc_ktotal)
-      real*8 fefdiv(bgc_ktotal)
-
 ! air sea gas exchange in general
       real*8 vgas660
       
 ! air-sea gas exchange of oxygen
-      real*8 o2gasex,o2sat
+      real*8 surf_oxy,o2gasex
       
 ! coefficients for biology
       real*8 attlim,atten,flight,flightlim,limnut,fnutlim,parfrac
       real*8 PO4,DOP,OXY,PHY,ZOO,DET,DIN
-      real*8 phygrow0,phygrowP,phygrow,phyexu,phyloss,detloss
+      real*8 phygrow0,phygrow,phyexu,phyloss,detloss
       real*8 graz0,graz,zooexu,zooloss
       real*8 eflux,flux_u,flux_l
       real*8 tempscale,TACmuphy,TACik
@@ -151,36 +120,27 @@ C flux_bury	burial in sediment in this call to BGC_MODEL [mmol P/m2]
 #ifdef CARBON      
       real*8 co2gasex,co2emp,alkemp,surf_dic,surf_pho,surf_alk,surf_sil
       real*8 caco3_prod,fdiv_caco3
+c      real*8 dicchem(bgc_ktotal)
+c      real*8 alkchem(bgc_ktotal)
       real*8 todic(bgc_ktotal)
       real*8 toalk(bgc_ktotal)
 #endif
 
-! The burial ratio which is used for both DET and PFE
-      real*8 BRatio 
-
-! For Fe: auxiliary local variables
-      real*8 kfe,felim,phygrowFe,ligands,fesed,DFE,PFE,fPFE,febury
-      real*8 fea,feprime,feorgads,feprecip,totalscav,o2demand
-
-! Depth of the euphotic zone
-      bgc_keuphloc = INT(MIN(bgc_kloc,bgc_keuph))
-       
 ! Reset the diagnostic fluxes per ocean time step.
 
+      bgc_keuphloc = INT(MIN(bgc_kloc,bgc_keuph))
+       
       DO K=1,bgc_kloc
 
-        f1_out(k)=0.0d0  ! PP
-        f2_out(k)=0.0d0  ! Grazing
-        f3_out(k)=0.0d0  ! Sedimentation and burial
-        f4_out(k)=0.0d0  ! Oxic remineralisation of POP and DOP
-        f5_out(k)=0.0d0  ! River runoff or surface deposition of buried material
-        f6_out(k)=0.0d0  ! Nitrogen fixation
-        f7_out(k)=0.0d0  ! Anoxic remineralisation of POP and DOP
-        f8_out(k)=0.0d0  ! Option DCARBON: divergence (dissolution) of calcite - Without: Fe-ligand concentration 
-        f9_out(k)=0.0d0  ! Option DCARBON: production of calcite - Without: organic scavenging of dFe 
-        f10_out(k)=0.0d0 ! Option DCARBON: Organic scavenging and precipitation of dFe - Without: precipitation of dFe
-        f11_out(k)=0.0d0 ! Sedimentation of pFe (layer 1: burial)
-        f12_out(k)=0.0d0 ! External sources of dFe (dust, hydrothermal, sedimentary release)
+        f1_out(k)=0.0d0 
+        f2_out(k)=0.0d0 
+        f3_out(k)=0.0d0 
+        f4_out(k)=0.0d0 
+        f5_out(k)=0.0d0 
+        f6_out(k)=0.0d0 
+        f7_out(k)=0.0d0 
+        f8_out(k)=0.0d0 
+        f9_out(k)=0.0d0 
 
       ENDDO
 
@@ -199,15 +159,6 @@ C flux_bury	burial in sediment in this call to BGC_MODEL [mmol P/m2]
 #endif
       
       flux_bury = 0.0d0
-
-#ifdef BUDGET
-      budget_o2 = 0.0d0
-      budget_n2 = 0.0d0
-      budget_h2o = 0.0d0
-      budget_co2 = 0.0d0
-      budget_fe  = 0.0d0
-      budget_c   = 0.0d0
-#endif
 
 C INTERNAL TIME LOOP FOR BGC
 
@@ -234,20 +185,15 @@ C INTERNAL TIME LOOP FOR BGC
 
         runoff(k)=0.0d0 
 
-! For Fe       
-        todfe(k) = 0.0d0
-        topfe(k) = 0.0d0
-        feflux(k) =0.0d0
-        fefdiv(k) =0.0d0
-
       ENDDO
 
 
 ! AIR-SEA GAS EXCHANGE OF OXYGEN
 
-      CALL O2SATURATION(bgc_theta(1),bgc_salt(1),o2sat)
+      surf_oxy = bgc_tracer(1,ioxy)
+
       CALL O2_SURFFORCING(vgas660,bgc_atmosp,bgc_theta(1),bgc_salt(1),
-     &     bgc_tracer(1,ioxy),o2sat,o2gasex)
+     &     surf_oxy,o2gasex)
 
 #ifdef CARBON
 
@@ -303,62 +249,37 @@ C INTERNAL TIME LOOP FOR BGC
        DIN=bgc_tracer(k,idin)
        PHY=bgc_tracer(k,iphy)
        ZOO=bgc_tracer(k,izoo)
-       DFE=bgc_tracer(k,idfe) 
        attlim=MAX(PHY,0.0d0)
 
-! For Fe: Determine kfe depending on concentration of phytoplankton, as in Nickelsen et al. (2015)
-       if(PHY.gt.pmax) then
-         kfe = kfemax-(kfemax-kfemin)*pmax/PHY
-       else
-         kfe = kfemin
-       endif
-       
-! Temperature dependence of phytoplankton growth (Eppley) - this may be applied to other rates as well, hence I keep this outside the Fe-loop and other loops
+! temperature dependence of phytoplankton growth (Eppley)
+! this affects the light-half-saturation constant via acik=acmuphy/alpha
        tempscale = EXP(bgc_theta(k)/TempB)
-
-! For Fe: Safeguard the equations in case DFe becomes negative and evaluate growth terms
-       if(DFE.gt.0.0d0) then        
-
-! Temperature dependence affects the light-half-saturation constant via acik=acmuphy/alpha
-! The extension to dfe means that muphy and ik decline with declining fe, leaving alpha untouched        
-         felim  = DFE/(kfe+DFE)
-         TACmuphy = ACmuphy*tempscale*felim
-         TACik = ACik*tempscale*felim       
+       TACmuphy = ACmuphy*tempscale
+       TACik = ACik*tempscale       
        
 ! The light limitation function of phytoplankton.
 ! This function corresponds to Evans and Garcon, 1997.
 ! Note that the initial slope of the P-I curve, alpha, is ACMuPhy/ACIk
-! flightlim thus gives the light limited growth rate, averaged over day and layer, normalised by max. growth rate
-         atten = (ACkw+ACkchl*attlim)*bgc_dz(k) !attenuation at bottom of layer
-         glbygd = 2.0d0*ciz(k)/(TACik*bgc_tau)   ! 2 * G_L/G_D of EG97
-         flightlim = bgc_tau/atten*(phi(glbygd)-phi(glbygd*exp(-atten)))
-       
-       else
-       
-         TACmuphy = 0.0d0
-         flightlim = 0.0d0
-         DFE=0.0d0
-       
-       endif       
+! flightlim thus gives the light limited growth rate, averaged over day 
+! and layer, normalised by max. growth rate
+       atten = (ACkw+ACkchl*attlim)*bgc_dz(k) !attenuation at bottom of layer
+       glbygd = 2.0d0*ciz(k)/(TACik*bgc_tau)   ! 2 * G_L/G_D of EG97
+       flightlim = bgc_tau/atten*(phi(glbygd)-phi(glbygd*exp(-atten)))
 
        if(PHY.gt.0.0d0) then
 
-         limnut = MIN(PO4,DIN/rnp) ! because I use the same (scaled) half-sat constant for N and P I here determine the limiting nutrient in this simple way
+         limnut = MIN(PO4,DIN/rnp)
 
          if(limnut.gt.vsafe) then
 
 ! The nutrient limitation of phytoplankton
            fnutlim = limnut/(ackpo4+limnut)
 
-! The growth rate of phytoplankton: minimum of light and nutrients; note that felim is 
-! already in TACMuPhy! Thus, here we assume multiplicative limitation
-
+! The growth rate of phytoplankton: light*nutrient limitation.
            phygrow0 = TACmuphy*PHY*MIN(flightlim,fnutlim)
 
-! Make sure not to take up more nutrients than available (mmol P/m3/d)
-           phygrowFe = MIN(DFE,phygrow0*rfep*bgc_dt)/(bgc_dt*rfep) ! mmol P/m3/d
-           phygrowP  = MIN(limnut,phygrow0*bgc_dt)/bgc_dt          ! mmol P/m3/d
-           phygrow   = MIN(phygrowFe,phygrowP)                     ! mmol P/m3/d
+! Make sure not to take up more nutrients than available.
+           phygrow = MIN(limnut,phygrow0*bgc_dt)/bgc_dt
 
          else !limnut < vsafe
 
@@ -443,29 +364,13 @@ C INTERNAL TIME LOOP FOR BGC
      &        + (1.0d0-graztodop)*(phyexu+zooloss)
         todin(k)=topo4(k)*rnp + nfixation
 
-! For Fe:
-        todfe(k)=topo4(k)*rfep + todop(k)*rfep    
-        topfe(k)=todet(k)*rfep
-
-#ifdef BUDGET
-! Note: in the original MOPS source code I never account for the O2-requirement
-!       during N2-Fixation (to form HNO3). Thus, here it is an external source.
-        budget_o2 = budget_o2 + 1.25d0*nfixation*bgc_dt*bgc_dz(k)
-        budget_n2 = budget_n2 + nfixation*bgc_dt*bgc_dz(k)
-        budget_h2o = budget_h2o 
-     &             - 0.5d0*nfixation*bgc_dt*bgc_dz(k)
-     &             + orh2o*(zooexu-phygrow)*bgc_dt*bgc_dz(k)
-        budget_co2 = budget_co2 
-     &             + rcp*(zooexu-phygrow)*bgc_dt*bgc_dz(k)
-#endif
-
-
         ENDDO !loop over euphotic zone
+
 
 ! Explicit sinking of detritus in seperate loop. 
         flux_u = 0.0d0
 
-        do k=1,bgc_kloc-1 !loop over all layers except last one, which accounts for burial (see below)
+        do k=1,bgc_kloc-1 !loop over all layers
 
           DET = MAX(bgc_tracer(k,idet)-alimit*alimit,0.0d0)
           flux_l=wdet(k)*DET
@@ -480,14 +385,13 @@ C INTERNAL TIME LOOP FOR BGC
 ! account for burial in the sediment	
         DET = MAX(bgc_tracer(bgc_kloc,idet)-alimit*alimit,0.0d0)
         fDET = wdet(bgc_kloc)*DET
-        BRatio = MIN(1.0d0,burdige_fac*fDET**burdige_exp)
-        flux_l = BRatio*fDET
+        flux_l = MIN(1.0d0,burdige_fac*fDET**burdige_exp)*fDET
         flux_bury = flux_bury + flux_l*bgc_dt
 
         flux(bgc_kloc) = flux(bgc_kloc)+flux_u
         fdiv(bgc_kloc) = fdiv(bgc_kloc)+(flux_u-flux_l)/bgc_dz(bgc_kloc)
 
-! Store flux for diagnostic purposes. Flux is at the top of a box; for box # 1 it is the burial
+! Store flux for diagnostic purposes.
 
         f3_out(1)  = flux_bury
 
@@ -495,60 +399,9 @@ C INTERNAL TIME LOOP FOR BGC
           f3_out(k)  = f3_out(k)+flux(k)*bgc_dt
         enddo
 
-! For Fe: Explicit sinking of pFe in seperate loop 
-! Sedimentary release of dFe depends on respiration divided by available oxygen
-! In contrast to Dale et al. (2015) and Somes et al. (2021) I don't calculate the dependence from the ratio of Cox and O2, but rather from O2-consumption and O2
-! In principle, o2demand/OXY is essentially the height of the water column [m] that would be stripped of oxygen within this time step because of the non-buried organic matter
-! This lowers the value for dFe release a bit.
-! 2024-04-16: Changed to omitting multiplication by bgc_dt. This is now the oxidative demand over a day. 
-
-        o2demand = (fDET-flux_l)*ro2ut  ! the oxidative demand of all organic matter that is NOT buried within a time step [mmol O2/m2]
-        OXY = MAX(bgc_tracer(bgc_kloc,ioxy)-alimit*alimit,0.0d0) ! bottom water oxygen
-
-        flux_u = 0.0d0
-
-        do k=1,bgc_kloc-1 !loop over all layers except last one, which accounts for burial (see below)
-
-          PFE = MAX(bgc_tracer(k,ipfe)-alimit*alimit,0.0d0)
-          flux_l=wdet(k)*PFE
-          feflux(k)  = feflux(k)+flux_u
-          fefdiv(k)  = fefdiv(k)+(flux_u-flux_l)/bgc_dz(k)
-          flux_u=flux_l         
-
-        enddo
-
-        flux_l = 0.0d0
-        
-! account for burial in the sediment	
-        PFE = MAX(bgc_tracer(bgc_kloc,ipfe)-alimit*alimit,0.0d0)
-        fPFE = wdet(bgc_kloc)*PFE
-        flux_l = BRatio*fPFE
-
-        feflux(bgc_kloc) = feflux(bgc_kloc)+flux_u
-        fefdiv(bgc_kloc) = fefdiv(bgc_kloc)+(flux_u-flux_l)
-     &                    /bgc_dz(bgc_kloc)
-
-! sedimentary release of dFe following Somes et al. (2021) - this may release more iron that is buried
-        fesed = fesedmax*tanh(o2demand/OXY)
-
-#ifdef BUDGET
-        budget_fe = budget_fe - flux_l*bgc_dt
-#endif
-    
-! Store flux for diagnostic purposes. Flux is at the top of a box; for box # 1 it is the burial
-
-        f11_out(1)  = f11_out(1) + flux_l*bgc_dt
-
-        do k=2,bgc_kloc
-          f11_out(k)  = f11_out(k)+feflux(k)*bgc_dt
-        enddo
-
-        flux_l = 0.0d0
-
-
 #ifdef CARBON
 
-! effect of CaCO3 production on alkalinity and DIC
+! effect of CaCO3 flux divergence out of euphotic zone on alkalinity and DIC
        caco3_prod = 0.0d0
        do k=1,bgc_kloc ! IK 2023-03-16: This should be bgc_kloc!
          caco3_prod = caco3_prod + todet(k)*rcp*frac_caco3*bgc_dz(k)
@@ -585,8 +438,6 @@ C INTERNAL TIME LOOP FOR BGC
       PHY = MAX(bgc_tracer(k,iphy)-alimit*alimit,0.0d0)
       ZOO = MAX(bgc_tracer(k,izoo)-alimit*alimit,0.0d0)
       DET = MAX(bgc_tracer(k,idet)-alimit*alimit,0.0d0)
-      DFE = MAX(bgc_tracer(k,idfe)-alimit*alimit,0.0d0)
-      PFE = MAX(bgc_tracer(k,ipfe)-alimit*alimit,0.0d0)
 
 c AEROBIC DECAY
 
@@ -660,55 +511,6 @@ c restrict anaerobic processes to regions with low oxygen concentration
       f4_out(k) = f4_out(k) + (remindop+remindet)*bgc_dt
       f7_out(k) = f7_out(k) + (denitdop+denitdet)*bgc_dt
 
-! For Fe: release of Fe from within detritus (O2 and NO3 dependent) and additional release
-      todfe(k)=todfe(k)+(remindet+denitdet)*rfep    
-     &                 +(plambda*PHY+zlambda*ZOO )*rfep
-      topfe(k)=topfe(k)-(remindet+denitdet)*rfep
-
-! For Fe: scavenging of DFe
-! For Fe: evaluate ligands and feprime
-      ligands = fdoclig*DOP+flig
-      fea = 1.0d0+kfeleq*(ligands-DFE)
-      feprime = ((fea**2.0d0+4.0d0*kfeleq*DFE)**0.5d0-fea)
-     &            /(2.0d0*kfeleq)
-
-c For Fe: restrict scavenging to amount of available DFE
-      feorgads = (lambdafemin+lambdafeorg*DET)*feprime*tanh(OXY)
-      feprecip = lambdafepre*feprime*feprime*tanh(OXY) 
-
-      totalscav = (feorgads+feprecip)*bgc_dt  
-      if (totalscav.gt.0.0d0) then
-         feorgads = feorgads*MIN(DFE,totalscav)/totalscav
-         feprecip = feprecip*MIN(DFE,totalscav)/totalscav
-      else
-         feorgads = 0.0d0
-         feprecip = 0.0d0
-      endif
-      
-      todfe(k) = todfe(k) - feorgads - feprecip
-      topfe(k) = topfe(k) + feorgads + feprecip
-
-#ifdef CARBON
-      f10_out(k) = f10_out(k) + (feprecip+feorgads)*bgc_dt
-#else
-      f8_out(k)  = ligands
-      f9_out(k)  = f9_out(k) + feorgads*bgc_dt
-      f10_out(k) = f10_out(k) + feprecip*bgc_dt
-#endif
-
-#ifdef BUDGET
-      budget_h2o = budget_h2o 
-     &           + orh2o*(remindop+remindet)*bgc_dt*bgc_dz(k)
-      budget_h2o = budget_h2o 
-     &           + srh2o*(denitdop+denitdet)*bgc_dt*bgc_dz(k)
-      budget_co2 = budget_co2 
-     &           + rcp*(remindop+remindet)*bgc_dt*bgc_dz(k)
-      budget_co2 = budget_co2 
-     &           + rcp*(denitdop+denitdet)*bgc_dt*bgc_dz(k)
-      budget_n2 = budget_n2 
-     &          - (denitdop+denitdet)*(rhno3ut+rnp)*bgc_dt*bgc_dz(k)
-#endif
-
       ENDDO
 
 
@@ -765,40 +567,11 @@ c For Fe: restrict scavenging to amount of available DFE
      &     + toalk(k)*bgc_dt    ! this is from CaCO3 production and dissolution
 #endif
 
-! For Fe - including sources from deposition and hydrothermal fluxes
-      bgc_tracer(k,idfe)= bgc_tracer(k,idfe)  +
-     &     (todfe(k)+bgc_fedep(k))*bgc_dt
-      bgc_tracer(k,ipfe)= bgc_tracer(k,ipfe)  +
-     &     (topfe(k)+fefdiv(k))*bgc_dt 
-
       ENDDO 
 
       bgc_tracer(1,ioxy)= bgc_tracer(1,ioxy) +   
      &    o2gasex/bgc_dz(1)*bgc_dt
 
-#ifdef BUDGET
-      budget_o2 = budget_o2 + o2gasex*bgc_dt
-#endif
-
-! For Fe: dust and hydrothermal source diagnostic
-      DO K=1,bgc_kloc
-        f12_out(k) = f12_out(k) + bgc_fedep(k)*bgc_dt
-      ENDDO 
-
-! For Fe: sedimentary release
-      bgc_tracer(bgc_kloc,idfe)= bgc_tracer(bgc_kloc,idfe) +   
-     &    fesed/bgc_dz(bgc_kloc)*bgc_dt
-
-      f12_out(bgc_kloc) = f12_out(bgc_kloc) + fesed*bgc_dt 
-     
-#ifdef BUDGET
-      do k=1,bgc_kloc
-        budget_fe = budget_fe + bgc_fedep(k)*bgc_dz(k)*bgc_dt
-      enddo
-      budget_fe = budget_fe + fesed*bgc_dt
-#endif
-
-! Air-sea gas exchange of CO2 and E-P
 #ifdef CARBON
       bgc_tracer(1,idic)= bgc_tracer(1,idic) +   
      &    (co2emp+co2gasex)/bgc_dz(1)*bgc_dt
@@ -806,13 +579,24 @@ c For Fe: restrict scavenging to amount of available DFE
       bgc_tracer(1,ialk)= bgc_tracer(1,ialk) +   
      &    (alkemp)/bgc_dz(1)*bgc_dt
 
-#ifdef BUDGET
-      budget_c = budget_c + (co2emp+co2gasex)*bgc_dt
-#endif
-
+!flocalarea is localdx*dy divided by the total atmospheric volume
+!      co2_atm=co2_atm+co2gasex*flocalarea*bgc_dt
+      
+! So far, no carbonate dissolution etc.
+!      DO K=1,bgc_kloc
+!        bgc_tracer(k,idic)= bgc_tracer(k,idic)   +
+!     &       dicchem(k)*bgc_dt    
+!        bgc_tracer(k,ialk)= bgc_tracer(k,idic)   +
+!             0.0d0
+!     &       alkchem(k)*bgc_dt    
+!      enddo
 #endif
 
       ENDDO !internal time loop
+
+! For now, I am happy to take tracer concentration at the end of each time loop
+! for computation of misfit; I might as well sum it up and divide by the number
+! of time steps
 
       RETURN
 
@@ -854,7 +638,6 @@ C atmosp0       atmopheric pressure
 C ttemp		surface temperature
 C stemp		surface salinity
 C soxy		surface oxygen
-C ssat     oxygen saturation
 
 C
 C INPUT/COMMON BLOCK: 
@@ -863,66 +646,26 @@ C Contants for O2 saturation calculation. See BGC_PARAMS.h and BGC_INI.F.
 C OUTPUT/ARGUMENT LIST: 
 C o2ex		exchange rate [mmol O2/m2/d]
 
-      SUBROUTINE O2_SURFFORCING(vgas660,atmosp,ttemp,stemp,
-     &                          soxy,ssat,o2ex)
+      SUBROUTINE O2_SURFFORCING(vgas660,atmosp,ttemp,stemp,soxy,o2ex)
 
       implicit none
 
 #include "BGC_PARAMS.h"
 
-      real*8 vgas660,atmosp,ttemp,stemp,soxy,ssat,o2ex
+      real*8 vgas660,atmosp,ttemp,stemp,soxy,o2ex
 
 ! local coefficients
 
-      real*8 SchmidtNoO2,Kwexch
+      real*8 SchmidtNoO2,aTT,aTK,aTS,aTS2,aTS3,aTS4,aTS5,
+     &       oCnew,o2s,O2sat,Kwexch
 
       SchmidtNoO2=sox1+sox2*ttemp+sox3*ttemp*ttemp  
      &    + sox4*ttemp*ttemp*ttemp
 
       KWexch = vgas660/sqrt(SchmidtNoO2/660.0d0)
 
-! Determine flux, inc. correction for local atmos surface pressure
-      o2ex = Kwexch*(atmosp*ssat-soxy)
-
-      RETURN
-
-      END
-
-C ----------------------------------------------------------------------
-
-C CALCULATE O2 SATURATION      
-C CALCULATE O2 SATURATION      
-C CALCULATE O2 SATURATION      
-C CALCULATE O2 SATURATION      
-C CALCULATE O2 SATURATION      
-
-C PREPROCESSOR OPTIONS:
- 
-C CALLED BY:	bgc_model
-
-C CALLS:	
-
-C INPUT/ARGUMENT LIST:	
-C ttemp		temperature
-C stemp		salinity
-
-C
-C INPUT/COMMON BLOCK: 
-C Contants for O2 saturation calculation. See BGC_PARAMS.h and BGC_INI.F.
-
-      SUBROUTINE o2saturation(ttemp,stemp,o2sat)
-
-      implicit none
-
-#include "BGC_PARAMS.h"
-
-      real*8 ttemp,stemp,o2sat
-
-! local coefficients
-
-      real*8 aTT,aTK,aTS,aTS2,aTS3,aTS4,aTS5,oCnew,o2s
-
-! Determine saturation O2 using Garcia and Gordon (1992), L&O (mistake in original???)
+! Determine saturation O2
+! using Garcia and Gordon (1992), L&O (mistake in original???)
 
       aTT  = 298.15d0 -ttemp
       aTK  = 273.15d0 +ttemp
@@ -937,7 +680,10 @@ C Contants for O2 saturation calculation. See BGC_PARAMS.h and BGC_INI.F.
 
 ! Convert from ml/l to mmol/m^3
 ! Note: o2 in mit is in mol/m3; I use mmol/m3, thus coonvert with 1d3
-      o2sat = o2s/22391.6d0 * 1.0d3*1.0d3
+      O2sat = o2s/22391.6d0 * 1.0d3*1.0d3
+
+! Determine flux, inc. correction for local atmos surface pressure
+      o2ex = Kwexch*(atmosp*O2sat-soxy)
 
       RETURN
 

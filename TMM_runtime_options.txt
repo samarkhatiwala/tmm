@@ -248,10 +248,10 @@ etc, in the -PREFIX_start_time_step NN option, NN can be set to any value >= Ite
 not given, NN will default to Iter0 (0 or that set via the -iter0 option). This means that the initial field of 
 whatever it is you're writing out (corresponding to absolute time step Iter0) can also be written out (and will be 
 by default if you don't specify -PREFIX_start_time_step). To handle this correctly requires a few extra lines of 
-code so if you're trying to add a step time object to your own model have a look at tmm_write.c (and the associated 
-calls in tmm_main.c). On the other hand, for timer objects used to do averaging, NN can be set to any value > Iter0. 
+code so if you're trying to add a step time object to your own model have a look at tmm_output.c. 
+On the other hand, for timer objects used to do averaging, NN can be set to any value > Iter0. 
 If -PREFIX_start_time_step is not given, NN will default to Iter0+1 so that time averaging starts at and includes 
-the first time step.
+the first time step. Again, see tmm_output.c for an example.
 
 11) Forcings: In addition to transporting tracers you can include source/sink terms ("forcings"). The TMM 
 driver allows this to be specified in three ways, any combination of which can be turned on: 
