@@ -43,10 +43,10 @@ struct _p_ExternalForcingCtx {
   StepTimer diagTimer;
   PetscBool appendDiagnostics;
 /* Add model specific diagnostic variables below */
-  Vec fbgc1, fbgc2, fbgc3, fbgc4, fbgc5, fbgc6, fbgc7, fbgc8, fbgc9, fbgc10, fbgc11, fbgc12;
-  Vec fbgc1avg, fbgc2avg, fbgc3avg, fbgc4avg, fbgc5avg, fbgc6avg, fbgc7avg, fbgc8avg, fbgc9avg, fbgc10avg, fbgc11avg, fbgc12avg;
-  PetscViewer fdfbgc1avg, fdfbgc2avg, fdfbgc3avg, fdfbgc4avg, fdfbgc5avg, fdfbgc6avg, fdfbgc7avg, fdfbgc8avg, fdfbgc9avg, fdfbgc10avg, fdfbgc11avg, fdfbgc12avg;
-  PetscScalar *localfbgc1, *localfbgc2, *localfbgc3, *localfbgc4, *localfbgc5, *localfbgc6, *localfbgc7, *localfbgc8, *localfbgc9, *localfbgc10, *localfbgc11, *localfbgc12;
+  Vec fbgc1, fbgc2, fbgc3, fbgc4, fbgc5, fbgc6, fbgc7, fbgc8, fbgc9;
+  Vec fbgc1avg, fbgc2avg, fbgc3avg, fbgc4avg, fbgc5avg, fbgc6avg, fbgc7avg, fbgc8avg, fbgc9avg;
+  PetscViewer fdfbgc1avg, fdfbgc2avg, fdfbgc3avg, fdfbgc4avg, fdfbgc5avg, fdfbgc6avg, fdfbgc7avg, fdfbgc8avg, fdfbgc9avg;
+  PetscScalar *localfbgc1, *localfbgc2, *localfbgc3, *localfbgc4, *localfbgc5, *localfbgc6, *localfbgc7, *localfbgc8, *localfbgc9;
   PetscInt numDiag;
 
 #ifdef CARBON

@@ -23,7 +23,7 @@ class DotDict(dict):
     def __setstate__(self, d):
         return self.__dict__.update(d)
 
-bgc_ktotal = 60
+bgc_ktotal = 100
 
 class MOPS:
 
@@ -53,6 +53,7 @@ class MOPS:
       lStartIndices=p.profileConfig['lStartIndices']
       maxSteps=p.timeConfig['maxSteps']
       Iter0=p.timeConfig['Iter0']
+      time0=p.timeConfig['time0']
       
       if self.efctxId==1:
         p.useSeparateBiogeochemTimeStepping=OptDB.hasName('separate_biogeochem_time_stepping')
@@ -197,7 +198,7 @@ class MOPS:
       ef.appendDiagnostics = False
 
       if p.useCarbon:
-# // Defaults
+        # Defaults
         ef.fixedAtmosCO2 = True
         ef.Focean=0.0
         ef.Foceanint = 0.0
@@ -206,13 +207,13 @@ class MOPS:
 
         if (ef.useAtmModel):
           PETSc.Sys.Print("Using interactive atmospheric model")
-# /* overwrite default value */
+          pCO2atm_ini = 280.0
+          # overwrite default value */
           if OptDBState.hasName('pco2atm_ini'):
-            pCO2atm_ini = OptDBState.getReal('pco2atm_ini', 280.0)
-          else:
-             if OptDBState.hasName("pco2atm_ini_file"):
-               pCO2atmIniFile = OptDBState.getString("pco2atm_ini_file")
-               pCO2atm_ini = np.fromfile(pCO2atmIniFile, dtype=np.dtype('>r8'), count=1)
+            pCO2atm_ini = OptDBState.getReal('pco2atm_ini', pCO2atm_ini)
+          elif OptDBState.hasName("pco2atm_ini_file"):
+             pCO2atmIniFile = OptDBState.getString("pco2atm_ini_file")
+             pCO2atm_ini = np.fromfile(pCO2atmIniFile, dtype=np.dtype('>f8'), count=1)[0]
           ef.pCO2atm = pCO2atm_ini
           PETSc.Sys.Print("Using initial atmospheric pCO2 of %g ppm" % ef.pCO2atm)
             
@@ -226,41 +227,41 @@ class MOPS:
             PETSc.Sys.Print("Atmospheric model output will overwrite existing file(s)")
 
          # /* Output times */
-          ef.atmOutTimeFile = OptDBState.getString('atm_time_file',"atm_output_time.txt")
+          atmOutTimeFile = OptDBState.getString('atm_time_file',"atm_output_time.txt")
           PETSc.Sys.Print("Atmospheric model output times will be written to %s" % atmOutTimeFile)
 
           if not ef.atmAppendOutput:
-            if p.myId==0:
-              ef.atmfptime = open(atmOutTimeFile, 'wt')
+            ef.atmfptime = open(atmOutTimeFile, 'wt')
+            if (Iter0==ef.atmWriteTimer.startTimeStep): # note: startTimeStep is ABSOLUTE time step
               ef.atmfptime.write("{:d}   {:.5f}\n".format(Iter0,time0))
-            PETSc.Sys.Print("Writing atmospheric output at time %10.5f, step %d" % (tc,Iter))
-            TMM.writeBinaryArray("pCO2atm_output.bin",np.atleast_1d(ef.pCO2atm),False)
-            TMM.writeBinaryArray("Foceanint_output.bin",np.atleast_1d(ef.Focean),False)
+              PETSc.Sys.Print("Writing atmospheric output at time %10.5f, step %d" % (tc,Iter))
+              TMM.writeBinaryArray("pCO2atm_output.bin",np.atleast_1d(ef.pCO2atm),False)
+              TMM.writeBinaryArray("Foceanint_output.bin",np.atleast_1d(ef.Focean),False)
           else:
-            if p.myId==0:
-              ef.atmfptime = open(atmOutTimeFile, 'at')
-            PETSc.Sys.Print("Atmospheric model output will be appended. Initial condition will NOT be written\n")
+            ef.atmfptime = open(atmOutTimeFile, 'at')
+            if (Iter0==ef.atmWriteTimer.startTimeStep): # note: startTimeStep is ABSOLUTE time step
+              PETSc.Sys.Print("Atmospheric model output will be appended. Initial condition will NOT be written")
 
-          ef.atmModelDeltaT = p.DeltaT/p.secondsPerYear #/* time step in years */
+          ef.atmModelDeltaT = p.DeltaT/p.secondsPerYear # time step in years
 
-        else:  #/* not using atm model */
+        else:  # not using atm model
           PETSc.Sys.Print("Using prescribed atmospheric pCO2")
-#            /* prescribed atmospheric CO2 */
+          # prescribed atmospheric CO2
           if OptDBState.hasName('pco2atm_history'):
             pCO2atmFiles = OptDBState.getString("pco2atm_history").split(",")
             if len(pCO2atmFiles) != 2:
               PETSc.Error("Insufficient number of file names specified for atmospheric pCO2 history")
             ef.fixedAtmosCO2 = False
             PETSc.Sys.Print("Reading time-dependent atmospheric pCO2 history")
-#                /* read time data */
+            # read time data
             f = open(pCO2atmFiles[0], 'rb')
             ef.numpCO2atm_hist = np.fromfile(f, dtype=np.dtype('>i4'), count=1)[0]
             PETSc.Sys.Print("Number of points in atmospheric history file is %d" % ef.numpCO2atm_hist)
             ef.TpCO2atm_hist = np.fromfile(f, dtype=np.dtype('>f8'), count=ef.numpCO2atm_hist)
             f.close()
-#                /* read atmospheric pCO2 data */
+            # read atmospheric pCO2 data
             ef.pCO2atm_hist = np.fromfile(pCO2atmFiles[1], dtype=np.dtype('>f8'), count=ef.numpCO2atm_hist)
-            ef.pCO2atm = ef.pCO2atm_hist[0];
+            ef.pCO2atm = ef.pCO2atm_hist[0]
           else:
             ef.pCO2atm = OptDBState.getReal('pco2atm', 280.0)
             PETSc.Sys.Print("Using fixed atmospheric pCO2 of %g ppm" % ef.pCO2atm)
@@ -270,12 +271,12 @@ class MOPS:
 
         # finished useCarbon
 
-# // Defaults
-      ef.localFburial = 0.0;
-      ef.Fburial=0.0;
+      # Defaults
+      ef.localFburial = 0.0
+      ef.Fburial=0.0
       PETSc.Sys.Print("Using Burial-Runoff model")
 
-# /* Define the interval over which to integrate global burial */
+      # Define the interval over which to integrate global burial
       try:
         ef.burialSumSteps = OptDBState.getInt("burial_sum_steps")
       except:
@@ -287,19 +288,18 @@ class MOPS:
       PETSc.Sys.Print("Runoff will be integrated over every %d time steps" % ef.burialSumSteps)
 
       if p.writeRunoff:
-# /* set the name of the runoff time file */
+        # set the name of the runoff time file
         runoffOutTimeFile = OptDBState.getString('runoff_time_file',"runoff_output_time.txt")
-        PETSc.Sys.Print("Runoff output times will be written to %s\n" % runoffOutTimeFile)
+        PETSc.Sys.Print("Runoff output times will be written to %s" % runoffOutTimeFile)
 
-# /* set inititial runoff: overwrite default value with value from command line*/
+      # set inititial runoff: overwrite default value with value from command line
       runoff_ini = 0.0
-      try:
-        runoff_ini = OptDBState.getReal('runoff_ini', 0.0)
-# /* set inititial runoff: overwrite default value with value from file*/
-      except:
-        if OptDBState.hasName("runoff_ini_file"):
-          runoffIniFile = OptDBState.getString("runoff_ini_file")
-          runoff_ini = np.fromfile(runoffIniFile, dtype=np.dtype('>f8'), count=1)
+      if OptDBState.hasName("runoff_ini"):
+        runoff_ini = OptDBState.getReal('runoff_ini', runoff_ini)
+      # set inititial runoff: overwrite default value with value from file
+      elif OptDBState.hasName("runoff_ini_file"):
+        runoffIniFile = OptDBState.getString("runoff_ini_file")
+        runoff_ini = np.fromfile(runoffIniFile, dtype=np.dtype('>f8'), count=1)[0]
 
       ef.GRunoff = runoff_ini
       PETSc.Sys.Print("Using initial runoff of %g Gmol P/d" % ef.GRunoff)
@@ -308,19 +308,17 @@ class MOPS:
       PETSc.Sys.Print("Final runoff output will be written to %s" % ef.runoffIniOutFile)
 
       if p.writeRunoff:
-# /* if run is continued, always append runoff and output times */
+        # if run is continued, always append runoff and output times
         if (Iter0>0):
           PETSc.Sys.Print("Runoff output will be appended")
-          if p.myId==0:
-            ef.runofffptime = open(runoffOutTimeFile, 'at')
-          PETSc.Sys.Print("Initial runoff output will not be written\n");CHKERRQ(ierr);
+          ef.runofffptime = open(runoffOutTimeFile, 'at')
+          PETSc.Sys.Print("Initial runoff output will not be written")
         else:  
-          PETSc.Sys.Print("Runoff output will overwrite existing file(s)\n");CHKERRQ(ierr);
-          if p.myId==0:
-            ef.runofffptime = open(runoffOutTimeFile, 'wt')
-            ef.runofffptime.write("{:d}   {:.5f}\n".format(Iter0,time0))
+          PETSc.Sys.Print("Runoff output will overwrite existing file(s)")
+          ef.runofffptime = open(runoffOutTimeFile, 'wt')
+          ef.runofffptime.write("{:d}   {:.5f}\n".format(Iter0,time0))
           TMM.writeBinaryArray("Grunoff_output.bin",np.atleast_1d(ef.GRunoff),False)
-          PETSc.Sys.Print("Writing runoff output at time %10.5f, step %d\n", tc,Iter);CHKERRQ(ierr);  
+          PETSc.Sys.Print("Writing runoff output at time %10.5f, step %d" % (tc,Iter))
 
 # /* Initialize biogeochem model */
 # /* Read and overwrite default parameter values here */
@@ -334,14 +332,14 @@ class MOPS:
         except:
           PETSc.Error("Must indicate number of BGC parameters to read with the -num_bgc_params option")
           
-        PETSc.Sys.Print("Reading %d parameters from file\n" % numBGCParams)
+        PETSc.Sys.Print("Reading %d parameters from file" % numBGCParams)
 
         if OptDBState.hasName('ascii_params'):
-          f = open(bgcParamsFile, 'rt')
-          ef.bgcparams = np.fromfile(f, count=numBGCParams)
-          f.close()
+          with open(bgcParamsFile, 'rt') as f:
+            ef.bgcparams = np.fromfile(f, count=numBGCParams)
         else:
-          ef.bgcparams = np.fromfile(bgcParamsFile, dtype=np.dtype('>f8'), count=numBGCParams)
+          with open(bgcParamsFile, 'rb') as f:
+            ef.bgcparams = np.fromfile(f, dtype=np.dtype('>f8'), count=numBGCParams)
 
 #SPK These are currently global but need to be moved into ef after parameters have been optionally read
 # C REMINERALISATION LENGTH SCALES
@@ -356,7 +354,7 @@ class MOPS:
 # C beside sinking and remineralization might play a role in the euphotic zone.
         anafac0 = (1.0+detwa*p.bgc_dt)**(detlambda/detwa)-1.0
         for k in range(p.bgc_keuph,p.bgc_kmax):
-          anafacz = (p.bgc_zu(k)/p.bgc_zu[k+1])**(detlambda/detwa)
+          anafacz = (p.bgc_zu[k]/p.bgc_zu[k+1])**(detlambda/detwa)
           ef.wdet[k] = ((p.bgc_zu[k+1]-p.bgc_zu[k])*anafac0* \
             anafacz/(1.0-anafacz))/p.bgc_dt
 #       enddo
@@ -409,7 +407,7 @@ class MOPS:
       if ef.calcDiagnostics:
 #     /*Data for diagnostics */
         ef.diagTimer = TMM.StepTimer()
-        ef.diagTimer.create(prefix="diag_",startTimeStep=Iter0)
+        ef.diagTimer.create(prefix="diag_",startTimeStep=Iter0+1)
         PETSc.Sys.Print("Diagnostics will be computed starting at (and including) time step: %d" % ef.diagTimer.startTimeStep)
         PETSc.Sys.Print("Diagnostics will be computed over %d time steps" % ef.diagTimer.numTimeSteps)
 
@@ -500,7 +498,7 @@ class MOPS:
       fbgc = None
       doDiagnostics = False
       if ef.calcDiagnostics:
-        if (Iter0+iLoop>=ef.diagTimer.startTimeStep): #{ /* start time averaging (note: startTimeStep is ABSOLUTE time step) */
+        if (Iter0+iLoop>=ef.diagTimer.startTimeStep): # start time averaging (note: startTimeStep is ABSOLUTE time step)
           doDiagnostics=True
       if doDiagnostics:
         fbgc=List(ef.localfbgc)
@@ -535,7 +533,7 @@ class MOPS:
        
       if p.useCarbon:
         if (ef.useAtmModel):
-          ef.Focean=TMM.dotProd(localco2airseaflux,p.localdA)*(1.0/p.DeltaT)*(12.0/1.e18)*secondsPerYear #/* PgC/y */
+          ef.Focean=TMM.dotProd(ef.localco2airseaflux,p.localdA)*(1.0/p.DeltaT)*(12.0/1.e18)*p.secondsPerYear #/* PgC/y */
           # time step atmosphere
           ef.pCO2atm = ef.pCO2atm + ef.atmModelDeltaT*(-ef.Focean)/ppmToPgC
           # reset values
@@ -573,39 +571,38 @@ class MOPS:
 
       if p.useCarbon:
         if (ef.useAtmModel):
-#       /* write instantaneous atmos model state */
-          if (Iter0+iLoop>=(ef.atmWriteTimer.startTimeStep)): # { /* note: startTimeStep is ABSOLUTE time step */
-            if ((ef.atmWriteTimer.count)<=(ef.atmWriteTimer.numTimeSteps)):
-              ef.atmWriteTimer.incr()
-            if ((ef.atmWriteTimer.count)==(ef.atmWriteTimer.numTimeSteps)): # { /* time to write out */
+          # accumulate/write instantaneous atmos model state
+          if (Iter0+iLoop>(ef.atmWriteTimer.startTimeStep)): # note: startTimeStep is ABSOLUTE time step
+            ef.atmWriteTimer.incr()
+          
+          if (Iter0+iLoop>=(ef.atmWriteTimer.startTimeStep)): # note: startTimeStep is ABSOLUTE time step
+            if ((ef.atmWriteTimer.count)==(ef.atmWriteTimer.numTimeSteps) or (Iter0+iLoop==ef.atmWriteTimer.startTimeStep)): # time to write out
               PETSc.Sys.Print("Writing atmospheric model output at time %10.5f, step %d" % (tc, Iter0+iLoop))
-              if p.myId==0:
-                ef.atmfptime.write("{:d}   {:.5f}\n".format(Iter0+iLoop,tc))
+              ef.atmfptime.write("{:d}   {:.5f}\n".format(Iter0+iLoop,tc))
               TMM.writeBinaryArray("pCO2atm_output.bin",np.atleast_1d(ef.pCO2atm),True)
               TMM.writeBinaryArray("Foceanint_output.bin",np.atleast_1d(ef.Focean),True)
               ef.Foceanint = 0.0
+              
+            if ((ef.atmWriteTimer.count)==(ef.atmWriteTimer.numTimeSteps)):
               ef.atmWriteTimer.update(Iter0+iLoop)
 
       if p.writeRunoff:
         if ((iLoop % ef.burialSumSteps)==0): #/*  time to write out */
           PETSc.Sys.Print("Writing runoff output at time %10.5f, step %d" % (tc, Iter0+iLoop))
-          if p.myId==0:
-            ef.runofffptime.write("{:d}   {:.5f}\n".format(Iter0+iLoop,tc))
+          ef.runofffptime.write("{:d}   {:.5f}\n".format(Iter0+iLoop,tc))
           TMM.writeBinaryArray("Grunoff_output.bin",np.atleast_1d(ef.GRunoff),True)
 
       if (ef.calcDiagnostics):
         if (Iter0+iLoop>=(ef.diagTimer.startTimeStep)):  #/* start time averaging (note: startTimeStep is ABSOLUTE time step) */  
-  
-          if (ef.diagTimer.count<=ef.diagTimer.numTimeSteps): #/* still within same averaging block so accumulate */
-            for i in range(ef.numDiag):
-              ef.localfbgcavg[i][:] = ef.localfbgcavg[i][:] + ef.localfbgc[i][:]
+          for i in range(ef.numDiag):
+            ef.localfbgcavg[i][:] = ef.localfbgcavg[i][:] + ef.localfbgc[i][:]
 
-            if p.useCarbon:
-              ef.localco2airseafluxdiagavg[:]=ef.localco2airseaflux[:]+ef.localco2airseafluxdiagavg[:]
+          if p.useCarbon:
+            ef.localco2airseafluxdiagavg[:]=ef.localco2airseaflux[:]+ef.localco2airseafluxdiagavg[:]
 
-            ef.diagTimer.incr()
+          ef.diagTimer.incr()
           
-          if ((ef.diagTimer.count)==(ef.diagTimer.numTimeSteps)): #/* time to write averages to file */
+          if ((ef.diagTimer.count)==(ef.diagTimer.numTimeSteps)): # time to write averages to file
             PETSc.Sys.Print("Writing diagnostics time average at time %10.5f, step %d" % (tc, Iter0+iLoop))
             for i in range(ef.numDiag):
               ef.localfbgcavg[i][:] = ef.localfbgcavg[i][:]/ef.diagTimer.count
@@ -615,13 +612,12 @@ class MOPS:
             if p.useCarbon:
                ef.localco2airseafluxdiagavg[:]=ef.localco2airseafluxdiagavg[:]/ef.diagTimer.count
                TMM.writeProfileScalarData(ef.co2airseafluxFile, ef.localco2airseafluxdiagavg, 1, ef.appendDiagnostics)
-#       /*      reset diagnostic arrays */
+               # reset diagnostic arrays
                ef.localco2airseafluxdiagavg[:]=0.0
 
             ef.appendDiagnostics=True
             ef.diagTimer.update(Iter0+iLoop)
       
-
     def finalizeExternalForcingFn(self, tc, Iter, state, *args, **kwargs):
 
       p=MOPS.p
@@ -718,10 +714,9 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
     bgc_runoffvol=localrunoffvol[kl:kl+nzloc]
  
   
-  # ! Depth of the euphotic zone
+    # Depth of the euphotic zone
     bgc_keuphloc = np.fmin(bgc_kloc,bgc_keuph)
 
-  # ! Reset the diagnostic fluxes per ocean time step.
     if doDiagnostics:
       f1_out=localfbgc[0]
       f2_out=localfbgc[1]
@@ -736,34 +731,21 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
       f11_out=localfbgc[10]
       f12_out=localfbgc[11]
 
-    if doDiagnostics:
-      f1_out[:]=0.0 # PP
-      f2_out[:]=0.0 # Grazing
-      f3_out[:]=0.0 # Sedimentation and burial
-      f4_out[:]=0.0 # Oxic remineralisation of POP and DOP
-      f5_out[:]=0.0 # River runoff or surface deposition of buried material
-      f6_out[:]=0.0 # Nitrogen fixation
-      f7_out[:]=0.0 # Anoxic remineralisation of POP and DOP
-      f8_out[:]=0.0 # Production of calcite (only for option DCARBON)
-      f9_out[:]=0.0 # Dissolution of calcite  (only for option DCARBON)
-      f10_out[:]=0.0 # Precipitation and organic scavenging of dFe  (only for option DCARBON)
+      # Reset the diagnostic fluxes per ocean time step.
+      f1_out[:]=0.0  # PP
+      f2_out[:]=0.0  # Grazing
+      f3_out[:]=0.0  # Sedimentation and burial
+      f4_out[:]=0.0  # Oxic remineralisation of POP and DOP
+      f5_out[:]=0.0  # River runoff or surface deposition of buried material
+      f6_out[:]=0.0  # Nitrogen fixation
+      f7_out[:]=0.0  # Anoxic remineralisation of POP and DOP
+      f8_out[:]=0.0  # Option DCARBON: divergence (dissolution) of calcite - Without: Fe-ligand concentration 
+      f9_out[:]=0.0  # Option DCARBON: production of calcite - Without: organic scavenging of dFe 
+      f10_out[:]=0.0 # Option DCARBON: Organic scavenging and precipitation of dFe - Without: precipitation of dFe
       f11_out[:]=0.0 # Sedimentation of pFe (layer 1: burial)
-      f12_out[:]=0.0 # Sedimentary release of dFe
-  
-    # ! arrays to store the sms and other fluxes
-  #   topo4=localto[ipo4]
-  #   tophy=localto[iphy]
-  #   tozoo=localto[izoo]
-  #   todop=localto[idop]
-  #   todet=localto[idet]
-  #   tooxy=localto[ioxy]
-  #   todin=localto[idin]
-  #   # ! For Fe: arrays to store sms
-  #   todfe=localto[idfe]
-  #   topfe=localto[ipfe]
-  #   if useCarbon:
-  #     todic=localto[idic]
-  #     toalk=localto[ialk]
+      f12_out[:]=0.0 # External sources of dFe (dust, hydrothermal, sedimentary release)
+    
+    # arrays to store the sms and other fluxes
     topo4=np.zeros(bgc_kloc)
     tophy=np.zeros(bgc_kloc)
     tozoo=np.zeros(bgc_kloc)
@@ -771,7 +753,7 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
     todet=np.zeros(bgc_kloc)
     tooxy=np.zeros(bgc_kloc)
     todin=np.zeros(bgc_kloc)
-    # ! For Fe: arrays to store sms
+    # For Fe: arrays to store sms
     todfe=np.zeros(bgc_kloc)
     topfe=np.zeros(bgc_kloc)
     if useCarbon:
@@ -795,17 +777,23 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
     if useCarbon:
   #     car_coeffs(bgc_theta[0],bgc_salt[0])
       co2airseaflux=0.0
-  #   else:
-  # #       Dummy return values for when not using carbon      
-  #     sph=None
-  #     co2airseaflux=None
     
     flux_bury = 0.0
+
+# #ifdef BUDGET
+#       budget_o2 = 0.0d0
+#       budget_n2 = 0.0d0
+#       budget_h2o = 0.0d0
+#       budget_co2 = 0.0d0
+#       budget_fe  = 0.0d0
+#       budget_c   = 0.0d0
+# #endif
   
-  # C INTERNAL TIME LOOP FOR BGC
+    # INTERNAL TIME LOOP FOR BGC
 
     for it in range(bgc_timesteps):
-  # ! Reset fluxes.
+
+      # Reset fluxes.
       topo4[0:bgc_kloc]=0.0
       todop[0:bgc_kloc]=0.0
       tooxy[0:bgc_kloc]=0.0
@@ -822,41 +810,40 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
 
       runoff[0:bgc_kloc]=0.0 
 
-  #           ! For Fe       
+      # For Fe       
       todfe[0:bgc_kloc] = 0.0
       topfe[0:bgc_kloc] = 0.0
       feflux[0:bgc_kloc] =0.0
       fefdiv[0:bgc_kloc] =0.0
 
-  # ! AIR-SEA GAS EXCHANGE OF OXYGEN
+      # AIR-SEA GAS EXCHANGE OF OXYGEN
 
       o2sat=o2saturation(bgc_theta[0],bgc_salt[0])    
       o2gasex=o2_surfforcing(vgas660,bgc_atmosp,bgc_theta[0],bgc_salt[0],bgc_tracer[ioxy][0],o2sat)
 
+      # AIR-SEA GAS EXCHANGE OF CO2
       if useCarbon:
-  # ! AIR-SEA GAS EXCHANGE OF CO2
-
         surf_dic = bgc_tracer[idic][0]
         surf_pho = bgc_tracer[ipo4][0]
 
-  # ! Surface total alkalinity 
+        # Surface total alkalinity 
         surf_alk = bgc_tracer[ialk][0]
 
-  # ! Surface silicate from the OCMIP protocol
+        # Surface silicate from the OCMIP protocol
         surf_sil=ocmip_silfac
 
         sph, co2gasex, co2emp, alkemp = co2_surfforcing(bgc_theta[0],bgc_salt[0],vgas660,bgc_atmosp,surf_dic,surf_pho,surf_alk,surf_sil,pco2atm,emp,dicgave,alkgave,sphin=sph)
 
-  # !     co2gasex and co2emp are in mmolC/(m^2 d)
-  # !     co2airseaflux at the end of the internal time stepping loop will be 
-  # !     in mmolC/(m^2 ocean_time_step)
+        # co2gasex and co2emp are in mmolC/(m^2 d)
+        # co2airseaflux at the end of the internal time stepping loop will be 
+        # in mmolC/(m^2 ocean_time_step)
         co2airseaflux = co2airseaflux + (co2gasex + co2emp)*bgc_dt
 
-  # !      CALL CAR_CHEMISTRY(...,dicchem,alkchem)
+        # CALL CAR_CHEMISTRY(...,dicchem,alkchem)
 
-  # ! EUPHOTIC ZONE  AND ITS EXPORT TO DEEPER LAYERS 
-  # 
-  # ! Net solar radiation at top of every layer.
+      # EUPHOTIC ZONE  AND ITS EXPORT TO DEEPER LAYERS 
+
+      # Net solar radiation at top of every layer.
 
       parfrac=0.4
       ciz[0]=bgc_swr*(1.0-bgc_seaice)*parfrac
@@ -866,8 +853,8 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
         atten = (ACkw+ACkchl*attlim)*bgc_dz[k-1]
         ciz[k]=ciz[k-1]*np.exp(-atten)
 
-  # ! Biogeochemical fluxes in euphotic zone and their export
-  # ! Take care of negative tracer concentrations.
+      # Biogeochemical fluxes in euphotic zone and their export
+      # Take care of negative tracer concentrations.
 
       for k in range(bgc_keuphloc):
         PO4=bgc_tracer[ipo4][k]
@@ -877,22 +864,38 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
         DFE=bgc_tracer[idfe][k]
         attlim=np.fmax(PHY,0.0)
 
-  # ! temperature dependence of phytoplankton growth (Eppley)
-  # ! this affects the light-half-saturation constant via acik=acmuphy/alpha
-  # ! the extension to dfe means that muphy and ik decline with declining fe, leaving alpha untouched 
+        # For Fe: Determine kfe depending on concentration of phytoplankton, as in Nickelsen et al. (2015)
+        if (PHY > pmax):
+          kfe = kfemax-(kfemax-kfemin)*pmax/PHY
+        else:
+          kfe = kfemin
+       
+        # Temperature dependence of phytoplankton growth (Eppley) - this may be applied to other rates as well, hence I keep this outside the Fe-loop and other loops
         tempscale = np.exp(bgc_theta[k]/TempB)
-        felim  = DFE/(kfe+DFE)
-        TACmuphy = ACmuphy*tempscale*felim
-        TACik = ACik*tempscale*felim       
+
+        # For Fe: Safeguard the equations in case DFe becomes negative and evaluate growth terms
+        if (DFE > 0.0):
+
+          # Temperature dependence affects the light-half-saturation constant via acik=acmuphy/alpha
+          # The extension to dfe means that muphy and ik decline with declining fe, leaving alpha untouched        
+          felim  = DFE/(kfe+DFE)
+          TACmuphy = ACmuphy*tempscale*felim
+          TACik = ACik*tempscale*felim       
+
+          # The light limitation function of phytoplankton.
+          # This function corresponds to Evans and Garcon, 1997.
+          # Note that the initial slope of the P-I curve, alpha, is ACMuPhy/ACIk
+          # flightlim thus gives the light limited growth rate, averaged over day and layer, normalised by max. growth rate
+          atten = (ACkw+ACkchl*attlim)*bgc_dz[k] #attenuation at bottom of layer
+          glbygd = 2.0*ciz[k]/(TACik*bgc_tau)   # 2 * G_L/G_D of EG97
+          flightlim = bgc_tau/atten*(__phi(glbygd)-__phi(glbygd*np.exp(-atten)))
+
+        else:
+       
+          TACmuphy = 0.0
+          flightlim = 0.0
+          DFE=0.0
  
-  # ! The light limitation function of phytoplankton.
-  # ! This function corresponds to Evans and Garcon, 1997.
-  # ! Note that the initial slope of the P-I curve, alpha, is ACMuPhy/ACIk
-  # ! flightlim thus gives the light limited growth rate, averaged over day 
-  # ! and layer, normalised by max. growth rate
-        atten = (ACkw+ACkchl*attlim)*bgc_dz[k] #attenuation at bottom of layer
-        glbygd = 2.0*ciz[k]/(TACik*bgc_tau)   # 2 * G_L/G_D of EG97
-        flightlim = bgc_tau/atten*(__phi(glbygd)-__phi(glbygd*np.exp(-atten)))
 
         if (PHY > 0.0):
 
@@ -900,15 +903,15 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
 
           if (limnut > vsafe):
 
-  #      ! The nutrient limitation of phytoplankton
+            # The nutrient limitation of phytoplankton
             fnutlim = limnut/(ACkpo4+limnut)
 
-  #      ! The growth rate of phytoplankton: minimum of light and nutrients; note that felim is 
-  #      ! already in TACMuPhy! Thus, here we assume multiplicative limitation
+            # The growth rate of phytoplankton: minimum of light and nutrients; note that felim is 
+            # already in TACMuPhy! Thus, here we assume multiplicative limitation
 
             phygrow0 = TACmuphy*PHY*np.fmin(flightlim,fnutlim)
 
-  #      ! Make sure not to take up more nutrients than available (mmol P/m3/d)
+            # Make sure not to take up more nutrients than available (mmol P/m3/d)
             phygrowFe = np.fmin(DFE,phygrow0*rfep*bgc_dt)/(bgc_dt*rfep) # mmol P/m3/d
             phygrowP  = np.fmin(limnut,phygrow0*bgc_dt)/bgc_dt          # mmol P/m3/d
             phygrow   = np.fmin(phygrowFe,phygrowP)                     # mmol P/m3/d
@@ -917,27 +920,23 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
 
             phygrow=0.0
 
-  #               endif !limnut
-
-  #      ! The exudation of phytoplankton
+          # The exudation of phytoplankton
           phyexu = AClambda * PHY
 
-  #      ! Other losses of phytoplankton       
+          # Other losses of phytoplankton       
           phyloss = AComni * PHY * PHY
 
           if (ZOO > 0.0):
 
-  #      ! Grazing of zooplankton, Holling III
+            # Grazing of zooplankton, Holling III
             graz0=ACmuzoo*PHY*PHY/(ACkphy*ACkphy+PHY*PHY)*ZOO
 
-  #      ! Make sure not to graze more phytoplankton than available.
+            # Make sure not to graze more phytoplankton than available.
             graz = np.fmin(PHY,graz0*bgc_dt)/bgc_dt
 
           else: #ZOO < 0
 
             graz=0.0
-
-  #               endif !ZOO
 
         else: #PHY < 0
 
@@ -946,22 +945,18 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
           phyloss=0.0
           graz   =0.0
 
-  #             endif !PHY
-
         if (ZOO > 0.0):
 
-  #      ! Zooplankton exudation
-           zooexu = AClambdaz * ZOO
+          # Zooplankton exudation
+          zooexu = AClambdaz * ZOO
 
-  #      ! Zooplankton mortality 
-           zooloss = AComniz * ZOO * ZOO
+          # Zooplankton mortality 
+          zooloss = AComniz * ZOO * ZOO
  
         else: #ZOO < 0
 
-            zooexu = 0.0
-            zooloss = 0.0
-
-  #             endif !ZOO
+          zooexu = 0.0
+          zooloss = 0.0
 
   # ! Relaxation of N:P to Redfield values (mimick cyanobacteria)
 
@@ -977,15 +972,13 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
 
            nfixation = 0.0  
 
-  #             endif  
- 
-  # ! Photosynthesis stored in this array for diagnostic purposes only.
+        # Photosynthesis stored in this array for diagnostic purposes only.
         if doDiagnostics:
           f1_out[k] = f1_out[k]+phygrow*bgc_dt
           f2_out[k] = f2_out[k]+graz*bgc_dt
           f6_out[k] = f6_out[k]+nfixation*bgc_dt
 
-  # ! Collect all euphotic zone fluxes in these arrays.
+        # Collect all euphotic zone fluxes in these arrays.
         topo4[k]=-phygrow+zooexu
         todop[k]= graztodop*(1.0-ACeff)*graz \
           +graztodop*(phyexu+zooloss) \
@@ -997,13 +990,25 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
           + (1.0-graztodop)*(phyexu+zooloss)
         todin[k]=topo4[k]*rnp + nfixation
 
-  # ! For Fe:
+        # For Fe:
         todfe[k]=topo4[k]*rfep + todop[k]*rfep    
         topfe[k]=todet[k]*rfep
 
-  #     !end loop over euphotic zone
+# #ifdef BUDGET
+# ! Note: in the original MOPS source code I never account for the O2-requirement
+# !       during N2-Fixation (to form HNO3). Thus, here it is an external source.
+#         budget_o2 = budget_o2 + 1.25d0*nfixation*bgc_dt*bgc_dz(k)
+#         budget_n2 = budget_n2 + nfixation*bgc_dt*bgc_dz(k)
+#         budget_h2o = budget_h2o 
+#      &             - 0.5d0*nfixation*bgc_dt*bgc_dz(k)
+#      &             + orh2o*(zooexu-phygrow)*bgc_dt*bgc_dz(k)
+#         budget_co2 = budget_co2 
+#      &             + rcp*(zooexu-phygrow)*bgc_dt*bgc_dz(k)
+# #endif
 
-  # ! Explicit sinking of detritus in seperate loop. 
+      # loop over euphotic zone
+
+      # Explicit sinking of detritus in seperate loop. 
       flux_u = 0.0
 
       for k in range(bgc_kloc-1): #loop over all layers except last one, which accounts for burial (see below)
@@ -1016,35 +1021,36 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
 
       flux_l = 0.0
 
-  # ! account for burial in the sediment 
+      # account for burial in the sediment 
       DET = np.fmax(bgc_tracer[idet][bgc_kloc-1]-alimit*alimit,0.0)
       fDET = wdet[bgc_kloc-1]*DET
-      flux_l = np.fmin(1.0,burdige_fac*fDET**burdige_exp)*fDET
+      BRatio = np.fmin(1.0,burdige_fac*fDET**burdige_exp)
+      flux_l = BRatio*fDET
       flux_bury = flux_bury + flux_l*bgc_dt
 
       flux[bgc_kloc-1] = flux[bgc_kloc-1]+flux_u
       fdiv[bgc_kloc-1] = fdiv[bgc_kloc-1]+(flux_u-flux_l)/bgc_dz[bgc_kloc-1]
 
-  # ! Store flux for diagnostic purposes. Flux is at the top of a box; for box # 1 it is the burial
+      # Store flux for diagnostic purposes. Flux is at the top of a box; for box # 1 it is the burial
       if doDiagnostics:
         f3_out[0]  = flux_bury
 
         for k in range(1,bgc_kloc):
           f3_out[k]  = f3_out[k]+flux[k]*bgc_dt
 
-  # ! For Fe: Explicit sinking of pFe in seperate loop 
-  # ! Sedimentary release of dFe depends on respiration divided by available oxygen
-  # ! In contrast to Dale et al. (2015) and Somes et al. (2021) I don't calculate the dependence from the ratio of Cox and O2, but rather from O2-consumption and O2
-  # ! In principle, o2demand/OXY is essentially the height of the water column [m] that would be stripped of oxygen within this time step because of the non-buried organic matter
-  # ! This lowers the value for dFe release a bit.
-  # ! 2024-04-16: Changed to omitting multiplication by bgc_dt. This is now the oxidative demand over a day. 
+      # For Fe: Explicit sinking of pFe in seperate loop 
+      # Sedimentary release of dFe depends on respiration divided by available oxygen
+      # In contrast to Dale et al. (2015) and Somes et al. (2021) I don't calculate the dependence from the ratio of Cox and O2, but rather from O2-consumption and O2
+      # In principle, o2demand/OXY is essentially the height of the water column [m] that would be stripped of oxygen within this time step because of the non-buried organic matter
+      # This lowers the value for dFe release a bit.
+      # 2024-04-16: Changed to omitting multiplication by bgc_dt. This is now the oxidative demand over a day. 
 
       o2demand = (fDET-flux_l)*ro2ut  # the oxidative demand of all organic matter that is NOT buried within a time step [mmol O2/m2]
       OXY = np.fmax(bgc_tracer[ioxy][bgc_kloc-1]-alimit*alimit,0.0) # bottom water oxygen
 
       flux_u = 0.0
 
-      for k in range(bgc_kloc): #loop over all layers - assumes no boundary parameterisation for burial (in contrast to detritus)
+      for k in range(bgc_kloc-1): #loop over all layers except last one, which accounts for burial (see below)
 
         PFE = np.fmax(bgc_tracer[ipfe][k]-alimit*alimit,0.0)
         flux_l=wdet[k]*PFE
@@ -1052,10 +1058,26 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
         fefdiv[k]  = fefdiv[k]+(flux_u-flux_l)/bgc_dz[k]
         flux_u=flux_l         
 
-  # ! sedimentary release of dFe: in contrast to Somes et al. (2021) do NOT release more dFE than would be buried
-      fesed = np.fmin(flux_l,fesedmax*np.tanh(o2demand/OXY))
 
-  # ! Store flux for diagnostic purposes. Flux is at the top of a box; for box # 1 it is the burial
+      flux_l = 0.0
+        
+      # account for burial in the sediment	
+      PFE = np.fmax(bgc_tracer[ipfe][bgc_kloc-1]-alimit*alimit,0.0)
+      fPFE = wdet[bgc_kloc-1]*PFE
+      flux_l = BRatio*fPFE
+
+      feflux[bgc_kloc-1] = feflux[bgc_kloc-1]+flux_u
+      fefdiv[bgc_kloc-1] = fefdiv[bgc_kloc]+(flux_u-flux_l) \
+                         /bgc_dz[bgc_kloc-1]
+
+      # sedimentary release of dFe following Somes et al. (2021) - this may release more iron that is buried
+      fesed = fesedmax*np.tanh(o2demand/OXY)
+
+# #ifdef BUDGET
+#         budget_fe = budget_fe - flux_l*bgc_dt
+# #endif
+
+      # Store flux for diagnostic purposes. Flux is at the top of a box; for box # 1 it is the burial
 
       if doDiagnostics:
         f11_out[0]  = f11_out[0] + flux_l*bgc_dt
@@ -1066,7 +1088,7 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
       flux_l = 0.0
 
       if useCarbon:
-  # ! effect of CaCO3 production on alkalinity and DIC
+        # effect of CaCO3 production on alkalinity and DIC
         caco3_prod = 0.0
         for k in range(bgc_kloc): # IK 2023-03-16: This should be bgc_kloc!
           caco3_prod = caco3_prod + todet[k]*rcp*frac_caco3*bgc_dz[k]
@@ -1075,7 +1097,7 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
           if doDiagnostics:
             f9_out[k] = f9_out[k] + todet[k]*rcp*frac_caco3*bgc_dt
 
-  # ! effect of CaCO3 flux divergence in aphotic layers on alkalinity and CaCO3
+        # effect of CaCO3 flux divergence in aphotic layers on alkalinity and CaCO3
         for k in range(bgc_kloc-1):
           fdiv_caco3 = caco3_prod*(fcaco3[k]-fcaco3[k+1])/bgc_dz[k]
           toalk[k] = toalk[k] + 2.0 * fdiv_caco3
@@ -1083,14 +1105,14 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
           if doDiagnostics:
             f8_out[k] = f8_out[k] + fdiv_caco3*bgc_dt
  
-  # ! The bottom box is closed = no exchange with the sediment
+        # The bottom box is closed = no exchange with the sediment
         fdiv_caco3 = caco3_prod*fcaco3[bgc_kloc-1]/bgc_dz[bgc_kloc-1]
         toalk[bgc_kloc-1] = toalk[bgc_kloc-1] + 2.0 * fdiv_caco3
         todic[bgc_kloc-1] = todic[bgc_kloc-1] + 1.0 * fdiv_caco3
         if doDiagnostics:
           f8_out[bgc_kloc-1] = f8_out[bgc_kloc-1] + fdiv_caco3*bgc_dt
 
-  # ! PROCESSES AFFECTING THE ENTIRE WATER COLUMN
+      # PROCESSES AFFECTING THE ENTIRE WATER COLUMN
 
       for k in range(bgc_kloc):
 
@@ -1101,52 +1123,51 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
         DFE = np.fmax(bgc_tracer[idfe][k]-alimit*alimit,0.0)
         PFE = np.fmax(bgc_tracer[ipfe][k]-alimit*alimit,0.0)
 
-  #     c AEROBIC DECAY
-  # 
-  #     c In contrast to the older (Kriest&Oschlies, 2013) version, this option:
-  #     c (1) does not degrade OM in the absence of O2, i.e. OM can accumulate 
-  #     c (2) uses a Michaelis-Menten Kinetic to slow down bacterial remineralisation under low O2
-  #     c (2) takes care not to use more O2 per timestep than available
-  # 
-  #     c Michaelis-Menten limitation for oxic degradation: 
+        # AEROBIC DECAY
+        # 
+        # In contrast to the older (Kriest&Oschlies, 2013) version, this option:
+        # (1) does not degrade OM in the absence of O2, i.e. OM can accumulate 
+        # (2) uses a Michaelis-Menten Kinetic to slow down bacterial remineralisation under low O2
+        # (2) takes care not to use more O2 per timestep than available
+        # 
+        # Michaelis-Menten limitation for oxic degradation: 
 
         OXY = np.fmax(bgc_tracer[ioxy][k]-subox,0.0)
         oxymm = OXY*OXY/(OXY*OXY+ACkbaco2*ACkbaco2)
 
-  #     c O2 required for total remineralisation in a time step will then be:
+        # O2 required for total remineralisation in a time step will then be:
 
         o2req = oxymm*(dlambda*DOP+detlambda*DET)*ro2ut*bgc_dt      
 
-  #     c restrict remineralisation to amount of vaialable oxygen
+        # restrict remineralisation to amount of vaialable oxygen
 
         if (o2req > 0.0):
            o2usefrac = np.fmin(OXY,o2req)/o2req
         else:
            o2usefrac = 0.0
-  #             endif
 
         remindop = oxymm*dlambda*DOP*o2usefrac
         remindet = oxymm*detlambda*DET*o2usefrac
 
-  #     c ANAEROBIC DECAY INCL. ANAMMOX ETC.
+        # ANAEROBIC DECAY INCL. ANAMMOX ETC.
 
         if (OXY < 36.0):
 
           DIN = np.fmax(bgc_tracer[idin][k]-subdin,0.0)
           dinmm = DIN*DIN/(DIN*DIN+ACkbacdin*ACkbacdin)*(1.0-oxymm)
 
-  #       c NO3 required for total remineralisation in a time step will then be:
+          # NO3 required for total remineralisation in a time step will then be:
 
           dinreq = dinmm*(dlambda*DOP+detlambda*DET)*rhno3ut*bgc_dt
 
-  #       c restrict remineralisation to amount of variable oxygen
+          # restrict remineralisation to amount of variable oxygen
 
           if (dinreq > 0.0):
              dinusefrac = np.fmin(DIN,dinreq)/dinreq
           else:
              dinusefrac = 0.0
 
-  #       c restrict anaerobic processes to regions with low oxygen concentration
+          # restrict anaerobic processes to regions with low oxygen concentration
 
           denitdop = dinmm*dlambda*DOP*dinusefrac
           denitdet = dinmm*detlambda*DET*dinusefrac
@@ -1170,26 +1191,29 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
           f4_out[k] = f4_out[k] + (remindop+remindet)*bgc_dt
           f7_out[k] = f7_out[k] + (denitdop+denitdet)*bgc_dt
 
-  #       ! For Fe: release of Fe from within detritus (O2 and NO3 dependent) and additional release
-        todfe[k]=todfe[k]+ (
-        (remindet+denitdet)*rfep \
+        # For Fe: release of Fe from within detritus (O2 and NO3 dependent) and additional release
+        todfe[k]=todfe[k]+(remindet+denitdet)*rfep \
           +(plambda*PHY+zlambda*ZOO )*rfep
-  #       !     &                 +(remindop+denitdop)*rfep   
-          +detlambda*np.fmax(0.0,PFE-DET*rfep) 
-        )
-        topfe[k]=topfe[k]-(remindet+denitdet)*rfep \
-          -detlambda*np.fmax(0.0,PFE-DET*rfep)    
+        topfe[k]=topfe[k]-(remindet+denitdet)*rfep
 
-  #       ! For Fe: scavenging by organic matter and precipipation
-
-        o2sat = o2saturation(bgc_theta[k],bgc_salt[k])
-        AOU = np.fmax(40.0,o2sat-OXY)
-        ligands = np.fmax(fealpha*AOU**0.8+febeta*DOP**0.8,0.5)
+        # For Fe: scavenging of DFe
+        # For Fe: evaluate ligands and feprime
+        ligands = fdoclig*DOP+flig
         fea = 1.0+kfeleq*(ligands-DFE)
         feprime = ((fea**2.0+4.0*kfeleq*DFE)**0.5-fea) \
-          /(2.0*kfeleq)
-        feorgads = kfeorg*feprime*DET**0.58
-        feprecip = kfepre*feprime**2.0*np.tanh(np.fmax(OXY,0.0)) # not in the paper, but in the code
+                  /(2.0*kfeleq)
+
+        # For Fe: restrict scavenging to amount of available DFE
+        feorgads = (lambdafemin+lambdafeorg*DET)*feprime*np.tanh(OXY)
+        feprecip = lambdafepre*feprime*feprime*np.tanh(OXY) 
+
+        totalscav = (feorgads+feprecip)*bgc_dt  
+        if (totalscav > 0.0):
+          feorgads = feorgads*np.fmin(DFE,totalscav)/totalscav
+          feprecip = feprecip*np.fmin(DFE,totalscav)/totalscav
+        else:
+          feorgads = 0.0
+          feprecip = 0.0
 
         todfe[k] = todfe[k] - feorgads - feprecip
         topfe[k] = topfe[k] + feorgads + feprecip
@@ -1202,9 +1226,8 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
             f9_out[k]  = f9_out[k] + feorgads*bgc_dt
             f10_out[k] = f10_out[k] + feprecip*bgc_dt
 
-  #           ENDDO
 
-  # ! RESUPPLY OF BURIED MATTER VIA RIVER RUNOFF OR VIA SURFACE
+      # RESUPPLY OF BURIED MATTER VIA RIVER RUNOFF OR VIA SURFACE
 
       if useRunoff:
         for k in range(bgc_kloc):
@@ -1216,11 +1239,11 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
         if doDiagnostics:
           f5_out[0] = f5_out[0] + runoff[0]*bgc_dt
 
-  # ! UPDATE MASS CONCENTRATIONS 
+      # UPDATE MASS CONCENTRATIONS 
 
       for k in range(bgc_kloc):
-  # ! Update tracer concentrations, by adding the fluxes scaled by 
-  # ! time step length.
+        # Update tracer concentrations, by adding the fluxes scaled by 
+        # time step length.
         bgc_tracer[ipo4][k] = bgc_tracer[ipo4][k] + \
           topo4[k]*bgc_dt + runoff[k]*bgc_dt
         bgc_tracer[idop][k] = bgc_tracer[idop][k] + \
@@ -1247,26 +1270,39 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
             + toalk[k]*bgc_dt    # this is from CaCO3 production and dissolution
             )
           
-  # ! For Fe - including sources from deposition and hydrothermal fluxes
+        # For Fe - including sources from deposition and hydrothermal fluxes
         bgc_tracer[idfe][k]= bgc_tracer[idfe][k]  + \
           (todfe[k]+bgc_fedep[k])*bgc_dt
         bgc_tracer[ipfe][k]= bgc_tracer[ipfe][k]  + \
           (topfe[k]+fefdiv[k])*bgc_dt 
 
-  #       ENDDO 
-
       bgc_tracer[ioxy][0]= bgc_tracer[ioxy][0] +  \
         o2gasex/bgc_dz[0]*bgc_dt
 
-  # ! For Fe: sedimentary release
+# #ifdef BUDGET
+#       budget_o2 = budget_o2 + o2gasex*bgc_dt
+# #endif
+
+      # For Fe: dust and hydrothermal source diagnostic
+      if doDiagnostics:
+        for k in range(bgc_kloc):
+          f12_out[k] = f12_out[k] + bgc_fedep[k]*bgc_dt
+
+      # For Fe: sedimentary release
       bgc_tracer[idfe][bgc_kloc-1]= bgc_tracer[idfe][bgc_kloc-1] +  \
         fesed/bgc_dz[bgc_kloc-1]*bgc_dt
 
       if doDiagnostics:
         f12_out[bgc_kloc-1] = f12_out[bgc_kloc-1] + fesed*bgc_dt 
 
-  # ! Air-sea gas exchange of CO2 and E-P
-  #ifdef CARBON
+# #ifdef BUDGET
+#       do k=1,bgc_kloc
+#         budget_fe = budget_fe + bgc_fedep(k)*bgc_dz(k)*bgc_dt
+#       enddo
+#       budget_fe = budget_fe + fesed*bgc_dt
+# #endif
+
+      # Air-sea gas exchange of CO2 and E-P
       if useCarbon:
         bgc_tracer[idic][0]= bgc_tracer[idic][0] + \
          (co2emp+co2gasex)/bgc_dz[0]*bgc_dt
@@ -1274,9 +1310,11 @@ def BGC_MODEL(bgc_flags,bgc_globalrunoff,localdA,bgc_dt,bgc_timesteps,tracer,bgc
         bgc_tracer[ialk][0]= bgc_tracer[ialk][0] +  \
          (alkemp)/bgc_dz[0]*bgc_dt
 
-  #endif
+# #ifdef BUDGET
+#       budget_c = budget_c + (co2emp+co2gasex)*bgc_dt
+# #endif
 
-  #       ENDDO !internal time loop
+    # internal time loop
 
     if useCarbon:
       localph[ip]=sph

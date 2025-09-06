@@ -29,7 +29,7 @@ C     copy BGC tracer field to TMM tracer array
 		  ptr(k)=bgc_tracer(k,itr+1)
 		enddo  
       else
-        stop 'ERROR in MOPS_BIOGEOCHEM_COPY_DATA: unknown copy option!' 
+        stop 'ERROR in MOPS_BIOGEOCHEM_COPY_DATA: unknown copy option!'
       endif
 
       END

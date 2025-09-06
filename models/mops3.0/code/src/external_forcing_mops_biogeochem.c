@@ -26,18 +26,16 @@
 /* Note that this also affects BGC_PARAMS.h and the runsccript(s) */
 
 #define TR state->c[0]
-#define DIC state->c[9]
-#define ALK state->c[10]
-#define localDIC ef->localTR[9]
-#define localALK ef->localTR[10]
+#define DIC state->c[7]
+#define ALK state->c[8]
+#define localDIC ef->localTR[7]
+#define localALK ef->localTR[8]
 
 static PetscClassId EXTERNALFORCING_CLASSID;
 
 // Common variables
 Vec Ts,Ss;
 PetscScalar *localTs,*localSs;
-Vec Fes;
-PetscScalar *localFes;
 #ifdef CARBON
   PetscBool useVirtualFlux = PETSC_FALSE;
   PetscScalar *localEmP;
@@ -59,7 +57,6 @@ PetscScalar *drF;
 PetscScalar *localdz;
 
 PeriodicVec Tsp, Ssp;
-PeriodicVec Fesp;
 PeriodicArray localwindp,localficep,localatmospp;
 #ifdef READ_SWRAD
 PeriodicArray localswradp;
@@ -132,7 +129,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, TMMState state,
   PetscScalar runoff_ini = 0.0;
   char runoffIniFile[PETSC_MAX_PATH_LEN];
   PetscInt idiag;
-  char *diagOutFile[12];
+  char *diagOutFile[9];
 
   static PetscBool registered = PETSC_FALSE;
   static PetscInt efctxId = 0;
@@ -215,11 +212,9 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, TMMState state,
     /*   Read T and S */
     ierr = VecDuplicate(TR,&Ts);CHKERRQ(ierr);
     ierr = VecDuplicate(TR,&Ss);CHKERRQ(ierr);  
-    ierr = VecDuplicate(TR,&Fes);CHKERRQ(ierr);  
     if (periodicBiogeochemForcing) {    
       PeriodicVecCreate(&Tsp);
       PeriodicVecCreate(&Ssp);
-      PeriodicVecCreate(&Fesp);
     } else {
       ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Ts.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
       ierr = VecLoad(Ts,fd);CHKERRQ(ierr);  /* IntoVector */ 
@@ -227,14 +222,10 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, TMMState state,
       ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Ss.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr);
       ierr = VecLoad(Ss,fd);CHKERRQ(ierr);    /* IntoVector */ 
       ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
-      ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,"Fes.petsc",FILE_MODE_READ,&fd);CHKERRQ(ierr); /* IK Note: not yet available ! */
-      ierr = VecLoad(Fes,fd);CHKERRQ(ierr);    /* IntoVector */ 
-      ierr = PetscViewerDestroy(&fd);CHKERRQ(ierr);    
     }  
     ierr = VecGetArray(Ts,&localTs);CHKERRQ(ierr);
     ierr = VecGetArray(Ss,&localSs);CHKERRQ(ierr);
-    ierr = VecGetArray(Fes,&localFes);CHKERRQ(ierr);
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"Done reading T/S/Fe\n");CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"Done reading T/S\n");CHKERRQ(ierr);
 
     /* Need this for atmospheric exchange, river runoff, ... */
     ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&localdA);CHKERRQ(ierr);
@@ -326,7 +317,7 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, TMMState state,
   ef->numBGCParams = 0;
   ef->calcDiagnostics = PETSC_FALSE;
   ef->appendDiagnostics = PETSC_FALSE;
-  ef->numDiag=12;
+  ef->numDiag=9;
  
 #ifdef CARBON
   // Defaults
@@ -502,7 +493,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, TMMState state,
 	if (periodicBiogeochemForcing) {   
 	  ierr = PeriodicVecInterp(tc,&Ts,biogeochemTimer->cyclePeriod,biogeochemTimer->numPerPeriod,biogeochemTimer->tdp,Tsp,"Ts_");
 	  ierr = PeriodicVecInterp(tc,&Ss,biogeochemTimer->cyclePeriod,biogeochemTimer->numPerPeriod,biogeochemTimer->tdp,Ssp,"Ss_");	
-	  ierr = PeriodicVecInterp(tc,&Fes,biogeochemTimer->cyclePeriod,biogeochemTimer->numPerPeriod,biogeochemTimer->tdp,Fesp,"Fes_");	
 #ifdef READ_SWRAD
 	  ierr = interpPeriodicProfileSurfaceScalarData(tc,localswrad,biogeochemTimer->cyclePeriod,biogeochemTimer->numPerPeriod,biogeochemTimer->tdp,localswradp,"swrad_");
 #else
@@ -664,27 +654,6 @@ PetscErrorCode iniExternalForcing(PetscScalar tc, PetscInt Iter, TMMState state,
 	ierr = VecSet(ef->fbgc9avg,zero);CHKERRQ(ierr);
 	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,diagOutFile[8],FILE_MODE_WRITE,&ef->fdfbgc9avg);CHKERRQ(ierr);
 
-	ierr = VecDuplicate(TR,&ef->fbgc10);CHKERRQ(ierr);
-	ierr = VecSet(ef->fbgc10,zero);CHKERRQ(ierr);
-	ierr = VecGetArray(ef->fbgc10,&ef->localfbgc10);CHKERRQ(ierr);
-	ierr = VecDuplicate(TR,&ef->fbgc10avg);CHKERRQ(ierr);
-	ierr = VecSet(ef->fbgc10avg,zero);CHKERRQ(ierr);
-	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,diagOutFile[9],FILE_MODE_WRITE,&ef->fdfbgc10avg);CHKERRQ(ierr);
-
-	ierr = VecDuplicate(TR,&ef->fbgc11);CHKERRQ(ierr);
-	ierr = VecSet(ef->fbgc11,zero);CHKERRQ(ierr);
-	ierr = VecGetArray(ef->fbgc11,&ef->localfbgc11);CHKERRQ(ierr);
-	ierr = VecDuplicate(TR,&ef->fbgc11avg);CHKERRQ(ierr);
-	ierr = VecSet(ef->fbgc11avg,zero);CHKERRQ(ierr);
-	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,diagOutFile[10],FILE_MODE_WRITE,&ef->fdfbgc11avg);CHKERRQ(ierr);
-
-	ierr = VecDuplicate(TR,&ef->fbgc12);CHKERRQ(ierr);
-	ierr = VecSet(ef->fbgc12,zero);CHKERRQ(ierr);
-	ierr = VecGetArray(ef->fbgc12,&ef->localfbgc12);CHKERRQ(ierr);
-	ierr = VecDuplicate(TR,&ef->fbgc12avg);CHKERRQ(ierr);
-	ierr = VecSet(ef->fbgc12avg,zero);CHKERRQ(ierr);
-	ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,diagOutFile[11],FILE_MODE_WRITE,&ef->fdfbgc12avg);CHKERRQ(ierr);
-
 #ifdef CARBON
     ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&ef->localco2airseafluxdiag);CHKERRQ(ierr);  
     ierr = PetscMalloc(lNumProfiles*sizeof(PetscScalar),&ef->localco2airseafluxdiagavg);CHKERRQ(ierr);  
@@ -748,7 +717,6 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
     if (periodicBiogeochemForcing) {   
       ierr = PeriodicVecInterp(tc,&Ts,biogeochemTimer->cyclePeriod,biogeochemTimer->numPerPeriod,biogeochemTimer->tdp,Tsp,"Ts_");
       ierr = PeriodicVecInterp(tc,&Ss,biogeochemTimer->cyclePeriod,biogeochemTimer->numPerPeriod,biogeochemTimer->tdp,Ssp,"Ss_");	
-      ierr = PeriodicVecInterp(tc,&Fes,biogeochemTimer->cyclePeriod,biogeochemTimer->numPerPeriod,biogeochemTimer->tdp,Fesp,"Fes_");	
 #ifdef READ_SWRAD
       ierr = interpPeriodicProfileSurfaceScalarData(tc,localswrad,biogeochemTimer->cyclePeriod,biogeochemTimer->numPerPeriod,biogeochemTimer->tdp,localswradp,"swrad_");
 #else
@@ -819,7 +787,7 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
 #ifdef CARBON			   
 			   &DICemp,&ALKemp,&localEmP[ip],&ef->pCO2atm,
 #endif
-			   &localTs[kl],&localSs[kl],&localFes[kl],&localfice[ip],&localswrad[ip],&localtau[ip],&localwind[ip],&localatmosp[ip],&localdz[kl],
+			   &localTs[kl],&localSs[kl],&localfice[ip],&localswrad[ip],&localtau[ip],&localwind[ip],&localatmosp[ip],&localdz[kl],
 #ifdef CARBON			   
 			   &ef->localph[ip],&localco2airseaflux,
 #endif
@@ -842,7 +810,7 @@ PetscErrorCode calcExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoop
 	if (ef->calcDiagnostics) {  
 	  if (Iter0+iLoop>=ef->diagTimer->startTimeStep) { /* start time averaging (note: startTimeStep is ABSOLUTE time step) */
         mops_biogeochem_diagnostics_(&nzloc,&ef->localfbgc1[kl],&ef->localfbgc2[kl],&ef->localfbgc3[kl],&ef->localfbgc4[kl],&ef->localfbgc5[kl],&ef->localfbgc6[kl],&ef->localfbgc7[kl],
-        &ef->localfbgc8[kl],&ef->localfbgc9[kl],&ef->localfbgc10[kl],&ef->localfbgc11[kl],&ef->localfbgc12[kl]);
+        &ef->localfbgc8[kl],&ef->localfbgc9[kl]);
 #ifdef CARBON        
         ef->localco2airseafluxdiag[ip]=localco2airseaflux;
 #endif                
@@ -979,9 +947,6 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoo
       ierr = VecAXPY(ef->fbgc7avg,one,ef->fbgc7);CHKERRQ(ierr);
       ierr = VecAXPY(ef->fbgc8avg,one,ef->fbgc8);CHKERRQ(ierr);
       ierr = VecAXPY(ef->fbgc9avg,one,ef->fbgc9);CHKERRQ(ierr);
-      ierr = VecAXPY(ef->fbgc10avg,one,ef->fbgc10);CHKERRQ(ierr);
-      ierr = VecAXPY(ef->fbgc11avg,one,ef->fbgc11);CHKERRQ(ierr);
-      ierr = VecAXPY(ef->fbgc12avg,one,ef->fbgc12);CHKERRQ(ierr);
 
 #ifdef CARBON
       for (ip=0; ip<lNumProfiles; ip++) {
@@ -1029,18 +994,6 @@ PetscErrorCode writeExternalForcing(PetscScalar tc, PetscInt Iter, PetscInt iLoo
         ierr = VecScale(ef->fbgc9avg,1.0/ef->diagTimer->count);CHKERRQ(ierr);
         ierr = VecView(ef->fbgc9avg,ef->fdfbgc9avg);CHKERRQ(ierr);
         ierr = VecSet(ef->fbgc9avg,zero); CHKERRQ(ierr);
-
-        ierr = VecScale(ef->fbgc10avg,1.0/ef->diagTimer->count);CHKERRQ(ierr);
-        ierr = VecView(ef->fbgc10avg,ef->fdfbgc10avg);CHKERRQ(ierr);
-        ierr = VecSet(ef->fbgc10avg,zero); CHKERRQ(ierr);
-
-        ierr = VecScale(ef->fbgc11avg,1.0/ef->diagTimer->count);CHKERRQ(ierr);
-        ierr = VecView(ef->fbgc11avg,ef->fdfbgc11avg);CHKERRQ(ierr);
-        ierr = VecSet(ef->fbgc11avg,zero); CHKERRQ(ierr);
-
-        ierr = VecScale(ef->fbgc12avg,1.0/ef->diagTimer->count);CHKERRQ(ierr);
-        ierr = VecView(ef->fbgc12avg,ef->fdfbgc12avg);CHKERRQ(ierr);
-        ierr = VecSet(ef->fbgc12avg,zero); CHKERRQ(ierr);
 
 #ifdef CARBON
         for (ip=0; ip<lNumProfiles; ip++) {
@@ -1103,16 +1056,13 @@ PetscErrorCode finalizeExternalForcing(PetscScalar tc, PetscInt Iter, TMMState s
   if (ef->efctxId==1) {  
 	ierr = VecRestoreArray(Ts,&localTs);CHKERRQ(ierr);
 	ierr = VecRestoreArray(Ss,&localSs);CHKERRQ(ierr);
-	ierr = VecRestoreArray(Fes,&localFes);CHKERRQ(ierr);
   
 	ierr = VecDestroy(&Ts);CHKERRQ(ierr);
 	ierr = VecDestroy(&Ss);CHKERRQ(ierr);
-	ierr = VecDestroy(&Fes);CHKERRQ(ierr);
 
 	if (periodicBiogeochemForcing) {    
 	  ierr = PeriodicVecDestroy(&Tsp);CHKERRQ(ierr);
 	  ierr = PeriodicVecDestroy(&Ssp);CHKERRQ(ierr);
-	  ierr = PeriodicVecDestroy(&Fesp);CHKERRQ(ierr);
 	  ierr = PeriodicArrayDestroy(&localficep);CHKERRQ(ierr);
 	  ierr = PeriodicArrayDestroy(&localwindp);CHKERRQ(ierr);    
 	  ierr = PeriodicArrayDestroy(&localatmospp);CHKERRQ(ierr);    
@@ -1167,18 +1117,6 @@ PetscErrorCode finalizeExternalForcing(PetscScalar tc, PetscInt Iter, TMMState s
 	ierr = VecDestroy(&ef->fbgc9);CHKERRQ(ierr);
 	ierr = VecDestroy(&ef->fbgc9avg);CHKERRQ(ierr);
     ierr = PetscViewerDestroy(&ef->fdfbgc9avg);CHKERRQ(ierr);	
-
-	ierr = VecDestroy(&ef->fbgc10);CHKERRQ(ierr);
-	ierr = VecDestroy(&ef->fbgc10avg);CHKERRQ(ierr);
-    ierr = PetscViewerDestroy(&ef->fdfbgc10avg);CHKERRQ(ierr);	
-
-	ierr = VecDestroy(&ef->fbgc11);CHKERRQ(ierr);
-	ierr = VecDestroy(&ef->fbgc11avg);CHKERRQ(ierr);
-    ierr = PetscViewerDestroy(&ef->fdfbgc11avg);CHKERRQ(ierr);	
-
-	ierr = VecDestroy(&ef->fbgc12);CHKERRQ(ierr);
-	ierr = VecDestroy(&ef->fbgc12avg);CHKERRQ(ierr);
-    ierr = PetscViewerDestroy(&ef->fdfbgc12avg);CHKERRQ(ierr);	
 
   }
 
@@ -1254,7 +1192,6 @@ PetscErrorCode reInitializeExternalForcing(PetscScalar tc, PetscInt Iter, PetscI
 // 	if (periodicBiogeochemForcing) {   
 // 	  ierr = PeriodicVecInterp(tc,&Ts,biogeochemTimer->cyclePeriod,biogeochemTimer->numPerPeriod,biogeochemTimer->tdp,Tsp,"Ts_");
 // 	  ierr = PeriodicVecInterp(tc,&Ss,biogeochemTimer->cyclePeriod,biogeochemTimer->numPerPeriod,biogeochemTimer->tdp,Ssp,"Ss_");	
-// 	  ierr = PeriodicVecInterp(tc,&Fes,biogeochemTimer->cyclePeriod,biogeochemTimer->numPerPeriod,biogeochemTimer->tdp,Fesp,"Fes_");	
 // #ifdef READ_SWRAD
 // 	  ierr = interpPeriodicProfileSurfaceScalarData(tc,localswrad,biogeochemTimer->cyclePeriod,biogeochemTimer->numPerPeriod,biogeochemTimer->tdp,localswradp,"swrad_");
 // #else

@@ -3,34 +3,36 @@
 
 default: all
 
+MODEL_DIR ?= $(shell pwd)
+
 include ${PETSC_DIR}/lib/petsc/conf/variables
 include ${PETSC_DIR}/lib/petsc/conf/rules
 
-SSTUBS = tmm_external_forcing.c tmm_external_bc.c tmm_monitor.c tmm_misfit.c
-STMM = tmm_main.c $(SSTUBS)
+SRCTMM = tmm_main.c
 
-SRCDIR   := ${TMM_DIR}/src
 BUILDDIR := build
-EXE := tmm
-LIBTMM := $(TMM_DIR)/lib/libtmm.so
+MODEL := mops
+EXE := tmm${MODEL}
+LIBMODEL := lib$(MODEL).so
+LIBTMM := ${TMM_DIR}/lib/libtmm.so
 
 #
-SRCTMM = $(addprefix $(SRCDIR)/,$(STMM))
-
-OBJTMM := $(subst $(SRCDIR), $(BUILDDIR), $(SRCTMM:.c=.o))
+OBJTMM = $(addprefix $(BUILDDIR)/,$(SRCTMM:.c=.o))
 
 INCLUDEPATHS = $(addprefix -I,$(TMM_DIR)/include)
 
+VPATH = $(TMM_DIR)/src
+
 all: $(EXE)
 
-$(BUILDDIR)/%.o: $(SRCDIR)/%.c | $(BUILDDIR)
+$(BUILDDIR)/%.o: %.c | $(BUILDDIR)
 	$(CC) $(INCLUDEPATHS) $(PCC_FLAGS) $(CFLAGS) $(CCPPFLAGS) -c -o $@ $<
 
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
-$(EXE): $(OBJTMM) $(LIBTMM)
-	-$(CLINKER) -o $@ $(OBJTMM) $(PETSC_MAT_LIB) -L$(TMM_DIR)/lib -ltmm -Wl,-rpath,$(TMM_DIR)/lib
+$(EXE): $(OBJTMM) $(LIBMODEL) $(LIBTMM)
+	-$(CLINKER) -o $@ $(OBJTMM) $(PETSC_MAT_LIB) -L$(TMM_DIR)/lib -ltmm -L$(MODEL_DIR) -l${MODEL} -Wl,-rpath,$(TMM_DIR)/lib -Wl,-rpath,$(MODEL_DIR)
 
 cleanall:
 	rm -f $(OBJTMM)

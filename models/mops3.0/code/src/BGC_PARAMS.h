@@ -12,7 +12,7 @@ c the total number of bgc tracers
       INTEGER bgc_ntracer
       
 c the indices of tracers
-      INTEGER ipo4,idop,iphy,izoo,ioxy,idet,idin,idfe,ipfe
+      INTEGER ipo4,idop,iphy,izoo,ioxy,idet,idin
 
       PARAMETER(ipo4=1,    !PO4
      &          idop=2,    !DOP
@@ -20,16 +20,14 @@ c the indices of tracers
      &          iphy=4,    !Phyto-P
      &          izoo=5,    !Zoo-P
      &          idet=6,    !Detritus-P
-     &          idin=7,    !DIN
-     &          idfe=8,    !dissolved Fe
-     &          ipfe=9)    !particulate Fe
+     &          idin=7)    !DIN
 
 #ifndef CARBON
-      PARAMETER(bgc_ntracer=9)
+      PARAMETER(bgc_ntracer=7)
 #else
-      PARAMETER(bgc_ntracer=11)
+      PARAMETER(bgc_ntracer=9)
       INTEGER idic,ialk
-      PARAMETER(idic=10,ialk=11)
+      PARAMETER(idic=8,ialk=9)
 c connect between carbon exchange and P-based BGC
       real*8 ocmip_alkfac,ocmip_silfac
       COMMON/CO2SURFACE/ocmip_alkfac,ocmip_silfac
@@ -78,13 +76,3 @@ c sediment burial and O2 sensitivity of OM degradation
 c parameters related to N-Fixation and denitrification
       real*8 tf2,tf1,tf0,tff,nfix,subdin,rhno3ut,ACkbacdin
       COMMON/BGCNPARAMS/tf2,tf1,tf0,tff,nfix,subdin,rhno3ut,ACkbacdin
-      
-c parameters related to the Fe cycle
-      real*8 rfep,kfemin,kfemax,pmax,kfeleq,flig,fdoclig,
-     &       lambdafemin,lambdafeorg,lambdafepre,fesedmax
-      COMMON/BGCFEPARAMS/rfep,kfemin,kfemax,pmax,kfeleq,flig,fdoclig,
-     &       lambdafemin,lambdafeorg,lambdafepre,fesedmax
-      
-     
-     
-           

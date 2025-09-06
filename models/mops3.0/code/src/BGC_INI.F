@@ -1,5 +1,5 @@
 C$Header: /Users/ikriest/CVS/mops/BGC_INI.F,v 1.3 2016/06/03 09:28:59 ikriest Exp $
-C$Name: mops-2_3 $
+C$Name: mops-2_0 $
 
 C Initialization for P core of the Kiel BGC model (NPZD-DOP) framework.
 C Written by Iris Kriest (modified Aug-Nov 2010).
@@ -45,10 +45,6 @@ C contants for air-sea gas exchange. See BGC_PARAMS.h and BGC_INI.F.
 #include "BGC_PARAMS.h"
 #include "BGC_CONTROL.h"
 
-#ifdef BUDGET
-#include "BGC_BUDGET.h"
-#endif
-
       real*8 bgc_zu(bgc_ktotal+1)
 
 #ifdef IMPRO
@@ -91,9 +87,9 @@ C BGC PARAMETERS FOR SURFACE OCEAN BIOLOGY
 ! Stoichiometry
         rcp=117.0d0 !redfield ratio C:P
         rnp=16.0d0 !redfield ratio N:P
-        ro2ut = 194.7075436894855925140657149086109711788595d0  ! from optimisation  O3
-        subox = 1.0d0 !no oxic degradation below this level; default value of Kriest et al. (2020)
-        subdin = 15.77129497301908116636132151100468945514876d0 ! no denitrification below this level, optimal value of MIT28* of Kriest et al. (2020) 
+        ro2ut = 169.2545586809128568828164418391679646447301d0  ! L4-SO of Kriest et al. (2023) 
+        subox = 1.0d0 !no oxic degradation below this level
+        subdin = 16.0d0 !no denitrification below this level
 
 ! N2-Fixatioon
 ! Factors tf2, tf1 and tf0 are a polynomial (2nd order) 
@@ -109,12 +105,16 @@ C BGC PARAMETERS FOR SURFACE OCEAN BIOLOGY
 	    tf1 = 0.2253d0
 	    tf0 = -2.7819d0
 	    tff = 0.2395d0  
-	    nfix = 0.001194890759152962841758761653333104080232374d0 ![mmol N/m3/d]; optimal value of MIT28* of Kriest et al. (2020)
+	    nfix = 0.002272073044d0 ![mmol N/m3/d]; if PO4>0 and DIN = 0 and T=26.82 this corresponds 
+	                  !to an integral over 100 m of ~ 200 umol N/m2/d, a 
+		              !rather high value acc. to Mahaffey et al., 2005
+		              !alternatively, 2 umol/m3/d = 0.08 nmol/L/hr,
+		              !a rather high value acc. to Mulholland (2007)
 
 ! Phytoplankton parameters
         TempB = 15.65d0 !ref. temperature for T-dependent growth
         ACmuphy = 0.6d0 !max. growth rate [1/day]
-        ACik = 11.70844406776519093082294942220755729067605d0 ! Light half-saturation constant [W/m2]; from optimisation O3
+        ACik = 22.13898097109098993262588095376486307941377d0 ! L4-SO of Kriest et al. (2023) 
         ACkpo4 = 0.4995d0 !half-saturation constant for PO4 uptake [mmol P/m3]
         ACkchl  = 0.03d0*rnp !att. of Phy [1/(m*mmol P/m3)]
         ACkw = 0.04d0 !attenuation of water [1/m]
@@ -123,42 +123,29 @@ C BGC PARAMETERS FOR SURFACE OCEAN BIOLOGY
         plambda = 0.01d0 !phytoplankton mortality
 
 ! Zooplankton parameters
-        ACmuzoo= 3.000d0 ! max. grazing rate [1/d]; from optimisation O3
-        ACkphy=SQRT(ACmuzoo/1.0d0)/rnp !zoo half-saturation constant [mmol P]
+        ACmuzoo= 2.384719471821353179189981186247848654602421d0 ! L4-SO of Kriest et al. (2023) 
+        ACkphy=SQRT(1.893d0/1.0d0)/rnp !zoo half-saturation constant [mmol P]
         AClambdaz=0.03d0 !zooplankton excretion [1/d]
         AComniz=4.548d0 !zooplankton mortality [m3/(mmol P * day)]
         ACeff=0.75d0 !assimilation efficiency
         zlambda=0.01d0 !zooplankton mortality
 
 ! DOPparameters
-        graztodop = 0.0003079415719245463227006268081518969292886823d0 ! fraction grazing that goes into DOP; from optimisation O3
-        dlambda  = 0.000662827652140595182064180623891097576816378d0 !DOP remineralization rate [1/day]  (SLOW recycling); from optimisation O3
+        graztodop = 0.00d0 ! fraction grazing that goes into DOP
+        dlambda  = 0.0005133333049196715389730860613828195004870736d0 ! base value of L4-SO in Kriest et al. (2023) 
 
 c A minimum value for the degradation of PHY and DOP
         alimit = 1.0d-3
 
 ! Detritus parameters
         detlambda = 0.05d0 !detritus remineralisation rate [1/d]    
-        detmartin = 1.0d0 ! from optimisation O3
+        detmartin = 1.022589344764692176467310580356695481896168d0 ! L4-SO of Kriest et al. (2023)
 
 ! Parameters specific to MOPS: (Kriest and Oschlies 2013, 2015)
         burdige_fac = 1.6828d0 ! factor for sediment burial (see Kriest and Oschlies, 2013)
         burdige_exp = 0.799d0  ! exponent for sediment burial (see Kriest and Oschlies, 2013)
-        ACkbaco2 = 1.0d0  !Half sat.-constant for oxic degradation, optimal value of MIT28* of Kriest et al. (2020)
-        ACkbacdin = 31.95521294352302090965856073978557105874643d0 !Half sat.-constant for suboxic degradation, optimal value of MIT28* of Kriest et al. (2020)
-
-! For Fe: Parameters all parameters converted to deal with Fe in umol/m3 and P in mmol/m3
-        rfep = 1.06d0              ! Fe:P uptake ratio and internal ratio in organics [umol Fe/mmol P], Nickelsen et al. (2015), conversion: 66.25 [umol Fe/mol N]*16/1000 
-        kfemin  = 0.04d0           ! minimum half-saturation constant for dFe uptake by phytoplankton [umol Fe/m3] at low phytoplankton concentrations, Nickelsen et al. (2015) 
-        kfemax  = 0.40d0           ! maximim half-saturation constant for dFe uptake by phytoplankton [umol Fe/m3] at high phytoplankton concentrations, Nickelsen et al. (2015) 
-        pmax   = 0.01d0            ! phytoplankton concentration at which kfe starts to increase [mmol P/m3], 0.15 [mmol N/m3] in Nickelsen et al. (2015) 
-        kfeleq = 10.0d0**2.5d0     ! Fe-ligand stability constant [1/(umol ligand/m3)], Nickelsen et al. (2015), conversion: 10^11.5 [1/(mol lig/L)] * 1e-9 [mol/umol]
-        fdoclig = 10.0d0           ! DOC-dependent concentration of ligands as in as in Tagliabue & Voelker (2011; 0.09 1/(mmol C/m3) 1/d) and Aumont et al. (2015) 
-        flig = 0.60d0              ! constant concentration of total ligands, as in Tagliabue & Voelker (2011; they have 0.4) and Aumont et al. (2015; they have 0.6) 
-        lambdafemin = 0.00010d0    ! independent dFe scavenging rate [1/d], loosely following Aumont et al. (2015; they have 3e-5)
-        lambdafeorg = 0.50d0       ! POC-dependent dFe scavenging rate [1/(mmol P/m3) 1/d], loosely following Aumont et al. (2015; they have 0.005 1/d 1/umol/L but also a large aggregation rate of Fecoll (half of Fe-Fe'))
-        lambdafepre = 0.0002d0       ! quadratic inorganic scavenging rate [1/(umol Fe'/m3) 1/d], Somes et al. (2021), Atm+SedHigh_LigVar, conversion: 850 [1/(mmol Fe/m3) 1/d] / 1000 
-        fesedmax = 0.0d0          ! maximum Fe release from sediment [umol Fe/m2/d], Somes et al. (2021; have 100)
+        ACkbaco2 = 1.145532d0  !Half sat.-constant for oxic degradation (see Kriest and Oschlies, 2015)
+        ACkbacdin = 23.083559d0 !Half sat.-constant for suboxic degradation (see Kriest and Oschlies, 2015)
 
 #ifdef CARBON
       frac_caco3 = 0.032d0 
@@ -200,18 +187,6 @@ C beside sinking and remineralization might play a role in the euphotic zone.
       do k=1,bgc_kmax
         fcaco3(k) = EXP(0.0d0-bgc_zu(k)/length_caco3) ! from OCMIP2: this is the flux fraction through the top of each box
       enddo      
-#endif
-
-#ifdef BUDGET
-! Stoichiometry required for budget calculations        
-! H-content (H atoms per P atom) of organic matter follow Anderson stoichiometry for H-Atoms
-! O-content (O atoms per P atom) of organic matter from H, C, N and P content
-! H20 produced per mole Porg remineralized after Eqn. 10 of Paulmier et al. (2009) 
-! H20 produced per mole Porg denitrified after Eqn. 18 of Paulmier et al. (2009) 
-        rhp   = 175.0d0 !Anderson, 1995
-        rop  = 2.0d0*rcp+0.5d0*rhp+2.5d0*rnp+2.5d0-2.0d0*ro2ut
-        orh2o = 0.5d0*rhp-0.5d0*rnp-1.5d0 ! Eqn. 10 of Paulmier et al., 2009
-        srh2o =0.4d0*rcp+0.6d0*rhp-0.2d0*rop-1.0d0 ! Eqn. 18 of Paulmier et al., 2009
 #endif
 
       return

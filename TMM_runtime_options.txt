@@ -1,0 +1,331 @@
+The TMM driver code is implemented in PETSc, which provides a flexible set of 
+routines for setting run-time options via command line arguments. These options 
+can also be read from a file or given in an environment variable. Options fall 
+into two categories: those for the TMM library and model-specific options. The 
+most important ones for the former are listed below (some are required, others 
+are optional and take on default values).
+
+The TMM library allows one to simultaneously simulate multiple instances of a model. 
+To do this we make use of the fact that PETSc options also take a "prefix"; this allows 
+one to set the same option (with different values) for different model instances by 
+prefacing it with the prefix. Prefixes can be specified at runtime with the -prefix 
+option. Thus, to run two model instances with prefixes m1_ and m2_ we do: 
+-prefixes m1_,m2_. Many of the options listed below can then be prefaced with these 
+prefixes to specify options for the corresponding instance. (Exceptions are options 
+such as -max_steps that apply to all model instances.) For example, input and output 
+file names, respectively, for the first instance can be specified via: 
+-m1_i f1in,f2in ... -m1_o f1out,f2out ...
+
+1) To specify number of tracers: -numtracers NN, where NN is an integer. By default this is 1.
+
+2) To specify the maximum number of time steps to run the model: -max_steps NN, where NN is an 
+integer.
+
+3) You can specify initial conditions (tracer concentrations) in two ways:
+  a) With the -i option: -i XX,YY,... where XX, YY etc are the file names (strings). 
+     You must provide as many file names as the number of tracers.
+  b) With the -pickup option: -pickup XX, where XX is the name of the pickup (restart) 
+     file. This file should contain as many vectors as the number of tracers.
+
+4) To specify the names of output files: -o XX,YY,... where XX, YY etc are the file names 
+(strings). You must provide as many file names as the number of tracers.
+
+Note: input and output files are in PETSc binary format.
+
+5) To specify output frequency (in time steps): -write_time_steps NN, where NN is an integer.
+
+The -write_time_steps option is controlled by a step timer object (see Sec #10) with prefix 
+"write". Thus, you can optionally control the output frequency more precisely by passing 
+-write_time_steps a comma separated list of frequencies (Sec #10(a)(ii)), specify its start 
+time (-write_start_time_step NN; see Sec #10(b)), or specify a reset frequency with 
+-write_start_time_step_reset_freq NN (Sec #10(c)).
+
+A couple of other related output options are -append (which will append output to the 
+files specified by the -o option rather than the default behavior of overwriting them) 
+and -time_file XX (which will write the output times to a text file called XX rather 
+than the default 'output_time.txt').
+
+Sometimes it is useful to write some tracers at a higher (or different) frequency than 
+the standard output. This can be done via the "-write_extra" option and then specifying 
+the indices of tracers to write out (e.g., -write_extra_tracer_indices 0,3,7), their 
+filenames (e.g., -o_extra tr0_extra.petsc,tr3_extra.petsc,tr7_extra.petsc) and whether 
+to append output (-append_extra), their output times (-time_file_extra XX, default is 
+"output_time_extra.txt"), and the output frequency via the extraWriteTimer StepTimer 
+object with prefix "write_extra". All StepTimer object options are supported 
+(-write_extra_start_time_step, -write_start_time_step_reset_freq). See Sec #10.
+
+IMPORTANT: See the note at the end of Sec #10.
+
+6) At the end of every run, the driver writes out a restart or pickup file that contains 
+the tracer fields at the end of the integration. By default it is called 'pickup.petsc'. 
+But you can specify the name of this file with the -pickup_out XX option, where XX is 
+the desired filename (string). Next time you want to start from this initial condition just 
+specify the file name: -pickup XX.
+
+You can also write intermediate pickup files at a specified frequency (in time steps) 
+by using the option -pickup_time_steps NN, where NN is an integer. This is controlled by 
+a step timer object with prefix "pickup", and thus can be configured more precisely with 
+options similar to those described in Sec #5 and Sec #10.
+
+7) The driver uses an internal 'clock' to keep track of time (e.g., for interpolating 
+forcing or transport matrices to the current time). The unit of this 'clock' is arbitrary 
+but any other time information you specify to the TMM driver must be in that unit. (The 
+exception is the physical time step required to convert the source/sink tendency term into 
+a discrete-in-time term. This is usually done via an option such as: -biogeochem_deltat XX.)
+Output times (see above) are written in the same units. 
+
+You control the clock by specifying the length of a time step (in your chosen unit) via: 
+-deltat_clock XX, where XX is a floating point number. Thus, if the unit of time is a year 
+then XX is the time step in years. For example, if your model takes 2 timesteps per day 
+and your year has 360 days, then you would specify: -deltat_clock 0.0013888888888889, 
+where 0.0013888888888889 is simply 1/(360*2). Note that you must use specify the value in full 
+double precision (16 decimal places). In Matlab this would be: sprintf('%17.16f',1/(360*2)). 
+Similarly, for a 365-day year: -deltat_clock 0.0013698630136986.
+
+By default the clock start at time=0.0. You can change this via the -t0 XX option, where XX is 
+your desired time origin. You can also optionally specify the corresponding starting iteration 
+number with -iter0 NN, where NN is an integer (by default 0). These options are useful if, for 
+example, you're restarting a run and want to record the correct output times.
+
+8) Transport matrices:
+ a) To specify the name or prefix of the explicit transport matrix: -me XX, where XX is a string.
+ b) To specify the name or prefix of the implicit transport matrix: -mi XX, where XX is a string.
+
+TMs can be constant, periodic or fully time-dependent. Periodic TMs can be specified with the 
+-periodic_matrix option, and time-dependent ones with -time_dependent_matrix. If neither is 
+specified then TMs are assumed constant and are read from PETSc-formatted sparse matrix files 
+XX and YY specified with -me XX and -mi YY.
+
+If TMs vary in time, the strings specified with -me XX and -mi YY are then interpreted as 
+prefixes for file names of the form XX_NN and YY_NN, where NN is a suffix generated from an 
+integer with the sprintf specifier "%02d". The first file will always be XX_00, etc. For example, 
+for monthly-mean TMs, NN = 00, 01, 02, ..., 11 and the driver will try to read files XX_00, XX_01, 
+..., XX_11 and YY_00, YY_01, ..., YY_11. See the next section for how to specify the times at which 
+the TMs are given.
+
+9) As mentioned above, the internal clock is used for interpolating transport matrices and 
+forcing fields to the current time step. The times at which these TMs and fields are given 
+must also be in the units of the internal clock and for periodic data this requires providing 
+additional information to the TMM driver via a set of extra options. For example, if the unit 
+of time is year and your circulation has a periodicity of 1 year you would specify that with: 
+-matrix_cycle_period 1.0. But you also need to tell the driver how many TMs it should read 
+and how these are spaced apart over the year. The former is given via the -matrix_num_per_period NN 
+option, where NN is an integer giving the number of TMs per period. Thus, for monthly-mean TMs, 
+you would have: -matrix_num_per_period 12. If only this option is given, the driver will 
+assume the TMs are spaced apart equally over the course of a period and assign times to them 
+accordingly. However, if the TMs are not equally spaced then you need to provide the corresponding 
+times via: -matrix_periodic_times_file XX, where XX is the name (string) of a binary file containing 
+the times at which the TMs are given (in units of the internal clock). This is useful, for instance, 
+if your year has 365 days with different days per month and you want to tell the driver that the TMs 
+are given at the middle of each month. (See below for how to create such a file.)
+
+The binary files with the time specification of periodic fields can be created in Matlab as follows:
+
+% For monthly-mean fields with a 365-day year:
+dpm=[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+cdpm=cumsum(dpm);
+dpy=sum(dpm);
+N=length(dpm);
+t=zeros(N,1);
+
+t(1)=dpm(1)/2;
+for it=1:N-1
+  t(it+1)=cdpm(it)+dpm(it+1)/2;
+end
+
+write_binary('periodic_times_365d.bin',t/dpy,'real*8’)
+
+% For 6-hourly fields with a 365-day year:
+dpm=repmat(1,[365*4 1]);
+cdpm=cumsum(dpm);
+dpy=sum(dpm);
+N=length(dpm);
+t=zeros(N,1);
+
+t(1)=dpm(1)/2;
+for it=1:N-1
+  t(it+1)=cdpm(it)+dpm(it+1)/2;
+end
+
+write_binary('periodic_times_6hourly.bin',t/dpy,'real*8')
+
+For fully time-dependent TMs, the options are -matrix_num_times NN, where NN is 
+the total number of TM files and -matrix_times_file time_file, the name of the 
+binary file with the corresponding times.
+
+Note that all binary files must be in IEEE big endian format and 64 bit precision.
+
+10) Time averaging: The driver can optionally accumulate and write out time averages of tracer fields 
+if you specify: -time_avg. You must then also give the names of files to which time-averaged output 
+is to be written for each tracer via: -avg_files XX,YY ... where XX, YY etc are the file names (strings). 
+You must provide as many file names as the number of tracers. 
+
+If you're restarting your run from a previous integration you can optionally append the time averages 
+to existing files (of the same name as given by arguments to -avg_files) with the -avg_append flag.
+
+The times at which time averages are written are written by default to 'time_average_output_time.txt'. 
+You can write this to a different file with: -avg_time_file XX, where XX is the name of a text file. 
+
+Time averaging is controlled by a "step timer" object with prefix "avg". This allows you to customize 
+several aspects of the averaging (or anything else the timer object is used for) at run time. In particular:
+
+ a) -avg_time_steps lets you specify the averaging interval. (You MUST specify this option.) 
+ This option takes two forms:
+
+   i) If the averaging interval is fixed: -avg_time_steps NN, where NN is an integer giving the 
+   number of time steps over which to average.
+
+   ii) If the averaging interval varies: -avg_time_steps NN,MM,...,PP where NN,MM,...,PP is a comma-separated 
+   list of integers giving the number of time steps over which to average. The driver will first average 
+   over NN time steps, then MM time steps, and so on. When it gets to the end of the list (PP), the 
+   list starts over again with NN. This option is useful if, for example, your year is 365 days and you're 
+   interested in calendar month averages. In this case the number of days per month and hence the number 
+   of time steps per month (and over which you wish to average) varies over the course of each year. 
+   Thus, if your simulation take 2 time steps per day (and assuming that the number of days per month for a 
+   nominal, no-leap, 365-day year is: 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31): 
+   -avg_time_steps 62,56,62,60,62,60,62,62,60,62,60,62
+
+ b) If, for example, you're doing a long spin-up run, you may only want to write out averages in, say, 
+ the last year of the integration. In that case use: -avg_start_time_step NN, where NN is an integer specifying 
+ the absolute (i.e., including iter0) time step at which (and including) to start accumulating time averages. 
+ By default this is iter0 + 1. Thus, if your simulation starts at iter0=0, takes 720 time steps per year and 
+ you want to start time averaging in the 2nd year: -avg_start_time_step 721.
+
+ c) Lastly, if, for example, you want to do averages at intervals (e.g., taking an average of only Januaries, 
+ an annual average every 10 years, or monthly averages for a year every 100 years),  you can do this via the 
+ option -avg_start_time_step_reset_freq NN, where NN is the number of time steps by which you want to want 
+ to increment the start time step once the number of (or sum of the sequence of) time steps specified by 
+ -avg_time_steps is completed. Here are some examples:
+
+ (1) Average for 60 time steps starting at step 1, 3601, 7201 etc (i.e., average of Januaries (assuming 
+ 60 steps/month) every 5 years): 
+ -time_avg -avg_start_time_step 1 -avg_time_steps 60 -avg_start_time_step_reset_freq 3600
+
+ (2) Take 3 averages of 60 time steps each starting at step 1, 3601, 7201 etc (i.e., average of Januaries, 
+ Februaries and Marches (assuming 60 steps/month) every 5 years):
+ -time_avg -avg_start_time_step 1 -avg_time_steps 60,60,60 -avg_start_time_step_reset_freq 3600
+
+ (3) Average for 720 time steps starting at step 1, 3601, 7201 etc (i.e., annual averages (assuming 
+ 720 steps/year) every 5 years):
+ -time_avg -avg_start_time_step 1 -avg_time_steps 720 -avg_start_time_step_reset_freq 3600
+
+ (4) Average for 720 time steps starting at step 1, 3601, 7201 etc (i.e., annual averages (assuming 
+ 720 steps/year) every 5 years):
+ -time_avg -avg_start_time_step 1 -avg_time_steps 720 -avg_start_time_step_reset_freq 3600
+
+ (5) Do monthly averages every 10 years (1st year, 11th year, 21st year, etc.) (assuming 1095 steps/year 
+ and unequal number of steps per month):
+ -time_avg -avg_start_time_step 1 -avg_time_steps 93,84,93,90,93,90,93,93,90,93,90,93 -avg_start_time_step_reset_freq 10950
+
+ (6) Do monthly averages every 10 years (1st year, 11th year, 21st year, etc.) (assuming 720 steps/year 
+ and equal number of steps (60) per month):
+ -time_avg -avg_start_time_step 1 -avg_time_steps 60,60,60,60,60,60,60,60,60,60,60,60 -avg_start_time_step_reset_freq 7200
+
+ Here is some additional information about this option:
+  - The value of the reset frequency is programmatically available via the PetscInt field startTimeStepResetFreq 
+    of the timer object (e.g., avgTimer.startTimeStepResetFreq).
+
+  - The start time is incremented when updateStepTimer is called AND if you’re at the end of the sequence of 
+    steps specified by the option -avg_time_steps. If you only specify a single number for this option then the 
+    start time will be incremented after those many time steps. (This is important. See examples above, especially 
+    1, 4 and 5.)
+
+  - When the start time is incremented the flag haveResetStartTimeStep is set to PETSC_TRUE. This allows the 
+    user to programmatically check if the start time has been incremented, e.g.,
+
+	if (avgTimer.haveResetStartTimeStep) {
+	  do something
+	}
+
+Everything described above for the averaging step timer object applies to any step timer object. Thus, for any 
+step timer object with prefix PREFIX (e.g., "write", "pickup", "write_extra"), the following command line options 
+can be specified: -PREFIX_time_steps, -PREFIX_start_time_step and -PREFIX_start_time_step_reset_freq. However, 
+see the note below.
+
+IMPORTANT: step timer objects for writing out instantaneous outputs at specific time steps work slightly different 
+from those used for time averaging. In particular, for objects such as -write_, -write_extra, -pickup_, -atm_write_, 
+etc, in the -PREFIX_start_time_step NN option, NN can be set to any value >= Iter0. If -PREFIX_start_time_step is 
+not given, NN will default to Iter0 (0 or that set via the -iter0 option). This means that the initial field of 
+whatever it is you're writing out (corresponding to absolute time step Iter0) can also be written out (and will be 
+by default if you don't specify -PREFIX_start_time_step). To handle this correctly requires a few extra lines of 
+code so if you're trying to add a step time object to your own model have a look at tmm_output.c. 
+On the other hand, for timer objects used to do averaging, NN can be set to any value > Iter0. 
+If -PREFIX_start_time_step is not given, NN will default to Iter0+1 so that time averaging starts at and includes 
+the first time step. Again, see tmm_output.c for an example.
+
+11) Forcings: In addition to transporting tracers you can include source/sink terms ("forcings"). The TMM 
+driver allows this to be specified in three ways, any combination of which can be turned on: 
+ a) Forcing term read from file (can be periodic, constant, or time-dependent) with: -forcing_from_file
+ b) External forcing computed in S/R calcExternalForcing: -external_forcing
+ c) Boundary conditions switched on via -prescribed_bc and either calculated (with -calc_bc and calculated 
+ in S/R calcBC) or read from file (periodic, constant, or time-dependent).
+
+Forcing vectors are assumed discrete in time i.e., already multiplied by any physical time step before 
+being read from file or in calcExternalForcing. We consider each in turn below.
+
+a) Forcing term read from file: If the option -forcing_from_file is given you must then also 
+provide a list of file names via: -forcing_files XX,YY,..., where XX, YY etc are the file names 
+(strings). You must provide as many file names as the number of tracers. Forcing is assumed 
+discrete in time i.e., already multiplied by any physical time step.
+
+There are now three possibilities: 
+i) Periodic forcing: -periodic_forcing
+In this case the file names specified with -forcing_files are interpreted as prefixes as described 
+above (#8) for TMs. Also, as described above (#9) for TMs, you must specify the times at which 
+the periodic forcing is given via the options: -forcing_cycle_period, -forcing_num_per_period 
+and -forcing_periodic_times_file. (These work identically to the corresponding matrix options.)
+
+ii) Time-dependent forcing: -time_dependent_forcing
+In this case you must specify the number of forcing vectors being provided: 
+-forcing_num_times NN as well as a binary file (see #9) with their corresponding times via: 
+-forcing_times_file time_file
+
+In this case the file names specified with -forcing_files are interpreted as files that 
+contain ALL NN forcing vectors in each file.
+
+iii) Constant forcing: if neither -periodic_forcing or -time_dependent_forcing are given, the forcing 
+is assumed constant in time.
+
+You can specify a time step after which forcing read from file is switched off via the 
+-forcing_from_file_cutoff_step NN option.
+
+Lastly, if periodic or time dependent forcing is specified, you can write out the (interpolated) 
+forcing vectors via: -ouf file_list. Additionally, if -time_avg is specified, then you must also specify 
+a list of file names to which to write out the time-averaged forcing via -ufavg_files file_list.
+  
+b)  External forcing: If the option -external_forcing is given then the (time discrete) forcing is 
+computed by a user-provided function called calcExternalForcing.
+
+You can specify a time step after which external forcing is switched off via the 
+-external_forcing_cutoff_step NN option.
+
+You can write out the calculated external forcing vectors via: -ouef file_list. Additionally, 
+if -time_avg is specified, then you must also specify a list of file names to which to write out the 
+time-averaged forcing via -uefavg_files file_list.
+
+c) Prescribed boundary condition: -prescribed_bc
+These can be either calculated (option switched on by -calc_bc and computed in S/R calcBC) or, if -calc_bc is 
+not specified, then read from file. If the BC is being calculated 'on-the-fly', you must specify the length 
+of the BC vector via -bc_vec_size NN. This length NN will be subsequently used to set correct sizes for the 
+boundary TMs (see below). For the second option, you must specify a list of file names via -bc_files.
+
+There are three possibilities for reading BCs from file:
+(i) Periodic BC: -periodic_bc
+In this case the file names specified with -bc_files are interpreted as prefixes as described 
+above (#8) for TMs. Also, as described above (#9) for TMs, you must specify the times at which 
+the periodic BCs are given via the options: -bc_cycle_period, -bc_num_per_period 
+and -bc_periodic_times_file. (These work identically to the corresponding matrix options.)
+
+(ii) Time-dependent BC: -time_dependent_bc
+In this case you must specify the number of BC vectors being provided: 
+-bc_num_times NN as well as a binary file (see #9) with their corresponding times via: 
+-bc_times_file time_file. (These work identically to the corresponding matrix options.)
+
+In this case the file names specified with -bc_files are interpreted as files that 
+contain ALL NN BC vectors in each file.
+
+(iii) Constant BC: if neither of the above options are given.
+
+If prescribed BCs are being used, then you must specify boundary TMs via -mbe and -mbi. These 
+options work similarly to those of the main TMs, i.e., boundary TMs can be constant, periodic 
+or time-dependent. Their characteristics along with any time info are inherited from the main TMs.
