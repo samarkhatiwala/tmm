@@ -10,7 +10,7 @@ STMM = tmm.c tmm_forward_step.c tmm_transport_matrices.c tmm_forcing.c tmm_outpu
        tmm_profile_utils.c tmm_timer.c tmm_petsc_matvec_utils.c \
 	      tmm_initialize.c tmm_timestep.c tmm_finalize.c
 
-PREFIX ?= $(abspath TMM)
+# PREFIX ?= $(abspath TMM)
 LIB := libtmm.so
 SRCDIR := $(TMMBASE)/src/tmm
 INCDIR := $(TMMBASE)/include/tmm
@@ -42,8 +42,13 @@ $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 	
 $(EXE): $(OBJTMM)
+ ifeq (${PYTHONSITE}, )
 	-$(CLINKER) -shared $(EXTRALINKERFLAG) -o $@ $(OBJTMM) $(PETSC_MAT_LIB)
+ else
+	-$(CLINKER) -shared $(EXTRALINKERFLAG) -o $@ $(OBJTMM) $(PETSC_MAT_LIB) -Wl,-rpath,${PYTHONSITE}/petsc/lib -L${PYTHONSITE}/petsc/lib
+ endif
 
+install: PREFIX ?= $(abspath TMM)
 install: $(EXE)
 	@echo "Installing TMM in ${PREFIX}"
 	mkdir -p ${PREFIX}/lib
@@ -54,18 +59,20 @@ install: $(EXE)
 # Stubs
 	mkdir -p ${PREFIX}/src
 	cp -p ${SRCDIR}/tmm_main.c ${SRCDIR}/tmm_external_forcing.c ${SRCDIR}/tmm_external_bc.c ${SRCDIR}/tmm_monitor.c ${SRCDIR}/tmm_misfit.c ${PREFIX}/src/
-	@echo "Set the TMM_DIR environment variable to ${PREFIX}"
-	@echo "To build and install tmm4py do: make tmm4py PREFIX=${PREFIX}"
+	@echo "Now set the TMM_DIR environment variable to ${PREFIX}"
+	@echo "To build and install tmm4py do: make tmm4py to install in site packages or "
+	@echo "                                make tmm4py PREFIX=XXX to install in XXX"
 
 tmm4py:
-	@echo "Installing tmm4py in ${PREFIX}"
 	rm -f src/binding/tmm4py/tmm4py.c
-	cd src/binding/tmm4py && TMM_DIR=${PREFIX} && ARCHFLAGS='' python3 setup.py build_ext --build-temp $(abspath ${BUILDDIR}) --build-lib $(abspath ${BUILDDIR})
-	mv ${BUILDDIR}/tmm4py.cpython*.so ${PREFIX}/lib/
-	cp -p src/binding/tmm4py/tmm4py.pxd ${PREFIX}/lib/
-	cp -p src/binding/tmm4py/tmm.py ${PREFIX}/lib/
-	@echo "Set the TMM_DIR environment variable to ${PREFIX}"
-	@echo "Add ${PREFIX}/lib to the PYTHONPATH environment variable"
+ ifeq (${PREFIX}, )
+	@echo "Installing tmm4py in site packages" 
+	cd src/binding/tmm4py && pip install .
+ else
+	@echo "Installing tmm4py in ${PREFIX}"
+	cd src/binding/tmm4py && pip install --target ${PREFIX} --upgrade .
+	@echo "Now add ${PREFIX} to the PYTHONPATH environment variable"
+ endif
 	
 cleanall:
 	rm -f $(OBJTMM)

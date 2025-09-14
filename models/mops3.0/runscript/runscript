@@ -1,3 +1,5 @@
+# Fortran version of MOPS run via the C driver and built as a standalone executable (depends on libtmm.so and libmops.so)
+
 mpiexec -np 4 ./tmmmops \
 -numtracers 9 \
 -i po4ini.petsc,dopini.petsc,oxyini.petsc,phyini.petsc,zooini.petsc,detini.petsc,no3ini.petsc,dicini.petsc,alkini.petsc \
@@ -23,6 +25,8 @@ mpiexec -np 4 ./tmmmops \
 -num_bgc_params_file num_bgc_params.txt \
 -pickup_runoff_out runoffend.bin \
 > log
+
+# Fortran version of MOPS run via the Python driver (depends on tmm4py, libtmm.so, libmops.so and mops.cpython...so)
 
 mpiexec -np 4 python3 -m tmm -module mops \
 -numtracers 9 \

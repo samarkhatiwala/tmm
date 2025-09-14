@@ -1,0 +1,43 @@
+Metadata-Version: 2.4
+Name: tmmlib
+Version: 3.2.0
+Summary: TMM: Transport Matrix Method Library
+Home-page: https://github.com/example/tmm
+Author: TMM Team
+Author-email: tmm-maint@example.com
+Maintainer: TMM Team
+Maintainer-email: tmm-maint@example.com
+License: MIT
+Keywords: TMM,Ocean,Transport,Matrix
+Platform: POSIX
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: Operating System :: POSIX
+Classifier: Programming Language :: C
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Topic :: Scientific/Engineering
+Classifier: Topic :: Software Development :: Libraries
+Provides: tmmlib
+Description-Content-Type: text/x-rst
+License-File: LICENSE.txt
+Requires-Dist: petsc
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: license-file
+Dynamic: maintainer
+Dynamic: maintainer-email
+Dynamic: platform
+Dynamic: provides
+Dynamic: requires-dist
+Dynamic: summary
+
+The Transport Matrix Method (TMM) library provides efficient numerical methods
+for ocean circulation modeling and biogeochemical simulations.

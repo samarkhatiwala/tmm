@@ -6,9 +6,9 @@ from mops_forcing cimport ExternalForcingContext
 
 from petsc4py.PETSc import Error
 
-from tmm4py cimport PetscTMMState, TMMState, PetscErrorCode, PetscInt, PetscScalar, PetscReal, PetscBool
-from tmm4py cimport getNumpyRealArrayFromPointer
-from tmm4py cimport asBool, asInt, asReal, toBool, toInt, toReal
+from tmm4py.tmm4py_core cimport PetscTMMState, TMMState, PetscErrorCode, PetscInt, PetscScalar, PetscReal, PetscBool
+from tmm4py.tmm4py_core cimport getNumpyRealArrayFromPointer
+from tmm4py.tmm4py_core cimport asBool, asInt, asReal, toBool, toInt, toReal
 
 cdef extern from "tmm_share.h":
     PetscInt nb

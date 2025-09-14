@@ -1,0 +1,16 @@
+include Makefile
+include README.md
+include *.py
+
+recursive-include src/tmm *
+recursive-include include *
+recursive-include lib *
+
+prune src/binding
+prune models
+prune utils
+prune TMM
+exclude README.txt TMM_Logo.png
+exclude Makefile_driver
+exclude TMM_runtime_options.txt command_line_options_list.txt
+exclude make_tmm_files_for_website.sh upload.sh

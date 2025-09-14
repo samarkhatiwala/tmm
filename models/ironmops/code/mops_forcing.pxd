@@ -1,5 +1,5 @@
 from petsc4py.PETSc cimport Vec, PetscVec, Viewer, PetscViewer, PetscErrorCode, Comm
-from tmm4py cimport PetscStepTimer
+from tmm4py.tmm4py_core cimport PetscStepTimer
 
 cdef extern from * nogil:
     ctypedef long   PetscInt

@@ -50,6 +50,9 @@ else:
 
 os.environ["CC"]=CC
 
+# Deal with MacOS/clang
+os.environ["ARCHFLAGS"] = ""
+
 include_paths=[
   os.path.join(petsc_dir, "include"),
   os.path.join(petsc_dir, petsc_arch, "include"),
