@@ -50,8 +50,12 @@ ifneq ($(strip $(OPTFILE)),)
   FPPFLAGS+=$(shell awk '/^\#define/ {print "$(FPPFLAG)-D"$$2}' $(OPTFILE))
 endif
 
+# Set EXTRA_COMPILE_FLAGS on the command line to pass any extra model CPP options
 CPPFLAGS+=$(EXTRA_COMPILE_FLAGS)
 FPPFLAGS+=$(EXTRA_COMPILE_FLAGS)
+
+# Set compiler-dependent flags
+findany = $(if $1,$(or $(findstring $(firstword $1),$2),$(call findany,$(wordlist 2,$(words $1),$1),$2)))
 
 # Set extra linker flag for clang (MacOS)
 EXTRALINKERFLAG=
@@ -59,8 +63,13 @@ ifneq (,$(findstring clang,$(C_VERSION)))
 	EXTRALINKERFLAG+=-install_name @rpath/$(LIB)
 endif
 
+# This is only supported on Darwin (MacOS) clang and gcc but we add this for all gcc versions
+ifneq (,$(call findany,clang gcc GCC,$(C_VERSION)))
+  CFLAGS += -Wl,-flat_namespace
+endif
+
 CFLAGS += -fvisibility=default
-CFLAGS += -Wl,-flat_namespace,-undefined,suppress
+CFLAGS += -Wl,-undefined,suppress
 
 # option -DCARBON to couple carbon to the P-core
 # option -DASCIIPARAMS to use ASCII parameter file as default

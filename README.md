@@ -26,11 +26,11 @@ In the following, it is assumed you're using bash as your shell. Change the comm
 
 ###### Notes:
 
-(1) The dependencies for TMM are: PETSc. The dependencies for tmm4py are: PETSc, petsc4py and TMM. PETSc in turn depends on MPI and BLAS/LAPACK.
+(1) The dependencies for TMM are: PETSc. The dependencies for tmm4py are: PETSc, petsc4py and TMM. PETSc in turn depends on MPI and BLAS/LAPACK. petsc4py and tmm4py also depend on NumPy and Cython.
 
 (2) TMM and tmm4py are available as independent packages on PyPI for installation with pip. (TMM is called tmmlib as there was already another package called TMM.) If PETSc and petsc4py are not already available on your system, the installers will build and install them for you.
 
-(3) On many HPC systems, optimized MPI and BLAS/LAPACK libraries will be already installed. PETSc may also be already installed and you just have to set the PETSC_DIR and PETSC_ARCH environment variables (see https://petsc.org/main/install/). While PETSc and petsc4py can be installed with pip, for production runs optimized for your hardware and software libraries it is recommended you build them from source (see instructions below).
+(3) On many HPC systems, optimized MPI and BLAS/LAPACK libraries will be already installed. PETSc may also be already installed and you just have to set the PETSC_DIR and PETSC_ARCH environment variables (see https://petsc.org/main/install/). While PETSc and petsc4py can be installed with pip, for production runs optimized for your hardware and software libraries it is recommended you build them from source (see instructions below). That said, as described below, even with pip you can control in detail how PETSc is configured and built by setting the PETSC_CONFIGURE_OPTIONS environment variable.
 
 (4) If MPI is not already available, it is recommended that you install it either from source or using a package manager (conda, brew, etc). Basic instructions for this are provided below. You can also install MPI via pip, assuming binaries are available for your platform (they appear to be for the most common ones). However, as of now this doesn't install compiler wrappers for Fortran. So if you want to use models written in Fortran then you should install MPI from source or with a different package manager.
 
@@ -51,6 +51,19 @@ and then follow the instructions below for installing tmm4py.
 (ii) It is highly recommended you do a ``pip cache purge`` before you run the install commands below.
 
 (iii) If you run into issues installing with pip add "-v" to the 'pip install xxx' commands below and email me the full output.
+
+(iv) When installing PETSc/petsc4py via pip (either directly or during installation of tmmlib/tmm4py), the PETSc build system will look for any compilers in its path, starting with wrappers named `mpicc`,`mpif90`etc. If your system uses different wrappers (e.g., `mpiifort` instead of `mpif90`) or if you want to use specific compilers, you can specify them in the environment variable `PETSC_CONFIGURE_OPTIONS`before invoking `pip install ...` below. You can also specify optimization flags, paths to optimized BLAS/LAPACK libraries, and any other configuration options that PETSc accepts (see instructions for building PETSc from source below) For example:
+
+```bash
+export PETSC_CONFIGURE_OPTIONS='--with-cc=mpicc --with-fc=mpiifort --with-cxx=0 --with-blas-lapack-dir=$MKLROOT --COPTFLAGS="-O2" --FOPTFLAGS="-O2"'
+pip install tmm4py
+```
+
+Or:
+
+```bash
+PETSC_CONFIGURE_OPTIONS='--with-cc=mpicc --with-fc=mpiifort --with-blas-lapack-dir=$MKLROOT --COPTFLAGS="-O2" --FOPTFLAGS="-O2"' pip install tmm4py
+```
 
 **(1) If you don't have MPI or PETSc and only want to run models written in Python or use the C driver:**
 
@@ -90,34 +103,27 @@ The previous instructions will install petsc4py. If you also already have petsc4
 PETSC_HAS_PETSC4PY=1 pip install tmm4py
 ```
 
-Sometimes the above fails because petsc4py was built with a particular NumPy version and the same version needs to be used when building tmm4py. Unfortunately, there is no way to automatically determine which version of NumPy was used to build petsc4py but if you know what it is you can specify it with the NUMPY_VER environment variable, for example:
+Notes:
+
+(i) The reason pip needs to be told about an existing petsc4py is because it uses 'build isolation' when compiling packages. Each required dependency package is installed in an isolated environment that knows nothing about what you may already have installed in your system when you invoked 'pip install ...'. In fact, this process is recursive so that the dependencies of each dependency are similarly built in an isolated environment. To get around this and deal with all the possible permutations of how PETSc/petsc4py/TMM/tmm4py can be installed, a custom backend was created that dynamically figures out what the actual dependencies are and what needs to be installed based on your configuration. Thus, if the PETSC_DIR environment variable is detected everything will be built against that version.
+
+(ii) petsc4py and tmm4py depend on NumPy at both build and run time. They also depend on Cython at build time. Ideally we want to use same versions of NumPy and Cython for petsc4py and tmm4py, as well as for building and at runtime. Unfortunately, this is difficult to enforce for petsc4py when using pip because its build system always downloads and  builds against the latest compatible versions regardless of NumPy and Cython, regardless of what you already have installed in your Python environment (becaue of build isolation). This can be problematic on HPC systems with preinstalled versions of NumPy and other packages built against it. (That said, NumPy libraries at least are ABI-compatible across versions and unless you have very old versions of either NumPy and Cython none of this may pose an issue.) However, should you run into problems, you can ensure that petsc4py is built against your desired NumPy and Cython by turning off build isolation. First, install some required packages and (if they're not already installed) the NumPy and Cython versions you desire, for example:
 
 ```bash
-PETSC_HAS_PETSC4PY=1 NUMPY_VER=1.24.3 pip install tmm4py
+pip install wheel setuptools numpy==1.24.4 cython==3.0.12
 ```
 
-Note: The reason that pip needs to be told about an existing petsc4py is because it uses 'build isolation' when compiling packages. Each required dependency package is installed in an isolated environment that knows nothing about what you may already have installed in your system when you invoked 'pip install ...'. In fact, this process is recursive so that the dependencies of each dependency are similarly built in an isolated environment. To get around this and deal with all the possible permutations of how PETSc/petsc4py/TMM/tmm4py can be installed, a custom backend was created that dynamically figures out what the actual dependencies are and what needs to be installed based on your configuration. Thus, if the PETSC_DIR environment variable is detected everything will be built against that version.
-
-Note: Some older versions of petsc4py on PyPI (e.g., 3.21.x) have an incorrect dependency requirement file causing pip to download an incompatible version of the Cython compiler (even if you have the correct one installed - see note above) and resulting in a failed build. This usually happens if you try to install a specific (older) version of petsc4py to match an existing PETSc installation. The PETSc folks can't fix this retroactively on PyPI but there is a workaround. First install the dependencies needed by petsc4py:
+Then, install petsc4py *without* build isolation:
 
 ```bash
-pip install wheel numpy setuptools cython==3.0.12
+pip install petsc4py --no-build-isolation
 ```
 
-Then (assuming PETSC_DIR/PETSC_ARCH are correctly set) install petsc4py *without* build isolation:
+The above trick also works for tmm4py, but its build system gives you much more control by letting you specify NumPy and Cython versions via environment variables, for example:
 
 ```bash
-cd $PETSC_DIR
-python -m pip install --no-build-isolation src/binding/petsc4py
+NUMPY_VER=1.24.4 CYTHON_VER=3.0.12 pip install tmm4py
 ```
-
-This will build petsc4py in place. If you don't have write persmission in $PETSC_DIR you can instead do:
-
-```bash
-pip install petsc4py==PETSC_VER --no-build-isolation 
-```
-
-where PETSC_VER is the specific PETSc version you're installing against (e.g., 3.21.1). (For recent versions you can figure out what it is by executing the script $PETSC_DIR/lib/petsc/bin/petscversion.)
 
 #### Installation from source
 
@@ -126,6 +132,11 @@ You can also clone or download this repository and build TMM/tmm4py from source.
 ```bash
 export PETSC_DIR=`python3 -c "from petsc import get_petsc_dir; print(get_petsc_dir())"`
 export PETSC_ARCH=''
+```
+For building tmm4py, if you installed PETSc from source *and* installed petsc4py at the same time, the latter needs to be in your path:
+
+```bash
+export PYTHONPATH=$PYTHONPATH:$PETSC_DIR/$PETSC_ARCH/lib
 ```
 
 (1) Build the TMM library. In the following, the path of the directory in which this README file is located is in the environment variable TOPDIR.
@@ -152,12 +163,14 @@ Note: You can delete the object files created above and in any of the subsequent
 
 (2) Build the tmm4py extension module:
 
+This step switches off build isolation (see above) so first make sure all the necessary Python modules are already installed. In addition to `petsc4py`, this includes `wheel`, `setuptools`, `numpy`and `cython` (for the latter two, the versions need to match the ones used to build petsc4py). Then:
+
 ```bash
-cd $TOPDIR  
+cd $TOPDIR
 make tmm4py
 ```
 
-This will build and install tmm4py in site packages. You don't need to do anything else. However, if you prefer you can specify a different location with the PREFIX option (which can be the same or different from where you installed TMM in the previous step). For example, using the same location:
+This will build and install tmm4py in site packages. (This step invokes pip to install tmm4py. By default it calls `pip3` but you can override this by setting the variable PIP: `make tmm4py PIP=pip`.)  You don't need to do anything else. However, if you prefer you can specify a different location with the PREFIX option (which can be the same or different from where you installed TMM in the previous step). For example, using the same location:
 
 ```bash
 make tmm4py PREFIX=$TMM_DIR
@@ -170,6 +183,12 @@ export PYTHONPATH=$PYTHONPATH:$TMM_DIR
 ```
 
 In addition to the dynamic libraries and header files, this will also install tmm.py, a generic driver script that can be used to run most models, whether implemented in Python or Fortran.
+
+Note: The above make call invokes `pip3` to perform the installation. On some systems you may need to use `pip` instead. You can pass this to make with:
+
+```bash
+PIP=pip make tmm4py ...
+```
 
 #### Examples
 
@@ -267,7 +286,13 @@ make rmops
 
 This will create libmops.so. (The Makefile targets several different versions of MOPS with different compiler directives; 'rmops' is the version with runoff, carbon and alkalinity switched on.) 
 
-To run the model from Python, compile the Python gateway interface into a Python extension module:
+To run the model from Python, first ensure you have the Cython compiler installed:
+
+```bash
+pip install Cython
+```
+
+Then, compile the Python gateway interface into a Python extension module:
 
 ```bash
 python3 setup.py build_ext --inplace

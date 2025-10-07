@@ -9,11 +9,7 @@ from setuptools import build_meta as _build_meta
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-_BUILD_DEPENDENCIES = [
-    "Cython",
-    "numpy",
-]
-PY_TMMLIB_VER = "3.2.0"
+PY_TMMLIB_VER = "3.2.1"
 
 
 def _determine_petsc_setup_type():
@@ -88,9 +84,16 @@ def _extra_build_requires():
     else:
         build_requires.append(f"numpy=={numpy_ver}")
 
+    cython_ver = os.environ.get("Cython_VER", "")
+    if not cython_ver:
+        cython_ver = "LATEST"
+        build_requires.append("Cython")
+    else:
+        build_requires.append(f"Cython=={cython_ver}")
+
     petsc_setup = _determine_petsc_setup_type()
     if petsc_setup == "USER_PETSC_WITH_PETSC4PY":
-        log.info("No extra build requires")
+        log.info("petsc4py already installed")
         petsc_ver = ""
     else:
         log.info("Adding petsc4py to build requires")
@@ -110,7 +113,7 @@ def _extra_build_requires():
         (Path(__file__).parent / "_build_info.txt").unlink()
     info_file = Path(__file__).parent / "_build_info.txt"
     info_file_str = (
-        f"petsc_setup:{petsc_setup}|petsc_ver:{petsc_ver}|numpy_ver:{numpy_ver}"
+        f"petsc_setup:{petsc_setup}|petsc_ver:{petsc_ver}|numpy_ver:{numpy_ver}|cython_ver:{cython_ver}"
     )
     log.info(f"Backend: Writing {info_file_str} to {info_file}")
     info_file.write_text(info_file_str)
@@ -119,11 +122,11 @@ def _extra_build_requires():
 
 
 def get_requires_for_build_wheel(config_settings=None):
-    return _BUILD_DEPENDENCIES + _extra_build_requires()
+    return _extra_build_requires()
 
 
 def get_requires_for_build_sdist(config_settings=None):
-    return _BUILD_DEPENDENCIES + _extra_build_requires()
+    return _extra_build_requires()
 
 
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):

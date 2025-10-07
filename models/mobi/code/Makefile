@@ -72,8 +72,13 @@ ifneq (,$(findstring clang,$(C_VERSION)))
 	EXTRALINKERFLAG+=-install_name @rpath/$(LIB)
 endif
 
+# This is only supported on Darwin (MacOS) clang and gcc but we add this for all gcc versions
+ifneq (,$(call findany,clang gcc GCC,$(C_VERSION)))
+  CFLAGS += -Wl,-flat_namespace
+endif
+
 CFLAGS += -fvisibility=default
-CFLAGS += -Wl,-flat_namespace,-undefined,suppress
+CFLAGS += -Wl,-undefined,suppress
 
 all: $(LIB)
 

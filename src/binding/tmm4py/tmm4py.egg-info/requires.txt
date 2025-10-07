@@ -1,3 +1,0 @@
-Cython
-tmmlib
-petsc4py

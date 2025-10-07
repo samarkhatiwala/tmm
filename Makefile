@@ -42,10 +42,10 @@ $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 	
 $(EXE): $(OBJTMM)
- ifeq (${PYTHONSITE}, )
+ ifeq (${PETSCPYTHONSITE}, )
 	-$(CLINKER) -shared $(EXTRALINKERFLAG) -o $@ $(OBJTMM) $(PETSC_MAT_LIB)
  else
-	-$(CLINKER) -shared $(EXTRALINKERFLAG) -o $@ $(OBJTMM) $(PETSC_MAT_LIB) -Wl,-rpath,${PYTHONSITE}/petsc/lib -L${PYTHONSITE}/petsc/lib
+	-$(CLINKER) -shared $(EXTRALINKERFLAG) -o $@ $(OBJTMM) $(PETSC_MAT_LIB) -Wl,-rpath,${PETSCPYTHONSITE}/petsc/lib -L${PETSCPYTHONSITE}/petsc/lib
  endif
 
 install: PREFIX ?= $(abspath TMM)
@@ -63,14 +63,19 @@ install: $(EXE)
 	@echo "To build and install tmm4py do: make tmm4py to install in site packages or "
 	@echo "                                make tmm4py PREFIX=XXX to install in XXX"
 
+tmm4py: PIP ?= pip3
 tmm4py:
-	rm -f src/binding/tmm4py/tmm4py.c
+	rm -f src/binding/tmm4py/tmm4py/tmm4py_core.c
+	rm -rf src/binding/tmm4py/build
+	rm -f src/binding/tmm4py/_build_info.txt
  ifeq (${PREFIX}, )
 	@echo "Installing tmm4py in site packages" 
-	cd src/binding/tmm4py && pip install .
+	cd src/binding/tmm4py && ${PIP} install --no-build-isolation .
  else
 	@echo "Installing tmm4py in ${PREFIX}"
-	cd src/binding/tmm4py && pip install --target ${PREFIX} --upgrade .
+	rm -rf ${PREFIX}/tmm4py*
+	rm -rf ${PREFIX}/tmm
+	cd src/binding/tmm4py && ${PIP} install --no-build-isolation --target ${PREFIX} .
 	@echo "Now add ${PREFIX} to the PYTHONPATH environment variable"
  endif
 	

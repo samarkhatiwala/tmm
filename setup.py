@@ -60,13 +60,43 @@ extra_install_requires = []
 # We don't really need the first if but just to be safe ...
 if os.environ.get('PETSC_DIR',"")=="":
     try:
-        # If we can import petsc then it was pip installed as a build requirement for tmmlib
+        # If we can import petsc then it was pip installed as a build requirement for tmmlib OR 
+        # pip was run with --no-build-isolation and we're picking up an existing installed petsc. 
+        # Unfortunately, there's no way to programmatically determine if this flag was used.
         import petsc as _
-        extra_install_requires.append("petsc") # This is to ensure petsc is also installed when pip finishes
-        os.environ["PYTHONSITE"] = get_site_package_dir("")
+        # We need to tell the linker when Makefile is invoked where petsc is (or will be) installed. 
+        # We assume this is (or will be) in the user site packages directory. Unfortunately, this 
+        # location depends on whether pip was invoked from within a virtual environment or not. 
+        # If a virtual environment, then the install location will be site.getsitepackages()[0]. If 
+        # from a 'regular' environment then it will be site.getusersitepackages(). At least that's 
+        # what I've determined from experimenting. We use this logic below to set PETSCPYTHONSITE 
+        # but this is fragile at best. Ideally, a user would just set PETSC_DIR/PETSC_ARCH and we 
+        # wouldn't be in this situation. Alternatively, if their pip installed petsc is not in user 
+        # site packages or they know that packages will be installed elsewhere, they can set the 
+        # PETSCPYTHONSITE environment variable to point to this location
+        log.info(f"DEBUG: Site packages: {[site.getusersitepackages()] + site.getsitepackages()}")
+        log.info(f"DEBUG: User site packages flag: {site.ENABLE_USER_SITE}")
+        if os.environ.get('PETSCPYTHONSITE',"")=="":
+            if sys.prefix != sys.base_prefix:
+                # We're in a virtual environment
+                log.info(f"DEBUG: virtual environment detected")
+                s = site.getsitepackages()[0]
+            else:
+                log.info(f"DEBUG: assuming regular environment")
+                s = site.getusersitepackages()
+            log.info(f"DEBUG: Setting PETSCPYTHONSITE to {s}")
+            os.environ["PETSCPYTHONSITE"] = s
+            
+        # We also want to ensure petsc is installed when pip finishes after an isolated build. 
+        # We first check if $PETSCPYTHONSITE/petsc exists. If it doesn't then we assume this is 
+        # an isolated build
+        petscdir=os.path.join(os.environ['PETSCPYTHONSITE'],"petsc")
+        if not os.path.isdir(petscdir):
+            log.info(f"DEBUG: No existing petsc found in site packages")
+            extra_install_requires.append("petsc")
     except:
         pass
-log.info(f"Extra install requires: {extra_install_requires}")
+log.info(f"DEBUG: Extra install requires: {extra_install_requires}")
 
 def bootstrap():
 
@@ -239,12 +269,12 @@ setup(
     keywords=["TMM", "Ocean", "Transport", "Matrix"],
     platforms=["POSIX"],
     license="MIT",
-    url="https://github.com/example/tmm",
+    url="https://github.com/samarkhatiwala/tmm",
     download_url=None,
-    author="TMM Team",
-    author_email="tmm-maint@example.com",
-    maintainer="TMM Team",
-    maintainer_email="tmm-maint@example.com",
+    author="Samar Khatiwala",
+    author_email="samkat6@gmail.com",
+    maintainer="Samar Khatiwala",
+    maintainer_email="samkat6@gmail.com",
     packages=["tmmlib"],
     package_dir={"tmmlib": "config/pypi"},
     cmdclass={
