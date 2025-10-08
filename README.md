@@ -119,11 +119,13 @@ Then, install petsc4py *without* build isolation:
 pip install petsc4py --no-build-isolation
 ```
 
-The above trick also works for tmm4py, but its build system gives you much more control by letting you specify NumPy and Cython versions via environment variables, for example:
+In contrast, tmm4py's build system gives you much more control by letting you specify NumPy and Cython versions via environment variables, for example:
 
 ```bash
 NUMPY_VER=1.24.4 CYTHON_VER=3.0.12 pip install tmm4py
 ```
+
+(Another useful parameter is PETSC_VER, which lets you specify the exact PETSc version to build TMM or tmm4py against.) Alternatively, the --no-build-isolation trick also works for tmm4py; just make sure you've already installed PETSc, TMM and petsc4py.
 
 #### Installation from source
 
@@ -163,7 +165,7 @@ Note: You can delete the object files created above and in any of the subsequent
 
 (2) Build the tmm4py extension module:
 
-This step switches off build isolation (see above) so first make sure all the necessary Python modules are already installed. In addition to `petsc4py`, this includes `wheel`, `setuptools`, `numpy`and `cython` (for the latter two, the versions need to match the ones used to build petsc4py). Then:
+This step switches off build isolation (see above) so first make sure all the necessary Python modules are already installed. In addition to `petsc4py`, this includes `wheel`, `setuptools`, `numpy`and `Cython` (for the latter two, the versions need to match the ones used to build petsc4py). Then:
 
 ```bash
 cd $TOPDIR
